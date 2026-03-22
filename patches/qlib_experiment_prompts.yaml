@@ -87,7 +87,7 @@ qlib_factor_strategy: |-
 qlib_factor_output_format: |-
   Your output should be a pandas dataframe similar to the following example information:
   <class 'pandas.core.frame.DataFrame'>
-  MultiIndex: 40914 entries, (Timestamp('2020-01-02 00:00:00'), 'SH600000') to (Timestamp('2021-12-31 00:00:00'), 'SZ300059')
+  MultiIndex: 99904 entries, (Timestamp('2022-03-14 00:00:00'), 'EURUSD') to (Timestamp('2026-03-20 00:00:00'), 'EURUSD')
   Data columns (total 1 columns):
   #   Column            Non-Null Count  Dtype  
   ---  ------            --------------  -----  
@@ -97,7 +97,7 @@ qlib_factor_output_format: |-
   Notice: The non-null count is OK to be different to the total number of entries since some instruments may not have the factor value on some days.
   One possible format of `result.h5` may be like following:
   datetime    instrument
-  2020-01-02  SZ000001     -0.001796
+  2022-03-14  EURUSD       -0.000234
               SZ000166      0.005780
               SZ000686      0.004228
               SZ000712      0.001298
