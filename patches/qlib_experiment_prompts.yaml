@@ -107,7 +107,7 @@ qlib_factor_output_format: |-
               SZ000776      0.002459
 
 qlib_factor_simulator: |-
-  The factors will be sent into Qlib to train a model to predict the next several days return based on the factor values of the previous days. 
+  The factors will be sent into Qlib to train a model to predict the next several 15min bars return based on the factor values of the previous bars. 
   Qlib is an AI-oriented quantitative investment platform that aims to realize the potential, empower research, and create value using AI technologies in quantitative investment, from exploring ideas to implementing productions. Qlib supports diverse machine learning modeling paradigms. including supervised learning, market dynamics modeling, and RL.
   User will use Qlib to automatically do the following things:
   1. generate a new factor table based on the factor values.
@@ -239,7 +239,7 @@ qlib_model_simulator: |-
   Qlib is an AI-oriented quantitative investment platform that aims to realize the potential, empower research, and create value using AI technologies in quantitative investment, from exploring ideas to implementing productions. Qlib supports diverse machine learning modeling paradigms, including supervised learning, market dynamics modeling, and reinforcement learning (RL).
   User will use Qlib to automatically perform the following tasks:
   1. Generate a baseline factor table.
-  2. Train the model defined in your class Net to predict the next several days' returns based on the factor values.
+  2. Train the model defined in your class Net to predict the next several 15min bars returns based on the factor values.
   3. Build a portfolio based on the predicted returns using a specific strategy.
   4. Evaluate the portfolio's performance, including metrics such as return, IC, max drawdown, and others.
   5. Iterate on growing the hypothesis to enable model improvements based on performance evaluations and feedback.
