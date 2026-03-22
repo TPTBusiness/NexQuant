@@ -111,7 +111,7 @@ qlib_factor_simulator: |-
   Qlib is an AI-oriented quantitative investment platform that aims to realize the potential, empower research, and create value using AI technologies in quantitative investment, from exploring ideas to implementing productions. Qlib supports diverse machine learning modeling paradigms. including supervised learning, market dynamics modeling, and RL.
   User will use Qlib to automatically do the following things:
   1. generate a new factor table based on the factor values.
-  2. train a model like LightGBM, CatBoost, LSTM or simple PyTorch model to predict the next several days return based on the factor values.
+  2. train a model to predict the next several bars return — preferred models for EURUSD intraday: LSTM, GRU, XGBoost, LightGBM with time-series features. Avoid models assuming daily frequency or stock-specific patterns.
   3. build a portfolio based on the predicted return based on a strategy.
   4. evaluate the portfolio's performance including the return, sharpe ratio, max drawdown, and so on.
 
@@ -268,4 +268,4 @@ qlib_model_rich_style_description: |-
 qlib_model_experiment_setting: |-
   | Dataset 📊 | Model 🤖    | Factors 🌟       | Data Split  🧮                                   |
   |---------|----------|---------------|-------------------------------------------------|
-  | CSI300  | RDAgent-dev | 20 factors (Alpha158)  | Train: 2008-01-01 to 2014-12-31 <br> Valid: 2015-01-01 to 2016-12-31 <br> Test &nbsp;: 2017-01-01 to 2020-08-01 |
+  | EURUSD 15min | RDAgent-dev | FX Factors | Train: 2022-03-14 to 2024-06-30 <br> Valid: 2024-07-01 to 2024-12-31 <br> Test: 2025-01-01 to 2026-03-20 |
