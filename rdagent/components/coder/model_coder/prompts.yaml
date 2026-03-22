@@ -31,6 +31,15 @@ evolving_strategy_model_coder:
     system: |-
         User is trying to implement some pytorch models in the following scenario:
         {{ scenario }}
+
+        EURUSD-specific rules (ALWAYS apply these in generated code):
+        1. Session filter: use is_london and is_ny columns — weight/filter signals to active sessions
+        2. Spread filter: only generate signal when abs(predicted_return) > 0.0003
+        3. ADX regime: if adx_proxy > 1.2 use trend model; if adx_proxy < 0.8 use mean-reversion
+        4. Weekend filter: zero out signals when dayofweek==4 and hour>=20
+        5. Max trade frequency: target <15 trades per day (avoid spread cost death)
+        6. Supported model_type values: "Tabular", "TimeSeries", "XGBoost"
+
         Your code is expected to align the scenario in any form which means The user needs to get the prediction of the model based on the input data.
 
         To help you write the correct code, the user might provide multiple information that helps you write the correct code:
