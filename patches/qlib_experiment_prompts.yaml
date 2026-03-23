@@ -87,7 +87,7 @@ qlib_factor_strategy: |-
 qlib_factor_output_format: |-
   Your output should be a pandas dataframe similar to the following example information:
   <class 'pandas.core.frame.DataFrame'>
-  MultiIndex: 99904 entries, (Timestamp('2022-03-14 16:30:00'), 'EURUSD') to (Timestamp('2026-03-20 00:00:00'), 'EURUSD')
+  MultiIndex: 99904 entries, (Timestamp('2022-03-14 16:30:00'), 'EURUSD') to (Timestamp('2026-03-20 23:45:00'), 'EURUSD')
   Data columns (total 1 columns):
   #   Column            Non-Null Count  Dtype  
   ---  ------            --------------  -----  
@@ -98,13 +98,6 @@ qlib_factor_output_format: |-
   One possible format of `result.h5` may be like following:
   datetime    instrument
   2022-03-14  EURUSD       -0.000234
-              SZ000166      0.005780
-              SZ000686      0.004228
-              SZ000712      0.001298
-              SZ000728      0.005330
-                              ...
-  2021-12-31  SZ000750      0.000000
-              SZ000776      0.002459
 
 qlib_factor_simulator: |-
   The factors will be sent into Qlib to train a model to predict the next several 15min bars return based on the factor values of the previous bars. 
