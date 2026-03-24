@@ -10,28 +10,16 @@ qlib_quant_background: |-
   {% endif %}
 
 qlib_factor_background: |-
-  You are developing alpha factors for EURUSD intraday trading using 15-minute OHLCV bars.
-  Each number in the factor represents a value for the EURUSD instrument at a specific 15min bar.
-  A model will be trained to predict the next several bars return based on the factor values of previous bars.
-
-  **Critical constraints:**
-  - Available columns: $open, $close, $high, $low, $volume ONLY
-  - NO $factor column exists — never reference it
-  - Each "instrument" is EURUSD, each "day" is a 15min bar
-  - Lookback in bars: 4=1h, 8=2h, 16=4h, 32=8h, 96=1day
-
-  **FX Market knowledge:**
-  - London session (08:00-16:00 UTC) = trending, momentum works
-  - Asian session (00:00-08:00 UTC) = ranging, mean reversion works
-  - London-NY overlap (13:00-16:00 UTC) = highest volume and volatility
-  - Spread cost ~1.5 bps — avoid factors generating excessive trades
-
+  The factor is a characteristic or variable used in quant investment that can help explain the returns and risks of a portfolio or a single asset. Factors are used by investors to identify and exploit sources of excess returns, and they are central to many quantitative investment strategies.
+  Each number in the factor represents a physics value to an instrument on a day.
+  User will train a model to predict the next several days return based on the factor values of the previous days.
   The factor is defined in the following parts:
   1. Name: The name of the factor.
   2. Description: The description of the factor.
   3. Formulation: The formulation of the factor.
   4. Variables: The variables or functions used in the formulation of the factor.
-  Please specifically give all hyperparameters like window size, lookback period. One factor defines one output. For example, 4-bar momentum and 16-bar momentum are two different factors.
+  The factor might not provide all the parts of the information above since some might not be applicable.
+  Please specifically give all the hyperparameter in the factors like the window size, look back period, and so on. One factor should statically defines one output with a static source data. For example, last 10 days momentum and last 20 days momentum should be two different factors.
 
   {% if runtime_environment is not none %}
   ====== Runtime Environment ======
@@ -41,34 +29,8 @@ qlib_factor_background: |-
 
 qlib_factor_interface: |-
   Your python code should follow the interface to better interact with the user's system.
-  
-IMPORTANT: The data has a MultiIndex with ['datetime', 'instrument'] as index levels.
-DO NOT use df['instrument'] — instrument is NOT a column, it is an index level.
-ALWAYS use: df.groupby(level='instrument') or df.index.get_level_values('instrument')
-
-Correct factor template:
-```python
-import pandas as pd
-import numpy as np
-
-def calculate_FactorName():
-    df = pd.read_hdf("daily_pv.h5", key="data")
-    close = df['$close'].unstack(level='instrument')
-    volume = df['$volume'].unstack(level='instrument')
-    
-    n = 8
-    factor = close.rolling(n).apply(lambda x: x[-1] - x[0]) / volume.rolling(n).sum()
-    
-    result = factor.stack().to_frame('FactorName')
-    result.index.names = ['datetime', 'instrument']
-    result.to_hdf("result.h5", key="data", mode="w")
-    return result
-
-if __name__ == "__main__":
-    calculate_FactorName()
-```
-
-Your python code should contain the following part: the import part, the function part, and the main part. You should write a main function name: "calculate_{function_name}" and call this function in "if __name__ == __main__" part. Don't write any try-except block in your python code. The user will catch the exception message and provide the feedback to you.
+  CRITICAL DATA FORMAT: The HDF5 file has a MultiIndex with levels ['datetime', 'instrument']. The instrument is an INDEX LEVEL, NOT a column. Never use df['instrument']. Always use df.index.get_level_values('instrument') or df.groupby(level='instrument'). For rolling calculations use df['$close'].unstack(level='instrument'), apply rolling, then .stack() to restore MultiIndex.
+  Your python code should contain the following part: the import part, the function part, and the main part. You should write a main function name: "calculate_{function_name}" and call this function in "if __name__ == __main__" part. Don't write any try-except block in your python code. The user will catch the exception message and provide the feedback to you.
   User will write your python code into a python file and execute the file directly with "python {your_file_name}.py". You should calculate the factor values and save the result into a HDF5(H5) file named "result.h5" in the same directory as your python file. The result file is a HDF5(H5) file containing a pandas dataframe. The index of the dataframe is the "datetime" and "instrument", and the single column name is the factor name,and the value is the factor value. The result file should be saved in the same directory as your python file.
 
 qlib_factor_strategy: |-
@@ -114,24 +76,31 @@ qlib_factor_strategy: |-
 qlib_factor_output_format: |-
   Your output should be a pandas dataframe similar to the following example information:
   <class 'pandas.core.frame.DataFrame'>
-  MultiIndex: 99904 entries, (Timestamp('2022-03-14 16:30:00'), 'EURUSD') to (Timestamp('2026-03-20 23:45:00'), 'EURUSD')
+  MultiIndex: 40914 entries, (Timestamp('2020-01-02 00:00:00'), 'SH600000') to (Timestamp('2021-12-31 00:00:00'), 'SZ300059')
   Data columns (total 1 columns):
   #   Column            Non-Null Count  Dtype  
   ---  ------            --------------  -----  
-  0   your factor name  99889 non-null  float64
+  0   your factor name  40914 non-null  float64
   dtypes: float64(1)
   memory usage: <ignore>
   Notice: The non-null count is OK to be different to the total number of entries since some instruments may not have the factor value on some days.
   One possible format of `result.h5` may be like following:
   datetime    instrument
-  2022-03-14  EURUSD       -0.000234
+  2020-01-02  SZ000001     -0.001796
+              SZ000166      0.005780
+              SZ000686      0.004228
+              SZ000712      0.001298
+              SZ000728      0.005330
+                              ...
+  2021-12-31  SZ000750      0.000000
+              SZ000776      0.002459
 
 qlib_factor_simulator: |-
-  The factors will be sent into Qlib to train a model to predict the next several 15min bars return based on the factor values of the previous bars. 
+  The factors will be sent into Qlib to train a model to predict the next several days return based on the factor values of the previous days. 
   Qlib is an AI-oriented quantitative investment platform that aims to realize the potential, empower research, and create value using AI technologies in quantitative investment, from exploring ideas to implementing productions. Qlib supports diverse machine learning modeling paradigms. including supervised learning, market dynamics modeling, and RL.
   User will use Qlib to automatically do the following things:
   1. generate a new factor table based on the factor values.
-  2. train a model to predict the next several bars return — preferred models for EURUSD intraday: LSTM, GRU, XGBoost, LightGBM with time-series features. Avoid models assuming daily frequency or stock-specific patterns.
+  2. train a model like LightGBM, CatBoost, LSTM or simple PyTorch model to predict the next several days return based on the factor values.
   3. build a portfolio based on the predicted return based on a strategy.
   4. evaluate the portfolio's performance including the return, sharpe ratio, max drawdown, and so on.
 
@@ -193,7 +162,7 @@ qlib_factor_from_report_rich_style_description : |-
 qlib_factor_experiment_setting: |-
   | Dataset 📊 | Model 🤖    | Factors 🌟       | Data Split  🧮                                   |
   |---------|----------|---------------|-------------------------------------------------|
-  | EURUSD 15min | LGBModel | FX Factors | Train: 2022-03-14 to 2024-06-30 <br> Valid: 2024-07-01 to 2024-12-31 <br> Test: 2025-01-01 to 2026-03-20 |
+  | CSI300  | LGBModel | Alpha158 Plus | Train: 2008-01-01 to 2014-12-31 <br> Valid: 2015-01-01 to 2016-12-31 <br> Test &nbsp;: 2017-01-01 to 2020-08-01 |
 
 
 qlib_model_background: |-
@@ -259,7 +228,7 @@ qlib_model_simulator: |-
   Qlib is an AI-oriented quantitative investment platform that aims to realize the potential, empower research, and create value using AI technologies in quantitative investment, from exploring ideas to implementing productions. Qlib supports diverse machine learning modeling paradigms, including supervised learning, market dynamics modeling, and reinforcement learning (RL).
   User will use Qlib to automatically perform the following tasks:
   1. Generate a baseline factor table.
-  2. Train the model defined in your class Net to predict the next several 15min bars returns based on the factor values.
+  2. Train the model defined in your class Net to predict the next several days' returns based on the factor values.
   3. Build a portfolio based on the predicted returns using a specific strategy.
   4. Evaluate the portfolio's performance, including metrics such as return, IC, max drawdown, and others.
   5. Iterate on growing the hypothesis to enable model improvements based on performance evaluations and feedback.
@@ -288,4 +257,4 @@ qlib_model_rich_style_description: |-
 qlib_model_experiment_setting: |-
   | Dataset 📊 | Model 🤖    | Factors 🌟       | Data Split  🧮                                   |
   |---------|----------|---------------|-------------------------------------------------|
-  | EURUSD 15min | RDAgent-dev | FX Factors | Train: 2022-03-14 to 2024-06-30 <br> Valid: 2024-07-01 to 2024-12-31 <br> Test: 2025-01-01 to 2026-03-20 |
+  | CSI300  | RDAgent-dev | 20 factors (Alpha158)  | Train: 2008-01-01 to 2014-12-31 <br> Valid: 2015-01-01 to 2016-12-31 <br> Test &nbsp;: 2017-01-01 to 2020-08-01 |
