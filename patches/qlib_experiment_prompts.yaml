@@ -41,7 +41,34 @@ qlib_factor_background: |-
 
 qlib_factor_interface: |-
   Your python code should follow the interface to better interact with the user's system.
-  Your python code should contain the following part: the import part, the function part, and the main part. You should write a main function name: "calculate_{function_name}" and call this function in "if __name__ == __main__" part. Don't write any try-except block in your python code. The user will catch the exception message and provide the feedback to you.
+  
+IMPORTANT: The data has a MultiIndex with ['datetime', 'instrument'] as index levels.
+DO NOT use df['instrument'] — instrument is NOT a column, it is an index level.
+ALWAYS use: df.groupby(level='instrument') or df.index.get_level_values('instrument')
+
+Correct factor template:
+```python
+import pandas as pd
+import numpy as np
+
+def calculate_FactorName():
+    df = pd.read_hdf("daily_pv.h5", key="data")
+    close = df['$close'].unstack(level='instrument')
+    volume = df['$volume'].unstack(level='instrument')
+    
+    n = 8
+    factor = close.rolling(n).apply(lambda x: x[-1] - x[0]) / volume.rolling(n).sum()
+    
+    result = factor.stack().to_frame('FactorName')
+    result.index.names = ['datetime', 'instrument']
+    result.to_hdf("result.h5", key="data", mode="w")
+    return result
+
+if __name__ == "__main__":
+    calculate_FactorName()
+```
+
+Your python code should contain the following part: the import part, the function part, and the main part. You should write a main function name: "calculate_{function_name}" and call this function in "if __name__ == __main__" part. Don't write any try-except block in your python code. The user will catch the exception message and provide the feedback to you.
   User will write your python code into a python file and execute the file directly with "python {your_file_name}.py". You should calculate the factor values and save the result into a HDF5(H5) file named "result.h5" in the same directory as your python file. The result file is a HDF5(H5) file containing a pandas dataframe. The index of the dataframe is the "datetime" and "instrument", and the single column name is the factor name,and the value is the factor value. The result file should be saved in the same directory as your python file.
 
 qlib_factor_strategy: |-
