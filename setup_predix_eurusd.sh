@@ -1,11 +1,11 @@
 #!/bin/bash
 # =============================================================================
 # setup_predix_eurusd.sh
-# Richtet Predix für EURUSD 15min Trading ein
-# Ausführen: bash setup_predix_eurusd.sh
+# Sets up Predix for EURUSD 15min trading
+# Usage: bash setup_predix_eurusd.sh
 # =============================================================================
 
-set -e  # Abbruch bei Fehler
+set -e  # Exit on error
 
 PREDIX_DIR="$HOME/Predix"
 CSV_SOURCE="$HOME/Downloads/eurusd_data.csv"
@@ -16,27 +16,27 @@ echo "========================================"
 echo " Predix EURUSD Setup"
 echo "========================================"
 
-# ─── 1. Prüfen ob alles da ist ───────────────────────────────────────────────
+# ─── 1. Check prerequisites ───────────────────────────────────────────────
 echo ""
-echo "[1/7] Prüfe Voraussetzungen..."
+echo "[1/7] Checking prerequisites..."
 
 if [ ! -d "$PREDIX_DIR" ]; then
-    echo "FEHLER: $PREDIX_DIR nicht gefunden!"
+    echo "ERROR: $PREDIX_DIR not found!"
     exit 1
 fi
 
 if [ ! -f "$CSV_SOURCE" ]; then
-    echo "FEHLER: $CSV_SOURCE nicht gefunden!"
-    echo "Bitte eurusd_data.csv in ~/Downloads/ legen"
+    echo "ERROR: $CSV_SOURCE not found!"
+    echo "Please place eurusd_data.csv in ~/Downloads/"
     exit 1
 fi
 
-echo "✓ Predix gefunden: $PREDIX_DIR"
-echo "✓ CSV gefunden: $CSV_SOURCE"
+echo "✓ Predix found: $PREDIX_DIR"
+echo "✓ CSV found: $CSV_SOURCE"
 
-# ─── 2. Ordner anlegen ───────────────────────────────────────────────────────
+# ─── 2. Create directory structure ─────────────────────────────────────────
 echo ""
-echo "[2/7] Erstelle Ordnerstruktur..."
+echo "[2/7] Creating directory structure..."
 
 mkdir -p "$DATA_DIR"
 mkdir -p "$QLIB_DIR/calendars"
@@ -45,11 +45,11 @@ mkdir -p "$QLIB_DIR/features/eurusd"
 mkdir -p "$PREDIX_DIR/git_ignore_folder/log"
 
 cp "$CSV_SOURCE" "$DATA_DIR/eurusd_data.csv"
-echo "✓ CSV kopiert nach $DATA_DIR"
+echo "✓ CSV copied to $DATA_DIR"
 
-# ─── 3. CSV → Qlib Format konvertieren ───────────────────────────────────────
+# ─── 3. Convert CSV to Qlib format ─────────────────────────────────────────
 echo ""
-echo "[3/7] Konvertiere CSV zu Qlib-Format..."
+echo "[3/7] Converting CSV to Qlib format..."
 
 python3 << 'PYEOF'
 import pandas as pd
@@ -60,20 +60,20 @@ import os
 QLIB_DIR = Path(os.path.expanduser("~/.qlib/qlib_data/eurusd_data"))
 CSV_PATH = Path(os.path.expanduser("~/Downloads/eurusd_data.csv"))
 
-# Laden + sortieren
+# Load + sort
 df = pd.read_csv(CSV_PATH, parse_dates=["datetime"])
 df = df.sort_values("datetime").reset_index(drop=True)
 df.columns = [c.lower() for c in df.columns]
 
 print(f"  Rows: {len(df):,} | Range: {df['datetime'].min().date()} -> {df['datetime'].max().date()}")
 
-# ── Kalender (alle 15min Timestamps) ────────────────────────────────────────
+# ── Calendar (all 15min timestamps) ────────────────────────────────────────
 cal = df["datetime"].dt.strftime("%Y-%m-%d %H:%M:%S")
 cal_path = QLIB_DIR / "calendars" / "15min.txt"
 cal.to_csv(cal_path, index=False, header=False)
-print(f"  ✓ Kalender: {len(cal)} Einträge -> {cal_path}")
+print(f"  ✓ Calendar: {len(cal)} entries -> {cal_path}")
 
-# ── Instruments (nur EURUSD) ─────────────────────────────────────────────────
+# ── Instruments (only EURUSD) ──────────────────────────────────────────────
 inst_path = QLIB_DIR / "instruments" / "all.txt"
 start = df["datetime"].min().strftime("%Y-%m-%d")
 end   = df["datetime"].max().strftime("%Y-%m-%d")
@@ -81,22 +81,22 @@ with open(inst_path, "w") as f:
     f.write(f"EURUSD\t{start}\t{end}\n")
 print(f"  ✓ Instruments -> {inst_path}")
 
-# ── Features (Qlib binary format via CSV) ───────────────────────────────────
+# ── Features (Qlib binary format via CSV) ──────────────────────────────────
 feat_dir = QLIB_DIR / "features" / "eurusd"
 feat_dir.mkdir(parents=True, exist_ok=True)
 
-# Qlib erwartet: $open, $high, $low, $close, $volume
+# Qlib expects: $open, $high, $low, $close, $volume
 for col in ["open", "high", "low", "close", "volume"]:
     out = feat_dir / f"{col}.day.bin"
     # Qlib binary: float32 array
     arr = df[col].astype("float32").values
     arr.tofile(str(out).replace(".day.bin", f"_15min.bin"))
 
-# Auch als einfache CSV für direkten Zugriff
+# Also as simple CSV for direct access
 df.to_csv(QLIB_DIR / "eurusd_15min.csv", index=False)
 print(f"  ✓ Features + CSV -> {feat_dir}")
 
-# ── Returns + technische Features vorberechnen ───────────────────────────────
+# ── Returns + technical features precomputation ────────────────────────────
 def ema(s, p): return s.ewm(span=p, adjust=False).mean()
 def rsi(c, p=14):
     d = c.diff()
@@ -118,28 +118,28 @@ feat["adx_proxy"] = df["close"].rolling(14).std() / df["close"].rolling(96).std(
 
 feat.dropna(inplace=True)
 feat.to_csv(QLIB_DIR / "eurusd_features.csv", index=False)
-print(f"  ✓ Features CSV: {len(feat):,} Zeilen, {len(feat.columns)} Spalten")
-print("  Fertig!")
+print(f"  ✓ Features CSV: {len(feat):,} rows, {len(feat.columns)} columns")
+print("  Done!")
 PYEOF
 
-echo "✓ Qlib-Daten konvertiert"
+echo "✓ Qlib data converted"
 
-# ─── 4. .env updaten ─────────────────────────────────────────────────────────
+# ─── 4. Update .env ────────────────────────────────────────────────────────
 echo ""
-echo "[4/7] Update .env..."
+echo "[4/7] Updating .env..."
 
 ENV_FILE="$PREDIX_DIR/.env"
 
 # Backup
 cp "$ENV_FILE" "$ENV_FILE.backup_$(date +%Y%m%d_%H%M%S)"
 
-# QLIB_DATA_DIR auf EURUSD umbiegen
+# Update QLIB_DATA_DIR to EURUSD
 sed -i "s|QLIB_DATA_DIR=.*|QLIB_DATA_DIR=$QLIB_DIR|" "$ENV_FILE"
 
-# LOG_PATH korrigieren (war /home/nico/RD-Agent-Local/log)
+# Fix LOG_PATH (was /home/nico/RD-Agent-Local/log)
 sed -i "s|LOG_PATH=.*|LOG_PATH=$PREDIX_DIR/git_ignore_folder/log|" "$ENV_FILE"
 
-# EURUSD-spezifische Vars hinzufügen (falls noch nicht da)
+# Add EURUSD-specific vars (if not already present)
 grep -q "EURUSD_DATA_PATH" "$ENV_FILE" || cat >> "$ENV_FILE" << 'ENVEOF'
 
 # ---------- EURUSD ----------
@@ -151,11 +151,11 @@ BACKTEST_END_TIME=2026-03-20
 COST_RATE=0.00015
 ENVEOF
 
-echo "✓ .env aktualisiert (Backup erstellt)"
+echo "✓ .env updated (backup created)"
 
-# ─── 5. Prompts für EURUSD anpassen ──────────────────────────────────────────
+# ─── 5. Adjust prompts for EURUSD ──────────────────────────────────────────
 echo ""
-echo "[5/7] Passe Qlib-Prompts für EURUSD an..."
+echo "[5/7] Adjusting Qlib prompts for EURUSD..."
 
 PROMPT_FILE="$PREDIX_DIR/rdagent/app/qlib_rd_loop/prompts.yaml"
 cp "$PROMPT_FILE" "${PROMPT_FILE}.backup_$(date +%Y%m%d_%H%M%S)"
@@ -218,16 +218,16 @@ hypothesis_generation:
     Target: beat current best ARR of 9.62%.
 YAMLEOF
 
-echo "✓ prompts.yaml aktualisiert (Backup erstellt)"
+echo "✓ prompts.yaml updated (backup created)"
 
-# ─── 6. Model Coder Prompt erweitern ─────────────────────────────────────────
+# ─── 6. Extend Model Coder Prompt ──────────────────────────────────────────
 echo ""
-echo "[6/7] Erweitere Model Coder Prompts..."
+echo "[6/7] Extending Model Coder prompts..."
 
 MODEL_PROMPT="$PREDIX_DIR/rdagent/components/coder/model_coder/prompts.yaml"
 cp "$MODEL_PROMPT" "${MODEL_PROMPT}.backup_$(date +%Y%m%d_%H%M%S)"
 
-# EURUSD session filter als Kommentar in den evolving_strategy Block injizieren
+# Inject EURUSD session filter as comment in evolving_strategy block
 python3 << 'PYEOF'
 import re
 from pathlib import Path
@@ -251,12 +251,12 @@ content = content.replace(
     eurusd_note + "\n        Your code is expected to align the scenario in any form"
 )
 path.write_text(content)
-print("  ✓ Model coder prompt erweitert")
+print("  ✓ Model coder prompt extended")
 PYEOF
 
-echo "✓ Model coder Prompt angepasst"
+echo "✓ Model coder prompt adjusted"
 
-# ─── 7. Git Commits ──────────────────────────────────────────────────────────
+# ─── 7. Git Commits ────────────────────────────────────────────────────────
 echo ""
 echo "[7/7] Git Commits..."
 
@@ -279,23 +279,23 @@ git commit -m "feat: inject EURUSD trading rules into model coder
 - Max trade frequency guidance"
 
 git add .env 2>/dev/null || true
-echo "  (Note: .env nicht committed - enthält API Keys)"
+echo "  (Note: .env not committed - contains API keys)"
 
 echo ""
 echo "========================================"
-echo " Setup abgeschlossen!"
+echo " Setup completed!"
 echo "========================================"
 echo ""
-echo "Nächste Schritte:"
+echo "Next steps:"
 echo ""
-echo "  1. Starten:"
+echo "  1. Start:"
 echo "     cd ~/Predix && rdagent fin_quant"
 echo ""
-echo "  2. Dashboard (in zweitem Terminal):"
+echo "  2. Dashboard (in second terminal):"
 echo "     cd ~/Predix && rdagent server_ui --port 19899"
 echo "     → http://localhost:19899"
 echo ""
 echo "  3. Logs:"
 echo "     tail -f $PREDIX_DIR/git_ignore_folder/log/*.log"
 echo ""
-echo "Backup-Dateien (.backup_*) können nach erfolgreichem Test gelöscht werden."
+echo "Backup files (.backup_*) can be deleted after successful testing."

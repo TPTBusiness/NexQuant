@@ -1,25 +1,25 @@
-# TODO: The maintainer of this repo has not yet edited this file
-
-**REPO OWNER**: Do you want Customer Service & Support (CSS) support for this product/project?
-
-- **No CSS support:** Fill out this template with information about how to file issues and get help.
-- **Yes CSS support:** Fill out an intake form at [aka.ms/onboardsupport](https://aka.ms/onboardsupport). CSS will work with/help you to determine next steps.
-- **Not sure?** Fill out an intake as though the answer were "Yes". CSS will help you decide.
-
-*Then remove this first heading from this SUPPORT.MD file before publishing your repo.*
-
 # Support
 
-## How to file issues and get help  
+## How to file issues and get help
 
-This project uses GitHub Issues to track bugs and feature requests. Please search the existing 
-issues before filing new issues to avoid duplicates.  For new issues, file your bug or 
+This project uses GitHub Issues to track bugs and feature requests. Please search the existing
+issues before filing new issues to avoid duplicates. For new issues, file your bug or
 feature request as a new Issue.
 
-For help and questions about using this project, please **REPO MAINTAINER: INSERT INSTRUCTIONS HERE 
-FOR HOW TO ENGAGE REPO OWNERS OR COMMUNITY FOR HELP. COULD BE A STACK OVERFLOW TAG OR OTHER
-CHANNEL. WHERE WILL YOU HELP PEOPLE?**.
+- **Issues**: [https://github.com/PredixAI/predix/issues](https://github.com/PredixAI/predix/issues)
 
-## Microsoft Support Policy  
+For help and questions about using this project, please reach out via:
 
-Support for this **PROJECT or PRODUCT** is limited to the resources listed above.
+- **Email**: nico@predix.io
+- **GitHub Discussions**: [https://github.com/PredixAI/predix/discussions](https://github.com/PredixAI/predix/discussions)
+
+## Community Support
+
+We encourage users to help each other through GitHub Discussions or by contributing
+answers to issues. If you find a solution to a problem, please consider sharing it
+publicly to help others.
+
+## Support Policy
+
+Support is provided on a best-effort basis by the maintainers and community.
+For critical issues or commercial support needs, please contact the maintainers directly.

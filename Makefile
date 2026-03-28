@@ -19,7 +19,7 @@ CONSTRAINTS_FILE := constraints/$(PYTHON_VERSION).txt
 PUBLIC_DIR := $(shell [ "$$READTHEDOCS" = "True" ] && echo "$$READTHEDOCS_OUTPUT/html" || echo "public")
 
 # URL and Path of changelog source code.
-CHANGELOG_URL := $(shell echo $${CI_PAGES_URL:-https://microsoft.github.io/rdagent}/_sources/changelog.md.txt)
+CHANGELOG_URL := $(shell echo $${CI_PAGES_URL:-https://predixai.github.io/predix}/_sources/changelog.md.txt)
 CHANGELOG_PATH := docs/changelog.md
 
 ########################################################################################

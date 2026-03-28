@@ -1,10 +1,16 @@
-We encourage to set the TODOs in code. But some TODOs are more global.
-So we place it here.
+# TODOs
 
+This file tracks global TODOs for the Predix project. Individual TODOs in code should be addressed in their respective modules.
 
-- [ ] Aligning the naming of files in components & scenarios.
-  - We would like to have the same logic for naming convention in components(reusable components for all scenarios) and scenarios (componets for specific scenario).
-  - But now we have following mismatch
-    - `coder` in `components` & `developer` in `components`
-- [ ] The name of the folders mismatch with the content in them.
-  - Why are scenarios in experiments?
+## Current Global TODOs
+
+- [ ] Align naming conventions for files in `components/` and `scenarios/` directories
+  - Current mismatch: `coder` in `components/` vs `developer` in `scenarios/`
+- [ ] Clean up folder naming inconsistencies
+  - Investigate why some scenario-related code is in `experiments/` folders
+
+## Completed
+
+- [x] Rebrand from RD-Agent to Predix for EUR/USD focus
+- [x] Remove Microsoft-specific references
+- [x] Update documentation for PredixAI organization
