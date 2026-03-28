@@ -3,7 +3,7 @@ qlib_init:
     region: cn
 
 market: &market csi300
-benchmark: &benchmark SH000300
+benchmark: &benchmark EURUSD
 
 data_handler_config: &data_handler_config
     start_time: {{ train_start | default("2008-01-01", true) }}
@@ -28,7 +28,6 @@ data_handler_config: &data_handler_config
 
     learn_processors:
         - class: DropnaLabel
-        - class: CSZScoreNorm
           kwargs:
               fields_group: label
 
