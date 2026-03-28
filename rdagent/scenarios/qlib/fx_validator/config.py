@@ -1,12 +1,12 @@
 """
 FX Validator Configuration
-Angepasst für EURUSD 15min intraday trading
+Angepasst für EURUSD 1min intraday trading
 """
 import os
 
 FX_CONFIG = {
     "instrument": "EURUSD=X",
-    "frequency": "15min",
+    "frequency": "1min",
     "llm_provider": "openai",
     "backend_url": os.getenv("OPENAI_API_BASE", "http://localhost:8081/v1"),
     "api_key": os.getenv("OPENAI_API_KEY", "local"),

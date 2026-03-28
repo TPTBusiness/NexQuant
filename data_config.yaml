@@ -5,8 +5,8 @@
 # ============================================================
 
 instrument: EURUSD
-frequency: 15min          # 1min, 5min, 15min, 1h, 1d
-data_path: ~/.qlib/qlib_data/eurusd_data
+frequency: 1min          # 1min, 5min, 15min, 1h, 1d
+data_path: ~/.qlib/qlib_data/eurusd_1min_data
 
 # Verfügbare Spalten (keine $factor Spalte!)
 columns:
