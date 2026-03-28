@@ -1,10 +1,10 @@
-# Contributing to RD-Agent
+# Contributing to Predix
 
-We welcome contributions and suggestions to improve RD-Agent. Whether it's solving an issue, addressing a bug, enhancing documentation, or even correcting a typo, every contribution is valuable and helps improve the project.
+We welcome contributions and suggestions to improve Predix. Whether it's solving an issue, addressing a bug, enhancing documentation, or even correcting a typo, every contribution is valuable and helps improve the project.
 
 ## Getting Started
 
-To get started, you can explore the issues list or search for `TODO:` comments in the codebase by running the command:
+To get started, you can explore the issues list or search for `TODO:` comments in the codebase by running:
 ```sh
 grep -r "TODO:"
 ```
@@ -14,7 +14,7 @@ grep -r "TODO:"
 1. **Fork the Repository**: Create a fork of the repository on GitHub.
 2. **Clone the Repository**: Clone your forked repository to your local machine.
    ```sh
-   git clone https://github.com/your-username/RD-Agent.git
+   git clone https://github.com/your-username/predix.git
    ```
 3. **Create a Branch**: Create a new branch for your changes.
    ```sh
@@ -47,4 +47,4 @@ If you encounter any issues or have suggestions for improvements, please open an
 - Update documentation as needed.
 - Test your changes thoroughly before submitting a pull request.
 
-Thank you for contributing to RD-Agent!
+Thank you for contributing to Predix!

@@ -1,13 +1,13 @@
-.. RDAgent documentation master file, created by
+.. Predix documentation master file, created by
    sphinx-quickstart on Mon Jul 15 04:27:50 2024.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to RDAgent's documentation!
+Welcome to Predix's documentation!
 ===================================
 
 .. image:: _static/logo.png
-   :alt: RD-Agent Logo
+   :alt: Predix Logo
 
 .. toctree::
    :maxdepth: 3
@@ -23,7 +23,7 @@ Welcome to RDAgent's documentation!
    api_reference
    policy
 
-   GitHub <https://github.com/microsoft/RD-Agent>
+   GitHub <https://github.com/PredixAI/predix>
 
 
 Indices and tables
