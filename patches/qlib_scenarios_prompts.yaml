@@ -101,7 +101,7 @@ factor_hypothesis_specification: |-
   - Asian session shows mean reversion tendencies
   - Spread cost ~1.5 bps per trade — avoid high-turnover factors
   - No $factor column exists — use only $open, $close, $high, $low, $volume
-  - Each "instrument" is EURUSD, each "day" is a 15min bar
+  - Each "instrument" is EURUSD, each "day" is a 1min bar
 
   **Factor Generation Rules:**
   1. **3-5 Factors per Generation** — cover different signal types per round
@@ -183,7 +183,7 @@ factor_feedback_generation:
     Your feedback should specify whether the current result supports or refutes the hypothesis, compare it with previous SOTA results, and suggest FX-specific improvements.
 
     **FX-specific evaluation criteria:**
-    - IC > 0.02 is meaningful for 15min EURUSD data
+    - IC > 0.02 is meaningful for 1min EURUSD data
     - Annualized return target: >9.62% (current SOTA to beat)
     - Spread cost ~1.5 bps per trade — penalize high-turnover factors
     - Factors using $factor column are INVALID — only $open $close $high $low $volume allowed
@@ -198,7 +198,7 @@ factor_feedback_generation:
       2. Development Directions:
         a) New Direction: Propose a new FX-specific factor (session filter, volatility regime, volume spike).
         b) Optimization: Refine lookback windows (4/8/16/32 bars), add ADX filter, adjust for spread costs.
-      3. Final Goal: Beat 9.62% ARR on EURUSD 15min with controlled drawdown (<20%).
+      3. Final Goal: Beat 9.62% ARR on EURUSD 1min with controlled drawdown (<20%).
 
     When judging results:
       1. Any small improvement in annualized return → set Replace Best Result as yes.

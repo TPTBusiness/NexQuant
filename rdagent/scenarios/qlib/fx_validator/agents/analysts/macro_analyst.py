@@ -27,11 +27,16 @@ def get_fx_macro_data() -> str:
         else:
             vol_24h = "N/A"
 
+        eurusd_last_str = f"{eurusd_last:.5f}" if isinstance(eurusd_last, float) else str(eurusd_last)
+        eurusd_change_str = f"{eurusd_change:.3f}%" if isinstance(eurusd_change, float) else str(eurusd_change)
+        dxy_last_str = f"{dxy_last:.2f}" if isinstance(dxy_last, float) else str(dxy_last)
+        vol_24h_str = f"{vol_24h:.4f}%" if isinstance(vol_24h, float) else str(vol_24h)
+
         return f"""
-EURUSD Current: {eurusd_last:.5f if isinstance(eurusd_last, float) else eurusd_last}
-EURUSD 24h Change: {eurusd_change:.3f}% if isinstance(eurusd_change, float) else eurusd_change}
-DXY (Dollar Index): {dxy_last:.2f if isinstance(dxy_last, float) else dxy_last}
-Realized Volatility 24h: {vol_24h:.4f}% if isinstance(vol_24h, float) else vol_24h}
+EURUSD Current: {eurusd_last_str}
+EURUSD 24h Change: {eurusd_change_str}
+DXY (Dollar Index): {dxy_last_str}
+Realized Volatility 24h: {vol_24h_str}
 """
     except Exception as e:
         return f"Macro data unavailable: {e}"

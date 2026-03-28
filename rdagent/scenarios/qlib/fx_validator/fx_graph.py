@@ -1,6 +1,6 @@
 """
 FX Validator Graph — Multi-Agent Validierung für Predix Faktoren
-Inspiriert von TradingAgents, angepasst für EURUSD 15min
+Inspiriert von TradingAgents, angepasst für EURUSD 1min
 """
 from typing import TypedDict, Optional
 from langgraph.graph import StateGraph, END

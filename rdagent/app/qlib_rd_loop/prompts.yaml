@@ -20,7 +20,7 @@ hypothesis_generation:
     - Statistical: Regime-switching (HMM), Kalman filter
 
     Available features in the dataset:
-    - OHLCV: open, high, low, close, volume (15min bars)
+    - OHLCV: open, high, low, close, volume (1min bars)
     - Returns: ret_1, ret_4, ret_8, ret_16, ret_96
     - Technical: rsi_14, macd_hist, adx_14, atr_14, bb_pct, stoch_k, cci_14
     - Volatility: vol_real_4, vol_real_16, vol_ratio, zscore_ret_96
@@ -36,7 +36,7 @@ hypothesis_generation:
 
     Please ensure your response is in JSON format:
     {
-      "hypothesis": "A clear and concise trading hypothesis for EURUSD 15min.",
+      "hypothesis": "A clear and concise trading hypothesis for EURUSD 1min.",
       "reason": "Detailed explanation including session, model choice, and expected edge.",
       "model_type": "One of: TimeSeries / Tabular / XGBoost",
       "target_session": "london / ny / asian / all",

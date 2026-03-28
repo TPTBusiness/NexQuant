@@ -243,7 +243,7 @@ class FactorDatetimeDailyEvaluator(FactorEvaluator):
                 False,
             )
         if min_diff <= pd.Timedelta(minutes=30):
-            return "The generated dataframe is intraday (15min bars). This is correct for EURUSD.", True
+            return "The generated dataframe is intraday (1min bars). This is correct for EURUSD.", True
         return "The generated dataframe is daily.", True
 
 
