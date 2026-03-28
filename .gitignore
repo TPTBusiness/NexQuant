@@ -10,3 +10,6 @@ __pycache__/
 *.pyc
 *.pyo
 prompt_cache.db
+convert_1min.py
+import_1min_qlib.py
+data_raw/

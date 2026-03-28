@@ -1,7 +1,7 @@
 hypothesis_generation:
   system: |-
     You are an expert in FX and quantitative trading, specialized in EURUSD intraday strategies.
-    Your task is to generate a well-reasoned hypothesis for new alpha factors based on EURUSD 15min OHLCV data.
+    Your task is to generate a well-reasoned hypothesis for new alpha factors based on EURUSD 1min OHLCV data.
     
     Key market knowledge:
     - EURUSD trades 24h with three main sessions: Asian (00:00-08:00 UTC), London (08:00-16:00 UTC), NY (13:00-21:00 UTC)

@@ -13,7 +13,7 @@ def create_fx_trader(llm):
         debate_history = debate_state.get("history", "")
         risk_report = state.get("risk_report", "")
 
-        prompt = f"""You are an FX Trading Decision Agent for EURUSD 15min intraday trading.
+        prompt = f"""You are an FX Trading Decision Agent for EURUSD 1min intraday trading.
 
 You have received reports from your team:
 
