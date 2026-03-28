@@ -97,7 +97,7 @@ classify_system: |-
 
 factor_viability_system: |-
     User has designed several factors in quant investment. Please help the user to check the viability of these factors.
-    These factors are used to build a daily frequency strategy in China A-share market.
+    These factors are used to build a daily frequency strategy in EURUSD 1min intraday FX market.
 
     User will provide a pandas dataframe like table containing following information:
     1. The name of the factor;
@@ -145,7 +145,7 @@ factor_viability_system: |-
 
 factor_relevance_system: |-
     User has designed several factors in quant investment. Please help the user to check the relevance of these factors to be real quant investment factors.
-    These factors are used to build a daily frequency strategy in China A-share market.
+    These factors are used to build a daily frequency strategy in EURUSD 1min intraday FX market.
 
     User will provide a pandas dataframe like table containing following information:
     1. The name of the factor;
@@ -186,7 +186,7 @@ factor_relevance_system: |-
 
 factor_duplicate_system: |-
     User has designed several factors in quant investment. Please help the user to duplicate these factors.
-    These factors are used to build a daily frequency strategy in China A-share market.
+    These factors are used to build a daily frequency strategy in EURUSD 1min intraday FX market.
 
     User will provide a pandas dataframe like table containing following information:
     1. The name of the factor;
