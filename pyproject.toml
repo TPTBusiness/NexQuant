@@ -7,7 +7,7 @@ requires = [
 
 [project]
 authors = [
-  {email = "xuyang1@microsoft.com", name = "MSRA-MIIC"},
+  {email = "nico@predix.io", name = "Predix Team"},
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -16,18 +16,20 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
 ]
-description = "Research & Development Agent"
+description = "Predix - AI-gestützter Quantitative Trading Agent für EUR/USD"
 dynamic = [
   "dependencies",
   "optional-dependencies",
   "version",
 ]
 keywords = [
+  "Quantitative Trading",
   "Autonomous Agents",
   "Large Language Models",
-  "Research and Development",
+  "EUR/USD",
+  "Forex",
 ]
-name = "rdagent"
+name = "predix"
 readme = "README.md"
 requires-python = ">=3.10"
 
@@ -35,8 +37,8 @@ requires-python = ">=3.10"
 rdagent = "rdagent.app.cli:app"
 
 [project.urls]
-homepage = "https://github.com/microsoft/RD-Agent/"
-issue = "https://github.com/microsoft/RD-Agent/issues"
+homepage = "https://github.com/PredixAI/predix/"
+issue = "https://github.com/PredixAI/predix/issues"
 
 [tool.coverage.report]
 fail_under = 80
