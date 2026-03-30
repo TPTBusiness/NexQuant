@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predix Dashboard - COMPLETE Progress</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .card h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #00d9ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card h2 .icon { font-size: 1.2em; }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .metric:last-child { border-bottom: none; }
+        .metric-label { color: #aaa; }
+        .metric-value {
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .metric-value.positive { color: #00ff88; }
+        .metric-value.negative { color: #ff4757; }
+        .metric-value.neutral { color: #ffa502; }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin: 5px 0;
+        }
+        .status-badge.success { background: #00ff88; color: #1a1a2e; }
+        .status-badge.failed { background: #ff4757; color: white; }
+        .status-badge.running { background: #ffa502; color: #1a1a2e; }
+        .factor-list {
+            list-style: none;
+            margin-top: 15px;
+        }
+        .factor-list li {
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.05);
+            margin: 5px 0;
+            border-radius: 8px;
+            border-left: 3px solid #00d9ff;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #aaa;
+        }
+        .refresh-btn {
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            color: #1a1a2e;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 20px auto;
+            display: block;
+            transition: transform 0.2s;
+        }
+        .refresh-btn:hover { transform: scale(1.05); }
+        .session-info {
+            background: rgba(0, 217, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #00d9ff;
+        }
+        .error-msg {
+            background: rgba(255, 71, 87, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            color: #ff4757;
+            margin: 15px 0;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .live-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #00ff88;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Predix Dashboard</h1>
+        <p style="text-align: center; color: #aaa; margin-bottom: 30px;">
+            COMPLETE Progress Visualisierung für EURUSD Trading-Agent
+        </p>
+
+        <div id="dashboard">
+            <div class="loading">Lade Dashboard-Daten...</div>
+        </div>
+
+        <button class="refresh-btn" onclick="loadDashboard()">🔄 Aktualisieren</button>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/api/dashboard`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('dashboard').innerHTML = `
+                        <div class="error-msg">❌ Fehler: ${data.error}</div>
+                    `;
+                    return;
+                }
+
+                const html = `
+                    <div class="grid">
+                        ${renderProgressCard(data.progress)}
+                        ${renderMacroCard(data.macro)}
+                        ${renderSessionCard(data.session)}
+                        ${renderMemoryCard(data.memory)}
+                        ${renderConfigCard(data.config)}
+                    </div>
+                `;
+                
+                document.getElementById('dashboard').innerHTML = html;
+                
+                // Auto-refresh alle 30 Sekunden
+                setTimeout(loadDashboard, 30000);
+                
+            } catch (error) {
+                document.getElementById('dashboard').innerHTML = `
+                    <div class="error-msg">❌ Verbindungsfehler: ${error.message}</div>
+                    <p style="text-align: center; color: #aaa;">
+                        Stelle sicher dass die API unter ${API_BASE} läuft.
+                    </p>
+                `;
+            }
+        }
+
+        function renderProgressCard(progress) {
+            return `
+                <div class="card">
+                    <h2><span class="icon">📊</span> Trading Progress</h2>
+                    
+                    <div class="metric">
+                        <span class="metric-label">Aktueller Loop:</span>
+                        <span class="metric-value">${progress.current_loop}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Aktueller Step:</span>
+                        <span class="metric-value">${progress.current_step}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Status:</span>
+                        <span class="status-badge ${progress.last_status.toLowerCase()}">
+                            ${progress.last_status}
+                        </span>
+                    </div>
+                    
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${progress.progress_percent}%">
+                            ${progress.progress_percent}%
+                        </div>
+                    </div>
+                    
+                    ${progress.recent_factors.length > 0 ? `
+                        <h3 style="margin-top: 20px; color: #00d9ff; font-size: 1.1em;">Letzte Faktoren:</h3>
+                        <ul class="factor-list">
+                            ${progress.recent_factors.map(f => `<li>📈 ${f}</li>`).join('')}
+                        </ul>
+                    ` : ''}
+                    
+                    <div class="metric" style="margin-top: 20px;">
+                        <span class="metric-label">Log Größe:</span>
+                        <span class="metric-value">${progress.log_size_mb || 'N/A'} MB</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMacroCard(macro) {
+            if (!macro || macro.error) {
+                return `
+                    <div class="card">
+                        <h2><span class="icon">🌍</span> Live Macro Daten</h2>
+                        <div class="error-msg">Daten nicht verfügbar</div>
+                    </div>
+                `;
+            }
+
+            const changeClass = macro.eurusd_24h_change >= 0 ? 'positive' : 'negative';
+            const changeSign = macro.eurusd_24h_change >= 0 ? '+' : '';
+
+            return `
+                <div class="card">
+                    <h2><span class="icon">🌍</span> Live Macro Daten <span class="live-indicator"></span></h2>
+                    
+                    <div class="metric">
+                        <span class="metric-label">EURUSD:</span>
+                        <span class="metric-value">${macro.eurusd_price ? macro.eurusd_price.toFixed(5) : 'N/A'}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">24h Change:</span>
+                        <span class="metric-value ${changeClass}">
+                            ${changeSign}${macro.eurusd_24h_change ? macro.eurusd_24h_change.toFixed(3) : '0'}%
+                        </span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">DXY (Dollar Index):</span>
+                        <span class="metric-value">${macro.dxy_price ? macro.dxy_price.toFixed(2) : 'N/A'}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Volatility (24h):</span>
+                        <span class="metric-value">${macro.realized_volatility ? macro.realized_volatility.toFixed(4) : 'N/A'}%</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSessionCard(session) {
+            if (!session) return '';
+
+            return `
+                <div class="card">
+                    <h2><span class="icon">🕐</span> Aktuelle Session</h2>
+                    
+                    <div class="session-info">
+                        <strong>${session.name}</strong><br>
+                        <span style="color: #aaa;">${session.hours} UTC</span>
+                    </div>
+                    
+                    <div class="metric">
+                        <span class="metric-label">Charakteristika:</span>
+                    </div>
+                    <p style="color: #ccc; margin: 10px 0;">${session.characteristics}</p>
+                    
+                    <div class="metric">
+                        <span class="metric-label">Empfohlene Strategie:</span>
+                        <span class="metric-value positive">${session.recommended_strategy}</span>
+                    </div>
+                    
+                    <div class="metric">
+                        <span class="metric-label">Vermeiden:</span>
+                        <span class="metric-value negative">${session.avoid}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMemoryCard(memory) {
+            if (!memory || memory.error) {
+                return `
+                    <div class="card">
+                        <h2><span class="icon">💾</span> Memory Statistics</h2>
+                        <div class="error-msg">Keine Trades gespeichert</div>
+                    </div>
+                `;
+            }
+
+            const winRateClass = memory.win_rate >= 60 ? 'positive' : memory.win_rate >= 40 ? 'neutral' : 'negative';
+
+            return `
+                <div class="card">
+                    <h2><span class="icon">💾</span> Memory Statistics</h2>
+                    
+                    <div class="metric">
+                        <span class="metric-label">Gespeicherte Trades:</span>
+                        <span class="metric-value">${memory.total_trades}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Win-Rate:</span>
+                        <span class="metric-value ${winRateClass}">${memory.win_rate}%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Ø Return:</span>
+                        <span class="metric-value ${memory.avg_return >= 0 ? 'positive' : 'negative'}">
+                            ${memory.avg_return >= 0 ? '+' : ''}${memory.avg_return}%
+                        </span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Sharpe Ratio:</span>
+                        <span class="metric-value">${memory.sharpe_ratio || 'N/A'}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderConfigCard(config) {
+            if (!config) return '';
+
+            return `
+                <div class="card">
+                    <h2><span class="icon">⚙️</span> Konfiguration</h2>
+                    
+                    <div class="metric">
+                        <span class="metric-label">Instrument:</span>
+                        <span class="metric-value">${config.instrument}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Target ARR:</span>
+                        <span class="metric-value positive">${config.target_arr}%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Max Drawdown:</span>
+                        <span class="metric-value negative">${config.max_drawdown}%</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initiales Laden
+        loadDashboard();
+    </script>
+</body>
+</html>

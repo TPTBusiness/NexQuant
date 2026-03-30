@@ -15,6 +15,7 @@ Ein Research Manager bewertet die Debatte und trifft die finale Entscheidung.
 import json
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
@@ -22,6 +23,34 @@ from typing import Dict, List, Literal, Optional
 sys.path.insert(0, str(Path(__file__).parent))
 
 from eurusd_llm import MultiProviderLLM
+from fx_config import get_fx_config
+
+
+def get_current_session_info() -> dict:
+    """
+    Gibt Informationen zur aktuellen FX-Session.
+    
+    Returns
+    -------
+    dict
+        Session-Info mit Name, Stunden, Charakteristika, empfohlene Strategie
+    """
+    config = get_fx_config()
+    current_session = config.get_current_session()
+    session_desc = config.get_session_description(current_session)
+    
+    # Aktuelle UTC Zeit hinzufügen
+    hour_utc = datetime.now(timezone.utc).hour
+    
+    return {
+        "session": current_session,
+        "name": session_desc["name"],
+        "hours": session_desc["hours"],
+        "current_utc_hour": hour_utc,
+        "characteristics": session_desc["characteristics"],
+        "recommended_strategy": session_desc["recommended_strategy"],
+        "avoid": session_desc["avoid"]
+    }
 
 
 @dataclass
@@ -71,6 +100,10 @@ class EURUSDBullAgent:
         TradingSignal
             Bull-Signal mit LONG-Empfehlung und Confidence
         """
+        # Session-Info hinzufügen
+        session_info = get_current_session_info()
+        market_data["session"] = session_info
+        
         prompt = self._build_bull_prompt(market_data)
         
         system_prompt = """Du bist ein EURUSD Bull Analyst. Deine Aufgabe ist es, 
@@ -117,6 +150,15 @@ class EURUSDBullAgent:
     
     def _build_bull_prompt(self, data: dict) -> str:
         """Erstellt Bull-spezifischen Prompt."""
+        session = data.get("session", {})
+        session_str = f"""
+=== Aktuelle Session ===
+- Session: {session.get('name', 'N/A')} ({session.get('hours', '')})
+- Charakteristika: {session.get('characteristics', '')}
+- Empfohlene Strategie: {session.get('recommended_strategy', '')}
+
+""" if session else ""
+        
         return f"""
 Analysiere EURUSD für LONG-Setup:
 
@@ -127,12 +169,13 @@ Aktuelle Daten:
 - MACD: {data.get('macd', 'N/A')}
 - Wirtschaftsdaten: {data.get('economic_data', 'N/A')}
 - Sentiment: {data.get('sentiment', 'N/A')}
-
+{session_str}
 Finde Argumente FÜR LONG EURUSD:
 1. Welche positiven Faktoren für EUR siehst du?
 2. Gibt es USD-Schwäche?
 3. Ist das technische Setup bullisch?
-4. Was ist das Risk/Reward?
+4. Passt der Trade zur aktuellen Session?
+5. Was ist das Risk/Reward?
 
 Antworte als JSON:
 {{
