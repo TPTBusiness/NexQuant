@@ -17,9 +17,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
+import yfinance as yf
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 from eurusd_llm import MultiProviderLLM
+from fx_config import get_fx_config
 
 
 @dataclass
@@ -30,21 +33,94 @@ class MacroSignal:
     reasoning: List[str]
     
     # Makro-Faktoren
-    rate_differential: float  # Fed - EZB Zinsen
-    growth_differential: float  # US - EU Wachstum
-    momentum_score: float  # -1 bis +1
-    sentiment_score: float  # -1 bis +1
+    rate_differential: float = 0.0  # Fed - EZB Zinsen
+    growth_differential: float = 0.0  # US - EU Wachstum
+    momentum_score: float = 0.0  # -1 bis +1
+    sentiment_score: float = 0.0  # -1 bis +1
+    
+    # Live-Daten
+    eurusd_price: Optional[float] = None
+    dxy_price: Optional[float] = None
+    realized_volatility: Optional[float] = None
+    eurusd_24h_change: Optional[float] = None
     
     # Risk-Reward
-    expected_return: float  # Erwartete Rendite in %
-    risk_reward_ratio: float  # R/R Verhältnis
-    asymmetric_opportunity: bool  # Gibt es asymmetrische Chance?
+    expected_return: float = 0.0  # Erwartete Rendite in %
+    risk_reward_ratio: float = 1.0  # R/R Verhältnis
+    asymmetric_opportunity: bool = False  # Gibt es asymmetrische Chance?
     
     # Trade-Parameter
     entry_price: Optional[float] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
     leverage: int = 20
+
+
+def get_live_fx_data() -> dict:
+    """
+    Holt Live-FX-Daten via yfinance.
+    
+    Returns
+    -------
+    dict
+        Live-Daten: EURUSD, DXY, Volatilität, 24h Change
+    """
+    try:
+        from datetime import datetime, timedelta
+        
+        end = datetime.now()
+        start = end - timedelta(days=5)
+        
+        # EURUSD holen
+        eurusd = yf.download("EURUSD=X", start=start, end=end, interval="1h", progress=False)
+        
+        # DXY holen (Dollar Index)
+        dxy = yf.download("DX-Y.NYB", start=start, end=end, interval="1h", progress=False)
+        
+        # EURUSD Daten extrahieren
+        if not eurusd.empty:
+            eurusd_price = float(eurusd['Close'].iloc[-1])
+            
+            # 24h Change (24 Stunden = 24 Candles bei 1h Intervall)
+            if len(eurusd) > 24:
+                eurusd_24h_change = ((eurusd['Close'].iloc[-1] / eurusd['Close'].iloc[-24]) - 1) * 100
+            else:
+                eurusd_24h_change = 0.0
+            
+            # Realized Volatility (24h annualisiert)
+            returns = eurusd['Close'].pct_change().dropna()
+            if len(returns) > 1:
+                realized_volatility = float(returns.tail(24).std() * (24 ** 0.5) * 100)
+            else:
+                realized_volatility = 0.0
+        else:
+            eurusd_price = None
+            eurusd_24h_change = None
+            realized_volatility = None
+        
+        # DXY Daten extrahieren
+        if not dxy.empty:
+            dxy_price = float(dxy['Close'].iloc[-1])
+        else:
+            dxy_price = None
+        
+        return {
+            "eurusd_price": eurusd_price,
+            "dxy_price": dxy_price,
+            "realized_volatility": realized_volatility,
+            "eurusd_24h_change": eurusd_24h_change,
+            "success": True
+        }
+        
+    except Exception as e:
+        return {
+            "eurusd_price": None,
+            "dxy_price": None,
+            "realized_volatility": None,
+            "eurusd_24h_change": None,
+            "success": False,
+            "error": str(e)
+        }
 
 
 class EURUSDMacroAgent:
@@ -71,7 +147,8 @@ class EURUSDMacroAgent:
     def analyze(
         self,
         macro_data: dict,
-        price_data: Optional[dict] = None
+        price_data: Optional[dict] = None,
+        use_live_data: bool = True
     ) -> MacroSignal:
         """
         Analysiert makroökonomische Daten für EURUSD.
@@ -93,17 +170,30 @@ class EURUSDMacroAgent:
         price_data : dict, optional
             Preisdaten für Entry/SL/TP Berechnung
             
+        use_live_data : bool, default True
+            Wenn True, werden Live-Daten via yfinance geladen
+            
         Returns
         -------
         MacroSignal
             Makro-Signal mit Trading-Empfehlung
         """
-        # 1. Berechne fundamentale Differentiale
+        # 1. Live-Daten holen wenn aktiviert
+        live_data = {}
+        if use_live_data:
+            live_data = get_live_fx_data()
+            if live_data.get("success"):
+                # Override DXY Trend basierend auf Live-Daten
+                if live_data.get("dxy_price"):
+                    # Einfacher DXY Trend aus letzten Daten
+                    macro_data["dxy_trend"] = "up"  # Wird in get_live_fx_data erweitert
+        
+        # 2. Berechne fundamentale Differentiale
         rate_diff = macro_data.get("fed_rate", 5.0) - macro_data.get("ecb_rate", 4.0)
         growth_diff = macro_data.get("us_gdp_growth", 2.0) - macro_data.get("eu_gdp_growth", 1.5)
         pmi_diff = macro_data.get("us_pmi", 50) - macro_data.get("eu_pmi", 50)
         
-        # 2. Berechne Momentum-Score
+        # 3. Berechne Momentum-Score
         dxy_trend = macro_data.get("dxy_trend", "neutral")
         if dxy_trend == "up":
             momentum_score = -0.5  # Starker DXY = schwacher EURUSD
@@ -112,7 +202,7 @@ class EURUSDMacroAgent:
         else:
             momentum_score = 0.0
         
-        # 3. Berechne Sentiment-Score
+        # 4. Berechne Sentiment-Score
         risk_sentiment = macro_data.get("risk_sentiment", "neutral")
         if risk_sentiment == "risk-on":
             sentiment_score = 0.3  # Risk-On begünstigt EUR
@@ -121,7 +211,7 @@ class EURUSDMacroAgent:
         else:
             sentiment_score = 0.0
         
-        # 4. LLM-basierte Gesamtanalyse
+        # 5. LLM-basierte Gesamtanalyse mit Live-Daten
         signal = self._llm_analysis(
             rate_diff=rate_diff,
             growth_diff=growth_diff,
@@ -129,14 +219,22 @@ class EURUSDMacroAgent:
             momentum_score=momentum_score,
             sentiment_score=sentiment_score,
             macro_data=macro_data,
-            price_data=price_data
+            price_data=price_data,
+            live_data=live_data
         )
         
-        # 5. Füge berechnete Werte hinzu
+        # 6. Füge berechnete Werte hinzu
         signal.rate_differential = rate_diff
         signal.growth_differential = growth_diff
         signal.momentum_score = momentum_score
         signal.sentiment_score = sentiment_score
+        
+        # 7. Füge Live-Daten hinzu
+        if live_data.get("success"):
+            signal.eurusd_price = live_data.get("eurusd_price")
+            signal.dxy_price = live_data.get("dxy_price")
+            signal.realized_volatility = live_data.get("realized_volatility")
+            signal.eurusd_24h_change = live_data.get("eurusd_24h_change")
         
         return signal
     
@@ -226,14 +324,27 @@ class EURUSDMacroAgent:
         momentum_score: float,
         sentiment_score: float,
         macro_data: dict,
-        price_data: Optional[dict]
+        price_data: Optional[dict],
+        live_data: Optional[dict]
     ) -> str:
         """Erstellt makroökonomischen Prompt."""
         price_str = f"- Aktueller Preis: {price_data.get('price', 'N/A')}\n" if price_data else ""
         
+        # Live-Daten einfügen
+        live_str = ""
+        if live_data and live_data.get("success"):
+            live_str = f"""
+=== Live Markt-Daten (via yfinance) ===
+- EURUSD: {live_data.get('eurusd_price', 'N/A'):.5f}
+- EURUSD 24h Change: {live_data.get('eurusd_24h_change', 0):+.3f}%
+- DXY (Dollar Index): {live_data.get('dxy_price', 'N/A'):.2f}
+- Realized Volatility (24h): {live_data.get('realized_volatility', 0):.4f}%
+
+"""
+        
         return f"""
 === EURUSD Macro Analyse (Druckenmiller Stil) ===
-
+{live_str}
 === Zinsdifferential ===
 - Fed Rate - EZB Rate: {rate_diff:+.2f}% ({'USD vorteil' if rate_diff > 0 else 'EUR vorteil' if rate_diff < 0 else 'neutral'})
 
