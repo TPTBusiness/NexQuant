@@ -65,3 +65,4 @@ data_raw/
 # Local scripts (generated)
 convert_1min.py
 import_1min_qlib.py
+*.h5
