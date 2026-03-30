@@ -21,6 +21,7 @@ from importlib.resources import path as rpath
 from typing import Optional
 
 import typer
+from rich.console import Console
 from typing_extensions import Annotated
 
 from rdagent.app.data_science.loop import main as data_science
@@ -110,33 +111,52 @@ def fin_quant_cli(
     loop_n: Optional[int] = None,
     all_duration: Optional[str] = None,
     checkout: CheckoutOption = True,
-    with_dashboard: bool = typer.Option(False, "--with-dashboard/-d", help="Start dashboard automatically"),
+    with_dashboard: bool = typer.Option(False, "--with-dashboard/-d", help="Start web dashboard automatically"),
+    with_cli_dashboard: bool = typer.Option(False, "--cli-dashboard/-c", help="Show beautiful CLI dashboard"),
     dashboard_port: int = typer.Option(5000, "--dashboard-port", help="Dashboard port"),
 ):
     """
     Start EURUSD quantitative trading loop.
     
-    Use --with-dashboard to automatically start the web dashboard.
+    Options:
+      --with-dashboard/-d: Start web dashboard at http://localhost:5000
+      --cli-dashboard/-c: Show beautiful terminal UI with live stats
+    
+    Examples:
+      rdagent fin_quant
+      rdagent fin_quant -d              # Web dashboard
+      rdagent fin_quant -c              # CLI dashboard
+      rdagent fin_quant -d -c           # Both dashboards
     """
     import subprocess
     import threading
     import time
     
-    # Start Dashboard wenn gewünscht
+    # Start Web Dashboard wenn gewünscht
     if with_dashboard:
-        def start_dashboard():
-            print(f"\n🚀 Starting Dashboard on http://localhost:{dashboard_port}...")
-            print(f"   Open: http://localhost:{dashboard_port}/dashboard.html\n")
+        def start_web_dashboard():
+            console = Console()
+            console.print(f"\n[bold green]🚀 Starting Web Dashboard on http://localhost:{dashboard_port}...[/bold green]")
+            console.print(f"   [cyan]Open: http://localhost:{dashboard_port}/dashboard.html[/cyan]\n")
             subprocess.run(
                 ["python", "web/dashboard_api.py"],
                 cwd=str(Path(__file__).parent.parent.parent),
                 env={**os.environ, "FLASK_ENV": "development"}
             )
         
-        # Dashboard im Hintergrund starten
-        dashboard_thread = threading.Thread(target=start_dashboard, daemon=True)
+        dashboard_thread = threading.Thread(target=start_web_dashboard, daemon=True)
         dashboard_thread.start()
-        time.sleep(2)  # Kurze Verzögerung damit Dashboard starten kann
+        time.sleep(2)
+    
+    # Start CLI Dashboard wenn gewünscht
+    if with_cli_dashboard:
+        def start_cli_dash():
+            from rdagent.log.ui.predix_dashboard import run_dashboard
+            run_dashboard(log_path="fin_quant.log", refresh_interval=3)
+        
+        cli_thread = threading.Thread(target=start_cli_dash, daemon=True)
+        cli_thread.start()
+        time.sleep(1)
     
     # Fin Quant starten
     fin_quant(path=path, step_n=step_n, loop_n=loop_n, all_duration=all_duration, checkout=checkout)
