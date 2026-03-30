@@ -10,15 +10,29 @@ NOTE: **key is always "data" for all hdf5 files **.
 
 | Filename       | Description                                                      |
 | -------------- | -----------------------------------------------------------------|
-| "daily_pv.h5"  | Adjusted daily price and volume data.                            |
+| "daily_pv.h5"  | EURUSD 1-minute price and volume data (2020-2026).               |
 
 
 # For different data, We have some basic knowledge for them
 
-## Daily price and volume data
-$open: open price of the stock on that day.
-$close: close price of the stock on that day.
-$high: high price of the stock on that day.
-$low: low price of the stock on that day.
-$volume: volume of the stock on that day.
-$factor: factor value of the stock on that day.
+## 1-Minute Price and Volume data (EURUSD)
+$open: open price at 1-minute bar.
+$close: close price at 1-minute bar.
+$high: high price at 1-minute bar.
+$low: low price at 1-minute bar.
+$volume: volume at 1-minute bar (tick volume for FX).
+
+## Important Notes for 1min Data
+- 96 bars = 1 trading day (24 hours for FX)
+- 16 bars = 16 minutes
+- 4 bars = 4 minutes
+- 1 bar = 1 minute
+- Data range: 2020-01-01 to 2026-03-20
+- Instrument: EURUSD
+- Timezone: UTC
+
+## Session Times (UTC)
+- Asian: 00:00-08:00 UTC (low volatility)
+- London: 08:00-16:00 UTC (high volatility)
+- NY: 13:00-21:00 UTC (high volatility)
+- Overlap: 13:00-16:00 UTC (highest volatility)
