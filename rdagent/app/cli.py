@@ -6,7 +6,9 @@ This will
 - autoamtically load dotenv
 """
 
+import os
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -108,7 +110,35 @@ def fin_quant_cli(
     loop_n: Optional[int] = None,
     all_duration: Optional[str] = None,
     checkout: CheckoutOption = True,
+    with_dashboard: bool = typer.Option(False, "--with-dashboard/-d", help="Start dashboard automatically"),
+    dashboard_port: int = typer.Option(5000, "--dashboard-port", help="Dashboard port"),
 ):
+    """
+    Start EURUSD quantitative trading loop.
+    
+    Use --with-dashboard to automatically start the web dashboard.
+    """
+    import subprocess
+    import threading
+    import time
+    
+    # Start Dashboard wenn gewünscht
+    if with_dashboard:
+        def start_dashboard():
+            print(f"\n🚀 Starting Dashboard on http://localhost:{dashboard_port}...")
+            print(f"   Open: http://localhost:{dashboard_port}/dashboard.html\n")
+            subprocess.run(
+                ["python", "web/dashboard_api.py"],
+                cwd=str(Path(__file__).parent.parent.parent),
+                env={**os.environ, "FLASK_ENV": "development"}
+            )
+        
+        # Dashboard im Hintergrund starten
+        dashboard_thread = threading.Thread(target=start_dashboard, daemon=True)
+        dashboard_thread.start()
+        time.sleep(2)  # Kurze Verzögerung damit Dashboard starten kann
+    
+    # Fin Quant starten
     fin_quant(path=path, step_n=step_n, loop_n=loop_n, all_duration=all_duration, checkout=checkout)
 
 
