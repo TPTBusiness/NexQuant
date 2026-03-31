@@ -22,6 +22,10 @@ class KnowledgeMetaData:
     def split_into_trunk(self, size: int = 1000, overlap: int = 0):
         """
         split content into trunks and create embedding by trunk
+        
+        Nomic-embed-text supports up to 8192 tokens (~30,000 characters).
+        We split content into smaller trunks to stay well within limits.
+        
         Returns
         -------
 
@@ -34,37 +38,53 @@ class KnowledgeMetaData:
                 chunks.append(chunk)
             return chunks
 
-        # Kürze Content falls zu lang für Embedding
-        max_trunk_size = 4000  # Sicher unter 8192 Token Limit
-        actual_size = min(size, max_trunk_size)
+        # Split into trunks of 'size' characters
+        # Keep size reasonable to stay under 8192 token limit
+        self.trunks = split_string_into_chunks(self.content, chunk_size=size)
         
-        self.trunks = split_string_into_chunks(self.content, chunk_size=actual_size)
-        
-        # Kürze zu lange Trunks für Embedding
+        # Create embeddings for each trunk
         self.trunks_embedding = []
         for trunk in self.trunks:
-            if len(trunk) > 15000:
-                trunk = trunk[:15000] + "... [truncated]"
-            self.trunks_embedding.extend(APIBackend().create_embedding(input_content=trunk))
+            embeddings = APIBackend().create_embedding(input_content=trunk)
+            self.trunks_embedding.extend(embeddings)
 
     def create_embedding(self):
         """
         create content's embedding
+        
+        Nomic-embed-text supports up to 8192 tokens (~30,000 characters).
+        For longer content, we split it into chunks and embed each chunk.
+        
         Returns
         -------
 
         """
         if self.embedding is None:
-            # Kürze Content auf max 4000 Token für Embedding (nomic-embed-text Limit ist 8192)
-            # Sicherer Puffer: 4000 Token ≈ 3000 Zeichen
-            max_content_length = 15000
-            content_to_embed = self.content[:max_content_length] if len(self.content) > max_content_length else self.content
+            # Max characters per chunk (safe limit: 8192 tokens ≈ 30,000 chars)
+            # Use 20,000 chars to be safe
+            max_chunk_size = 20000
             
-            if len(self.content) > max_content_length:
-                # Füge Hinweis hinzu dass Content gekürzt wurde
-                content_to_embed += "... [truncated for embedding]"
-            
-            self.embedding = APIBackend().create_embedding(input_content=content_to_embed)
+            if len(self.content) <= max_chunk_size:
+                # Content fits in one embedding
+                self.embedding = APIBackend().create_embedding(input_content=self.content)
+            else:
+                # Split content into chunks and embed each
+                chunks = []
+                for i in range(0, len(self.content), max_chunk_size):
+                    chunk = self.content[i:i + max_chunk_size]
+                    chunks.append(chunk)
+                
+                # Create embeddings for all chunks
+                all_embeddings = []
+                for chunk in chunks:
+                    embeddings = APIBackend().create_embedding(input_content=chunk)
+                    all_embeddings.extend(embeddings)
+                
+                # Use average of all chunk embeddings as final embedding
+                if all_embeddings:
+                    import numpy as np
+                    embeddings_array = np.array(all_embeddings)
+                    self.embedding = np.mean(embeddings_array, axis=0).tolist()
 
     def from_dict(self, data: dict):
         for key, value in data.items():
