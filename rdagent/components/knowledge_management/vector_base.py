@@ -34,8 +34,18 @@ class KnowledgeMetaData:
                 chunks.append(chunk)
             return chunks
 
-        self.trunks = split_string_into_chunks(self.content, chunk_size=size)
-        self.trunks_embedding = APIBackend().create_embedding(input_content=self.trunks)
+        # Kürze Content falls zu lang für Embedding
+        max_trunk_size = 4000  # Sicher unter 8192 Token Limit
+        actual_size = min(size, max_trunk_size)
+        
+        self.trunks = split_string_into_chunks(self.content, chunk_size=actual_size)
+        
+        # Kürze zu lange Trunks für Embedding
+        self.trunks_embedding = []
+        for trunk in self.trunks:
+            if len(trunk) > 15000:
+                trunk = trunk[:15000] + "... [truncated]"
+            self.trunks_embedding.extend(APIBackend().create_embedding(input_content=trunk))
 
     def create_embedding(self):
         """
@@ -45,7 +55,16 @@ class KnowledgeMetaData:
 
         """
         if self.embedding is None:
-            self.embedding = APIBackend().create_embedding(input_content=self.content)
+            # Kürze Content auf max 4000 Token für Embedding (nomic-embed-text Limit ist 8192)
+            # Sicherer Puffer: 4000 Token ≈ 3000 Zeichen
+            max_content_length = 15000
+            content_to_embed = self.content[:max_content_length] if len(self.content) > max_content_length else self.content
+            
+            if len(self.content) > max_content_length:
+                # Füge Hinweis hinzu dass Content gekürzt wurde
+                content_to_embed += "... [truncated for embedding]"
+            
+            self.embedding = APIBackend().create_embedding(input_content=content_to_embed)
 
     def from_dict(self, data: dict):
         for key, value in data.items():
