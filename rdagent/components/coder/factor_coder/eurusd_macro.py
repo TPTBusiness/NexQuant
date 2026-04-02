@@ -1,14 +1,18 @@
 """
 EURUSD Macro Agent (Stanley Druckenmiller Stil)
 
-Inspiriert von: ai-hedge-fund/src/agents/stanley_druckenmiller.py
-
 Makro-Fokus für Forex-Trading:
 - Zinsdifferential (Fed vs EZB)
 - Wirtschaftswachstum (BIP, PMI, NFP)
 - Momentum (DXY Trend, EURUSD Trend)
 - Sentiment (COT Report, Risk Sentiment)
 - Asymmetrische Risk-Reward-Analyse
+
+Druckenmiller-Prinzipien:
+- "It's not whether you're right or wrong, but how much you make when right"
+- Asymmetrische Chancen erkennen (begrenztes Downside, großes Upside)
+- Bei hoher Conviction großen Positionen eingehen
+- Makro-Trends folgen, nicht gegen sie handeln
 """
 
 import json
