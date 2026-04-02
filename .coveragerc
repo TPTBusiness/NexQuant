@@ -1,0 +1,55 @@
+[run]
+# Source code to measure
+source = rdagent/components/backtesting
+
+# Omit patterns
+omit =
+    */tests/*
+    */test_*
+    */__pycache__/*
+    */conftest.py
+    */site-packages/*
+
+# Branch coverage
+branch = True
+
+# Parallel execution support
+parallel = True
+
+[report]
+# Precision for coverage percentages
+precision = 2
+
+# Exclude patterns
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+
+# Show missing lines
+show_missing = True
+
+# Skip covered files in report
+skip_covered = False
+
+# Fail under threshold
+fail_under = 80
+
+[html]
+# HTML report directory
+directory = htmlcov
+
+# Title for HTML report
+title = PREDIX Backtesting Coverage Report
+
+[xml]
+# XML output file
+output = coverage.xml
+
+[json]
+# JSON output file
+output = coverage.json
