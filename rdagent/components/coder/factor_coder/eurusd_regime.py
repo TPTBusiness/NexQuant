@@ -144,7 +144,7 @@ def detect_eurusd_regime(
     - H = 0.55-0.65: Neutral (vorsichtig, scalping oder abwarten)
     - H > 0.65: Trending (Trend-Following mit EMA, MACD)
     
-    Hinweis: Der Hurst Exponent aus R/S-Analyse tendiert zu Werten um 0.6-0.7
+    Note: The Hurst Exponent from R/S analysis tends towards values around 0.6-0.7
     für finanzielle Zeitreihen. Die Thresholds wurden entsprechend angepasst.
     
     Parameters

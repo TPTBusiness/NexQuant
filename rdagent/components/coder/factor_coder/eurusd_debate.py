@@ -740,10 +740,10 @@ if __name__ == "__main__":
             result = "LONG"
         else:
             result = "SHORT"
-        
+
         status = "✓" if result == scenario["expected"] else "✗"
-        print(f"  {status} Szenario {i}: Bull={scenario['bull']}%, Bear={scenario['bear']}%, Neutral={scenario['neutral']}%")
-        print(f"      → {result} (erwartet: {scenario['expected']})")
-    
-    print("\n✅ EURUSD Debate Team Implementierung ist funktionsfähig!")
-    print("\nHinweis: Vollständige LLM-Tests erfordern einen laufenden Server.")
+        print(f"  {status} Scenario {i}: Bull={scenario['bull']}%, Bear={scenario['bear']}%, Neutral={scenario['neutral']}%")
+        print(f"      → {result} (expected: {scenario['expected']})")
+
+    print("\n✅ EURUSD Debate Team implementation is functional!")
+    print("\nNote: Full LLM tests require a running server.")

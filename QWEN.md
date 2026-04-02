@@ -151,7 +151,39 @@ pre-commit run --all-files
 
 ## Development Conventions
 
+### Language Policy
+
+**ALL code comments and documentation MUST be in English.**
+
+❌ **Wrong (German):**
+```python
+# Inspiriert von: TradingAgents
+# Berechnet den Sharpe Ratio
+# Achtung: Division durch Null möglich!
+# Hinweis: Diese Funktion ist experimentell
+```
+
+✅ **Correct (English):**
+```python
+# Inspired by: TradingAgents
+# Calculates the Sharpe ratio
+# Warning: Division by zero possible!
+# Note: This function is experimental
+```
+
+**Rationale:**
+- International collaboration
+- Better searchability
+- Professional codebase
+- Consistent with commit messages (also English-only)
+
+**Enforcement:**
+- All new code must have English comments
+- Existing German comments should be translated when modified
+- PRs with German comments will be rejected
+
 ### Code Style
+
 - **Line length:** 120 characters (configured in pyproject.toml)
 - **Type hints:** Required for all public functions
 - **Docstrings:** Google style for public APIs
