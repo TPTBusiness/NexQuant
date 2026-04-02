@@ -1,14 +1,14 @@
 # ============================================================
 #  Predix Data Configuration
-#  Ändere hier Instrument, Frequenz und Zeiträume
-#  Alle anderen Komponenten lesen aus dieser Datei
+#  Change instrument, frequency, and time periods here
+#  All other components read from this file
 # ============================================================
 
 instrument: EURUSD
 frequency: 1min          # 1min, 5min, 15min, 1h, 1d
 data_path: ~/.qlib/qlib_data/eurusd_1min_data
 
-# Verfügbare Spalten (keine $factor Spalte!)
+# Available columns (no $factor column!)
 columns:
   - $open
   - $close
@@ -24,7 +24,7 @@ valid_end:   "2024-12-31"
 test_start:  "2025-01-01"
 test_end:    "2026-03-20"
 
-# Markt-Kontext für LLM Prompts
+# Market Context for LLM Prompts
 market_context:
   spread_bps: 1.5
   sessions:
@@ -32,10 +32,10 @@ market_context:
     london:  "08:00-16:00 UTC"
     ny:      "13:00-21:00 UTC"
     overlap: "13:00-16:00 UTC"
-  target_arr: 9.62          # % ARR zu schlagen
-  max_drawdown: 20          # % maximaler Drawdown
+  target_arr: 9.62          # % ARR to beat
+  max_drawdown: 20          # % maximum drawdown
 
-# Lookback Referenz (in Bars)
+# Lookback Reference (in Bars)
 lookback:
   1h:  4
   2h:  8
