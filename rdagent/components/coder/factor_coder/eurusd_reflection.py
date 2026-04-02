@@ -239,7 +239,7 @@ class EURUSDReflectionSystem:
         """Extrahiert negative Lessons Learned."""
         lessons = []
         
-        # Counter-Trend Warnung
+        # Counter-trend warning
         reasoning = trade_result.get("reasoning", [])
         for reason in reasoning:
             if "Counter-Trend" in reason and trade_result.get("pnl", 0) < 0:
