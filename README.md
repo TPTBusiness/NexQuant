@@ -13,7 +13,6 @@
 
 <p align="center">
   <a href="https://github.com/PredixAI/predix/blob/main/LICENSE"><img src="https://img.shields.io/github/license/PredixAI/predix" alt="License"></a>
-  <a href="https://pypi.org/project/predix/"><img src="https://img.shields.io/pypi/v/predix" alt="PyPI"></a>
   <a href="https://github.com/PredixAI/predix/actions/workflows/ci.yml"><img src="https://github.com/PredixAI/predix/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
   <a href="https://github.com/PredixAI/predix/stargazers"><img src="https://img.shields.io/github/stars/PredixAI/predix" alt="Stars"></a>
@@ -59,72 +58,87 @@ All code in Predix is originally written and implemented independently. Predix e
 ### Quick Install
 
 ```bash
-# Install from PyPI
-pip install predix
-
-# Or install from source
+# Clone repository
 git clone https://github.com/PredixAI/predix
 cd predix
-pip install -e .
-```
 
-### Development Setup
-
-```bash
 # Create conda environment
 conda create -n predix python=3.10
 conda activate predix
 
-# Install in editable mode with dev dependencies
-make dev
+# Install in editable mode
+pip install -e .[test,lint]
+```
+
+### Configuration
+
+1. **Create `.env` file:**
+```bash
+# Local LLM (llama.cpp)
+OPENAI_API_KEY=local
+OPENAI_API_BASE=http://localhost:8081/v1
+CHAT_MODEL=qwen3.5-35b
+
+# Embedding (Ollama)
+LITELLM_PROXY_API_KEY=local
+LITELLM_PROXY_API_BASE=http://localhost:11434/v1
+EMBEDDING_MODEL=nomic-embed-text
+
+# Paths
+QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
+```
+
+2. **Start LLM server (llama.cpp):**
+```bash
+~/llama.cpp/build/bin/llama-server \
+  --model ~/models/qwen3.5/Qwen3.5-35B-A3B-Q3_K_M.gguf \
+  --n-gpu-layers 36 \
+  --ctx-size 80000 \
+  --port 8081
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Health Check
-
-Verify your environment is properly configured:
+### 1. Run Trading Loop
 
 ```bash
-rdagent health_check --no-check-env
-```
+# Activate conda environment
+conda activate predix
 
-### 2. Configure LLM Backend
-
-Create a `.env` file in your project root:
-
-```bash
-# Example: OpenAI configuration
-cat << EOF > .env
-CHAT_MODEL=gpt-4o
-EMBEDDING_MODEL=text-embedding-3-small
-OPENAI_API_BASE=https://api.openai.com/v1
-OPENAI_API_KEY=your-api-key-here
-EOF
-```
-
-**Alternative providers:**
-
-- **Azure OpenAI**: Set `AZURE_API_KEY`, `AZURE_API_BASE`, `AZURE_API_VERSION`
-- **DeepSeek**: Use `CHAT_MODEL=deepseek/deepseek-chat` with `DEEPSEEK_API_KEY`
-- **SiliconFlow (embedding)**: Use `EMBEDDING_MODEL=litellm_proxy/BAAI/bge-m3`
-
-### 3. Run Quantitative Trading Loop
-
-```bash
-# Full factor & model co-evolution
+# Start EURUSD trading loop
 rdagent fin_quant
 
-# Factor-only evolution
-rdagent fin_factor
-
-# Model-only evolution
-rdagent fin_model
+# With options
+rdagent fin_quant --loop-n 5 --step-n 2
 ```
 
-### 4. Monitor Results
+### 2. Monitor Results
+
+```bash
+# Start the UI dashboard
+rdagent server_ui --port 19899 --log-dir git_ignore_folder/RD-Agent_workspace/
+
+# Or open in browser
+# http://127.0.0.1:19899
+```
+
+### 3. Loop Continuously
+
+To run the trading loop continuously with auto-restart:
+
+```bash
+# Simple loop
+while true; do
+    rdagent fin_quant
+    sleep 5
+done
+```
+
+---
+
+## Configuration
 
 ```bash
 # Start the UI dashboard
