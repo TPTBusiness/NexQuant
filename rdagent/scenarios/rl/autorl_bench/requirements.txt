@@ -19,7 +19,7 @@ vllm>=0.18.0  # Security fix: CVE-2026-22778 (RCE via JPEG2000 heap overflow) + 
 # Data processing
 numpy>=1.26.0
 pandas>=1.5.0
-pydantic>=2.0.0
+pydantic>=2.4.0  # Security fix: CVE-2024-3772 (ReDoS via crafted email)
 
 # Models
 torch>=2.6.0  # Security fix: CVE-2025-32434 (torch.load RCE with weights_only=True)
