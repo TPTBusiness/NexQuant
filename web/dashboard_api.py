@@ -313,5 +313,15 @@ if __name__ == '__main__':
     print(f"Starting server on http://localhost:5000")
     print(f"API Docs: http://localhost:5000/")
     print("="*60)
+
+    # Security fix: Disable debug mode in production
+    # Debug mode allows arbitrary code execution via Werkzeug debugger
+    # For development only: Set FLASK_DEBUG=1 environment variable
+    import os
+    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    if debug_mode:
+        print("\n⚠️  WARNING: Running in DEBUG mode (development only!)")
+        print("   Do NOT use in production - allows arbitrary code execution!\n")
+    
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
