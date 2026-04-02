@@ -65,4 +65,13 @@ data_raw/
 # Local scripts (generated)
 convert_1min.py
 import_1min_qlib.py
+
+# Results (Backtesting, Factors, Runs)
+results/
+*.db
+*.csv
+*_export.json
 *.h5
+
+# Documentation (generated)
+QWEN.md
