@@ -38,7 +38,7 @@ class MultiProviderLLM:
     Multi-Provider LLM Client mit automatischem Fallback.
     
     Verwendet eine Prioritätsliste von Providern und wechselt
-    automatisch zum nächsten bei Fehlern.
+    automatically switches to the next provider on errors.
     
     Attributes
     ----------
