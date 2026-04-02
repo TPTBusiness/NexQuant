@@ -16,6 +16,7 @@
   <a href="https://pypi.org/project/predix/"><img src="https://img.shields.io/pypi/v/predix" alt="PyPI"></a>
   <a href="https://github.com/PredixAI/predix/actions/workflows/ci.yml"><img src="https://github.com/PredixAI/predix/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+  <a href="https://github.com/PredixAI/predix/stargazers"><img src="https://img.shields.io/github/stars/PredixAI/predix" alt="Stars"></a>
 </p>
 
 ---
@@ -275,6 +276,15 @@ Core dependencies (see [`requirements.txt`](requirements.txt) for full list):
 ## License
 
 This project is licensed under the **MIT License** – see the [`LICENSE`](LICENSE) file for details.
+
+### Attribution Requirements
+
+If you use this code or concepts in your project, you **must**:
+1. Include the MIT License text
+2. Keep the copyright notice: "Copyright (c) 2025 Predix Team"
+3. Provide attribution to the original project
+
+See [`ATTRIBUTION.md`](ATTRIBUTION.md) for detailed guidelines and examples.
 
 ---
 
