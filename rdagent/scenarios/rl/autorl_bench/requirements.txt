@@ -1,34 +1,36 @@
-# AutoRL-Bench 依赖
-# conda 环境: (Python 3.10)
+# AutoRL-Bench Dependencies
+# conda environment: Python 3.10
 
-# RL 训练（核心）
+# RL Training (core)
 trl>=0.27.0
 accelerate>=1.0.0
 datasets>=3.0.0
 peft>=0.18.1
 
-# 评测
+# Evaluation
 opencompass==0.5.1
-setuptools<75  # uv venv 不自带, opencompass 依赖 pkg_resources
+setuptools<75  # uv venv doesn't include, opencompass depends on pkg_resources
 
-# 推理加速（可选，TRL 支持 0.10.2-0.12.0）
-vllm>=0.18.0  # Security fix: CVE-2026-22778 (JPEG2000 RCE), CVE-2026-22807 (auto_map RCE), CVE-2026-27893 (trust_remote_code)
+# Inference acceleration (optional, TRL supports 0.10.2-0.12.0)
+# Security: Version >=0.14.0 fixes CVE-2026-22807 (RCE via auto_map dynamic module loading)
+# Current spec (>=0.18.0) is already safe. Dependabot alert is false positive due to missing lockfile.
+vllm>=0.18.0  # Security fix: CVE-2026-22778 (RCE via JPEG2000 heap overflow) + CVE-2026-27893
 
-# 数据处理
+# Data processing
 numpy>=1.26.0
 pandas>=1.5.0
 pydantic>=2.0.0
 
-# 模型
+# Models
 torch>=2.6.0  # Security fix: CVE-2025-32434 (torch.load RCE with weights_only=True)
 transformers>=4.48.0  # Security fix: CVE-2024-11393 (Deserialization RCE)
 huggingface_hub>=0.20.0
 
-# Web 服务
+# Web services
 flask
 flask-cors
 
-# 工具
+# Tools
 loguru
 requests
 pyyaml
