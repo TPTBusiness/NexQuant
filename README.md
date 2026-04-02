@@ -12,10 +12,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/TPTBusiness/Predix/blob/main/LICENSE"><img src="https://img.shields.io/github/license/PredixAI/predix" alt="License"></a>
+  <a href="https://github.com/TPTBusiness/Predix/blob/main/LICENSE"><img src="https://img.shields.io/github/license/TPTBusiness/Predix" alt="License"></a>
   <a href="https://github.com/TPTBusiness/Predix/actions/workflows/ci.yml"><img src="https://github.com/TPTBusiness/Predix/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
-  <a href="https://github.com/TPTBusiness/Predix/stargazers"><img src="https://img.shields.io/github/stars/PredixAI/predix" alt="Stars"></a>
+  <a href="https://github.com/TPTBusiness/Predix/stargazers"><img src="https://img.shields.io/github/stars/TPTBusiness/Predix" alt="Stars"></a>
 </p>
 
 ---
