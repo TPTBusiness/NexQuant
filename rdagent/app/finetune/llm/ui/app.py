@@ -30,15 +30,40 @@ def get_job_options(base_path: Path) -> list[str]:
     Scan directory and return job options list.
     - "." means standalone tasks in root directory
     - Others are job directory names
+    
+    Security: Validates base_path to prevent path traversal attacks.
+    Only allows scanning directories within the current working directory.
     """
     options = []
     has_root_tasks = False
     job_dirs = []
 
-    if not base_path.exists():
+    # Security fix: Validate base_path to prevent path traversal
+    # Resolve to absolute path and ensure it's within allowed boundaries
+    try:
+        base_path_resolved = base_path.resolve(strict=False)
+        cwd_resolved = Path.cwd().resolve()
+        
+        # Ensure base_path is within or relative to current working directory
+        # This prevents accessing arbitrary filesystem locations
+        try:
+            base_path_resolved.relative_to(cwd_resolved)
+        except ValueError:
+            # Path is outside CWD, check if it's a safe relative path
+            if base_path_resolved.is_relative_to(cwd_resolved):
+                pass  # OK
+            else:
+                # Path is completely outside project, reject it
+                st.error(f"Invalid log base path: Must be within project directory")
+                return options
+    except (OSError, RuntimeError) as e:
+        st.error(f"Invalid path: {e}")
         return options
 
-    for d in base_path.iterdir():
+    if not base_path_resolved.exists():
+        return options
+
+    for d in base_path_resolved.iterdir():
         if not d.is_dir():
             continue
         # Check if standalone task (has __session__ directly)
