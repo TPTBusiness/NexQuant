@@ -30,6 +30,62 @@ def _get_available_gpus() -> Set[str]:
     return {g.strip() for g in cuda_env.split(",") if g.strip()}
 
 
+def _safe_resolve_path(user_path: str, allowed_root: Path) -> Path:
+    """
+    Safely resolve a user-provided path within an allowed root directory.
+    
+    This function prevents path traversal attacks by:
+    1. Rejecting null bytes
+    2. Normalizing the path to remove .. and . components
+    3. Rejecting Windows drive letters
+    4. Rejecting absolute paths
+    5. Validating the resolved path is within allowed_root using relative_to()
+    
+    Args:
+        user_path: User-provided relative path
+        allowed_root: Root directory that must contain the resolved path
+        
+    Returns:
+        Resolved absolute Path within allowed_root
+        
+    Raises:
+        ValueError: If the path is invalid or attempts path traversal
+        
+    Security: This function is designed to satisfy CodeQL path-injection checks
+    by explicitly validating the resolved path is within the allowed root.
+    """
+    # Reject null bytes
+    if "\x00" in user_path:
+        raise ValueError("Invalid path: contains null byte")
+
+    # Normalize path to remove .. and . components
+    normalized = os.path.normpath(user_path)
+
+    # Reject Windows drive letters (e.g., C:\)
+    if os.path.splitdrive(normalized)[0]:
+        raise ValueError("Invalid path: contains drive letter")
+
+    # Reject absolute paths
+    if os.path.isabs(normalized):
+        raise ValueError("Invalid path: must be relative path")
+
+    # Resolve allowed_root to absolute path
+    root_resolved = allowed_root.expanduser().resolve()
+
+    # Join with root and resolve to absolute path
+    candidate = root_resolved / normalized
+    resolved = candidate.resolve(strict=False)
+
+    # Security check: ensure resolved path is within allowed_root
+    # This is the critical check that prevents path traversal attacks
+    try:
+        resolved.relative_to(root_resolved)
+    except ValueError as exc:
+        raise ValueError(f"Invalid path: path traversal detected - {user_path}") from exc
+
+    return resolved
+
+
 def _validate_gpu(gpu: str, available: Set[str]) -> Optional[str]:
     """校验 gpu 参数，返回错误信息或 None（合法）"""
     requested = {g.strip() for g in gpu.split(",") if g.strip()}
