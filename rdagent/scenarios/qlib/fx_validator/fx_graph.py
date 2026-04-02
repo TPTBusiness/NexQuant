@@ -1,6 +1,11 @@
 """
 FX Validator Graph — Multi-Agent Validierung für Predix Faktoren
-Inspiriert von TradingAgents, angepasst für EURUSD 1min
+
+Implementiert Multi-Agenten-System für Trading-Entscheidungen:
+- Session Analyst: Analysiert aktuelle FX-Session
+- Macro Analyst: Bewertet makroökonomische Faktoren
+- Bull/Bear Researchers: Debattieren Long/Short-These
+- FX Trader: Trifft finale Trading-Entscheidung
 """
 from typing import TypedDict, Optional
 from langgraph.graph import StateGraph, END
