@@ -26,9 +26,11 @@ from rdagent.scenarios.finetune.benchmark.data.adaptor import BENCHMARK_CONFIG_D
 from rdagent.scenarios.finetune.benchmark.data.default import extract_error_samples
 
 # OpenCompass API config template
+# Security: API key is read from environment variable at runtime, not stored in config file
 API_CONFIG_TEMPLATE = """
 from mmengine.config import read_base
 from opencompass.models import OpenAI
+import os
 
 # ==================== Dataset Import ====================
 with read_base():
@@ -53,7 +55,7 @@ models = [
         abbr='{model_abbr}',
         type=OpenAI,
         path='{model_path}',
-        key='{api_key}',
+        key=os.environ.get('TEST_API_KEY', ''),  # Security: Read from env var, not stored in file
         openai_api_base='{api_base}',
         meta_template=api_meta_template,
         query_per_second={query_per_second},
