@@ -272,6 +272,8 @@ def run_benchmark_api(
         # Pass API credentials for use inside Docker
         "OPENAI_API_KEY": api_key,
         "OPENAI_BASE_URL": docker_api_base_sdk,  # SDK auto-appends /chat/completions
+        # Security: Pass TEST_API_KEY for config file to read at runtime (not stored in file)
+        "TEST_API_KEY": api_key,
     }
     # Add HF token for gated datasets (e.g., ChemCoTBench)
     if hf_token:
