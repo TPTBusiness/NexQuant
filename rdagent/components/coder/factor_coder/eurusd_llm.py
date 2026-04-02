@@ -1,8 +1,6 @@
 """
 Multi-Provider LLM Fallback für robuste AI-Infrastruktur
 
-Inspiriert von: OpenStock/lib/ai-provider.ts
-
 Verwendet mehrere LLM-Provider mit automatischem Fallback:
 1. Primär: Lokaler Qwen3.5-35B (localhost:8081)
 2. Fallback 1: DeepSeek Chat API

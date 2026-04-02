@@ -31,7 +31,19 @@
 
 Predix is optimized for **1-minute EUR/USD FX data** (2020–2026) and uses Qlib as the underlying backtesting engine.
 
-> **Acknowledgment:** This project is built upon [Microsoft RD-Agent](https://github.com/microsoft/RD-Agent), an open-source autonomous R&D agent framework. We extend our gratitude to the RD-Agent team for their excellent foundational work. Predix extends RD-Agent with EUR/USD forex-specific features, backtesting capabilities, risk management, and trading dashboards.
+## Acknowledgments
+
+This project draws inspiration from various open-source projects in the AI trading and multi-agent systems space. We thank all the authors for their innovative work that helped shape our understanding of these patterns.
+
+Special thanks to:
+
+- **[Microsoft RD-Agent](https://github.com/microsoft/RD-Agent)** (MIT License) - Foundation for our autonomous R&D agent framework. We extend our gratitude to the RD-Agent team for their excellent foundational work.
+
+- **[TradingAgents](https://github.com/TradingAgents/TradingAgents)** (Apache 2.0 License) - Inspiration for our multi-agent debate system, reflection mechanism, and memory management modules.
+
+- **[ai-hedge-fund](https://github.com/virattt/ai-hedge-fund)** - Inspiration for macro analysis (Stanley Druckenmiller agent), risk management concepts, and market regime detection.
+
+All code in Predix is originally written and implemented independently. Predix extends these frameworks with EUR/USD forex-specific features, 1-minute backtesting capabilities, comprehensive risk management, and trading dashboards.
 
 ---
 
