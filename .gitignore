@@ -81,3 +81,8 @@ QWEN.md
 
 # Internal documentation (not for public)
 TODO.md
+
+# Test credentials
+.env.test
+*.test.env
+test_credentials.py
