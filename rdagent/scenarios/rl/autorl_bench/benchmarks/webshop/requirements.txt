@@ -30,5 +30,6 @@ spacy==3.7.2
 # - CVE-2024-49766: safe_join UNC path bypass on Windows (fixed in 3.0.6)
 # - CVE-2024-34069: Werkzeug debugger RCE (fixed)
 # - CVE-2024-49767: Resource exhaustion via multipart/form-data (fixed)
+# - CVE-2023-46136: DoS via multipart/form-data parser (fixed in 2.3.8)
 flask>=3.0.0
 Werkzeug>=3.1.6  # Security fix: All Werkzeug CVEs fixed (Windows + Linux)
