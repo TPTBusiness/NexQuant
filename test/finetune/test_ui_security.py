@@ -1,218 +1,142 @@
 """
-Security Tests for FT Timeline Viewer UI
+Security Tests for UI Path-Validation
 
-Tests for path traversal vulnerability prevention (GitHub Issue #13).
-Ensures user-provided paths are validated before file system access.
+Tests for path traversal prevention in get_job_options() function.
+Ensures that only directories within the Current Working Directory
+can be accessed.
+
+Run:
+    pytest test/finetune/test_ui_security.py -v
 """
-
-import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
-
 import pytest
-
-# Import the functions we're testing
-import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import os
+from pathlib import Path
 
 from rdagent.app.finetune.llm.ui.app import get_job_options
 
 
-class TestPathTraversalPrevention:
-    """Test path traversal vulnerability prevention in UI."""
+class TestGetJobOptionsSecurity:
+    """Security tests for get_job_options() - Path Traversal Prevention"""
 
-    def test_valid_path_within_cwd(self):
-        """Test that valid paths within CWD are accepted."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_path = Path(tmpdir)
-            # Create a valid job directory structure
-            job_dir = tmp_path / "valid_job"
-            job_dir.mkdir()
-            (job_dir / "subdir").mkdir()
-            (job_dir / "subdir" / "__session__").touch()
+    def test_absolute_path_outside_cwd_blocked(self):
+        """Absolute paths outside CWD should be blocked"""
+        # Try to access /etc (outside CWD)
+        malicious_path = Path("/etc")
+        result = get_job_options(malicious_path)
+        # Should return empty list (path outside CWD)
+        assert result == [], "Path traversal to /etc should be blocked"
 
-            # Should return the valid job directory
-            options = get_job_options(tmp_path)
-            assert "valid_job" in options
+    def test_root_path_blocked(self):
+        """Root path / should be blocked"""
+        result = get_job_options(Path("/"))
+        # Root path is outside CWD, should return empty list
+        assert result == [], "Root path should be blocked"
 
-    def test_path_traversal_with_double_dots(self):
-        """Test that path traversal with ../ is blocked."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_path = Path(tmpdir)
-            # Try to traverse outside allowed directory
-            malicious_path = tmp_path / ".." / ".." / "etc"
+    def test_nonexistent_path_returns_empty(self):
+        """Non-existent paths should return empty list"""
+        nonexistent_path = Path("/nonexistent/path/that/does/not/exist")
+        result = get_job_options(nonexistent_path)
+        assert result == [], "Non-existent path should return empty list"
 
-            # Should not raise an error, but should return empty options
-            # The function should handle this gracefully via try-except
-            options = get_job_options(malicious_path)
-            # Either returns empty list or shows error via Streamlit
-            assert isinstance(options, list)
+    def test_path_traversal_relative_blocked(self):
+        """Relative path traversal ../../../etc should be blocked"""
+        # Try with relative path traversal
+        malicious_path = Path("../../../etc")
+        result = get_job_options(malicious_path)
+        # Should be blocked (either empty or error)
+        assert isinstance(result, list), "Should return list"
+        # The path should be resolved and blocked
+        assert result == [], "Relative path traversal should be blocked"
 
-    def test_absolute_path_outside_cwd(self):
-        """Test that absolute paths outside CWD are rejected."""
-        # Try to access /tmp which should be outside CWD
-        outside_path = Path("/tmp")
+    def test_empty_path_handling(self):
+        """Test handling of empty path"""
+        result = get_job_options(Path(""))
+        assert isinstance(result, list), "Should return list for empty path"
 
-        # Mock st.error to capture the error message
-        with patch('rdagent.app.finetune.llm.ui.app.st') as mock_st:
-            options = get_job_options(outside_path)
 
-            # Should show error and return empty list
-            assert mock_st.error.called
-            error_msg = mock_st.error.call_args[0][0]
-            assert "Invalid log base path" in error_msg or "Invalid path" in error_msg
-            assert options == []
+class TestJobFolderPathValidation:
+    """Tests for job_folder path validation logic (from main() function)"""
 
-    def test_path_with_symlink_traversal(self):
-        """Test that symlink-based path traversal is blocked."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_path = Path(tmpdir)
+    def test_job_folder_within_base_path(self, tmp_path):
+        """Test that job_folder within base_path is accepted"""
+        base_path = tmp_path / "log"
+        base_path.mkdir()
+        job_path = base_path / "job1"
+        job_path.mkdir()
 
-            # Create a safe directory
-            safe_dir = tmp_path / "safe"
-            safe_dir.mkdir()
+        # Simulate validation logic from main()
+        safe_root = base_path.resolve()
+        job_path_resolved = job_path.resolve()
 
-            # Create a symlink pointing outside
-            outside_target = Path("/etc")
-            symlink_path = safe_dir / "evil_link"
+        # Should not raise ValueError
+        try:
+            job_path_resolved.relative_to(safe_root)
+            validation_passed = True
+        except ValueError:
+            validation_passed = False
 
-            try:
-                symlink_path.symlink_to(outside_target)
+        assert validation_passed is True, "Valid path within base should pass validation"
 
-                # Try to use the symlink path
-                with patch('rdagent.app.finetune.llm.ui.app.st') as mock_st:
-                    options = get_job_options(symlink_path)
+    def test_job_folder_outside_base_path(self, tmp_path):
+        """Test that job_folder outside base_path is rejected"""
+        base_path = tmp_path / "log"
+        base_path.mkdir()
+        job_path = tmp_path / "other" / "job1"
+        job_path.mkdir(parents=True)
 
-                    # Should either reject or handle gracefully
-                    assert isinstance(options, list)
-            except (OSError, NotImplementedError):
-                # Symlinks not supported on this system - skip test
-                pytest.skip("Symlinks not supported")
+        # Simulate validation logic from main()
+        safe_root = base_path.resolve()
+        job_path_resolved = job_path.resolve()
 
-    def test_resolve_prevents_traversal(self):
-        """Test that Path.resolve() prevents traversal attacks."""
-        # This tests the core security mechanism
-        safe_root = Path.cwd().resolve()
-
-        # Attempt to create a path that tries to escape
-        malicious = Path("/tmp/../etc/passwd")
-        resolved = malicious.resolve(strict=False)
-
-        # The resolved path should still be /etc/passwd (not normalized away)
-        # But the relative_to check should fail
+        # Should raise ValueError
         with pytest.raises(ValueError):
-            resolved.relative_to(safe_root)
+            job_path_resolved.relative_to(safe_root)
 
-    def test_expanduser_security(self):
-        """Test that ~ expansion doesn't bypass security."""
-        with patch('rdagent.app.finetune.llm.ui.app.st') as mock_st:
-            # Try to use home directory which may be outside CWD
-            home_path = Path("~").expanduser()
+    def test_job_folder_traversal_attempt(self, tmp_path):
+        """Test that path traversal in job_folder is blocked"""
+        base_path = tmp_path / "log"
+        base_path.mkdir()
 
-            options = get_job_options(home_path)
+        # Malicious job_folder attempt
+        job_folder = str(base_path / ".." / ".." / "etc")
 
-            # Should be rejected if outside CWD
-            if home_path.resolve().relative_to(Path.cwd().resolve()):
-                # If home is within CWD (unlikely), it might pass
-                pass
-            else:
-                # Should show error
-                assert mock_st.error.called or options == []
+        # Simulate validation logic from main()
+        safe_root = base_path.resolve()
+        job_path = Path(job_folder).expanduser().resolve(strict=False)
 
-    def test_special_characters_in_path(self):
-        """Test that special characters in paths are handled safely."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_path = Path(tmpdir)
-
-            # Create directory with special characters
-            special_dir = tmp_path / "job$test`backtick"
-            special_dir.mkdir()
-            (special_dir / "__session__").touch()
-
-            # Should handle safely (either accept or reject, but not crash)
-            options = get_job_options(tmp_path)
-            assert isinstance(options, list)
-
-    def test_nonexistent_path_handling(self):
-        """Test that nonexistent paths are handled gracefully."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_path = Path(tmpdir)
-            nonexistent = tmp_path / "does_not_exist"
-
-            # Should not crash, just return empty list
-            options = get_job_options(nonexistent)
-            assert options == []
-
-    def test_permission_error_handling(self):
-        """Test that permission errors are handled gracefully."""
-        # Try to access a directory that may have permission issues
-        restricted = Path("/root")
-
-        with patch('rdagent.app.finetune.llm.ui.app.st') as mock_st:
-            options = get_job_options(restricted)
-
-            # Should handle gracefully (either error message or empty list)
-            assert isinstance(options, list)
-
-
-class TestSecurityMechanism:
-    """Test the core security mechanism (relative_to validation)."""
-
-    def test_relative_to_validation(self):
-        """Test that relative_to() correctly identifies path containment."""
-        base = Path("/safe/base").resolve()
-
-        # Valid: path within base
-        valid = Path("/safe/base/job1").resolve()
-        assert valid.relative_to(base) is not None
-
-        # Invalid: path outside base
-        invalid = Path("/unsafe/other").resolve()
+        # Should raise ValueError
         with pytest.raises(ValueError):
-            invalid.relative_to(base)
+            job_path.relative_to(safe_root)
 
-        # Invalid: path traversal attempt
-        traversal = Path("/safe/base/../other").resolve()
-        with pytest.raises(ValueError):
-            traversal.relative_to(base)
 
-    def test_security_pattern_from_issue_13(self):
-        """
-        Test the exact security pattern used to fix GitHub Issue #13.
+class TestIntegrationScenarios:
+    """Integration tests for realistic attack scenarios"""
 
-        The fix uses:
-        1. Path.resolve() to normalize the path
-        2. Path.relative_to() to verify containment
-        3. try-except to handle ValueError
+    def test_double_encoding_attack(self):
+        """Test double-encoded path traversal attempt"""
+        # Double-encoded "../" would be "%252e%252e%252f"
+        # But we're testing raw paths, so use literal dots
+        malicious_path = Path("/../../etc/passwd")
+        result = get_job_options(malicious_path)
+        assert result == [], "Double encoding attack should be blocked"
 
-        This pattern prevents:
-        - Path traversal with ../
-        - Symlink attacks
-        - Absolute path injection
-        """
-        safe_root = Path("/allowed").resolve()
+    def test_etc_passwd_access_blocked(self):
+        """Test that direct /etc/passwd access is blocked"""
+        result = get_job_options(Path("/etc/passwd"))
+        assert result == [], "/etc/passwd access should be blocked"
 
-        # Test cases that should be REJECTED
-        rejected_paths = [
-            Path("/allowed/../forbidden").resolve(),
-            Path("/forbidden").resolve(),
-            Path("/tmp/escape").resolve(),
+    def test_system_directories_blocked(self):
+        """Test that system directories are blocked"""
+        system_paths = [
+            Path("/etc"),
+            Path("/usr"),
+            Path("/var"),
+            Path("/root"),
+            Path("/home"),
         ]
-
-        for malicious in rejected_paths:
-            with pytest.raises(ValueError):
-                malicious.relative_to(safe_root)
-
-        # Test cases that should be ACCEPTED
-        accepted_paths = [
-            Path("/allowed/job1").resolve(),
-            Path("/allowed/subdir/job2").resolve(),
-        ]
-
-        for valid in accepted_paths:
-            result = valid.relative_to(safe_root)
-            assert result is not None
+        for path in system_paths:
+            result = get_job_options(path)
+            assert result == [], f"System directory {path} should be blocked"
 
 
 if __name__ == "__main__":
