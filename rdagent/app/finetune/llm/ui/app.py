@@ -25,12 +25,45 @@ from rdagent.app.finetune.llm.ui.ft_summary import render_job_summary
 DEFAULT_LOG_BASE = "log/"
 
 
+def validate_path_within_cwd(user_path: Path) -> Path:
+    """
+    Validate that a user-provided path is within the current working directory.
+    
+    Security: This function prevents path traversal attacks by:
+    1. Resolving the path to its absolute canonical form
+    2. Verifying it's within the CWD boundary using relative_to()
+    3. Rejecting paths outside the boundary with ValueError
+    
+    Parameters
+    ----------
+    user_path : Path
+        User-provided path to validate
+    
+    Returns
+    -------
+    Path
+        Resolved absolute path if valid
+    
+    Raises
+    ------
+    ValueError
+        If path is outside the current working directory
+    """
+    safe_root = Path.cwd().resolve()
+    resolved_path = user_path.expanduser().resolve(strict=False)
+    
+    # This will raise ValueError if resolved_path is not within safe_root
+    resolved_path.relative_to(safe_root)
+    
+    return resolved_path
+
+
 def get_job_options(base_path: Path) -> list[str]:
     """
     Scan directory and return job options list.
     - "." means standalone tasks in root directory
     - Others are job directory names
-    
+
     Security: Validates base_path to prevent path traversal attacks.
     Only allows scanning directories within the current working directory.
     """
@@ -39,13 +72,9 @@ def get_job_options(base_path: Path) -> list[str]:
     job_dirs = []
 
     # Security: Validate base_path to prevent path traversal
-    # Resolve to absolute path and ensure it's within the current working directory.
     try:
-        safe_root = Path.cwd().resolve()
-        base_path_resolved = base_path.expanduser().resolve(strict=False)
-
-        # Ensure base_path_resolved is within safe_root; raises ValueError if not.
-        base_path_resolved.relative_to(safe_root)
+        # Use dedicated validation function for path traversal prevention
+        base_path_resolved = validate_path_within_cwd(base_path)
     except ValueError:
         # Path is outside the allowed root, reject it.
         st.error("Invalid log base path: Must be within project directory")
