@@ -12,10 +12,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/PredixAI/predix/blob/main/LICENSE"><img src="https://img.shields.io/github/license/PredixAI/predix" alt="License"></a>
-  <a href="https://github.com/PredixAI/predix/actions/workflows/ci.yml"><img src="https://github.com/PredixAI/predix/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/TPTBusiness/Predix/blob/main/LICENSE"><img src="https://img.shields.io/github/license/PredixAI/predix" alt="License"></a>
+  <a href="https://github.com/TPTBusiness/Predix/actions/workflows/ci.yml"><img src="https://github.com/TPTBusiness/Predix/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
-  <a href="https://github.com/PredixAI/predix/stargazers"><img src="https://img.shields.io/github/stars/PredixAI/predix" alt="Stars"></a>
+  <a href="https://github.com/TPTBusiness/Predix/stargazers"><img src="https://img.shields.io/github/stars/PredixAI/predix" alt="Stars"></a>
 </p>
 
 ---
@@ -59,7 +59,7 @@ All code in Predix is originally written and implemented independently. Predix e
 
 ```bash
 # Clone repository
-git clone https://github.com/PredixAI/predix
+git clone https://github.com/TPTBusiness/Predix
 cd predix
 
 # Create conda environment
@@ -335,7 +335,7 @@ If you use Predix in your research, please cite the underlying framework:
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/PredixAI/predix/issues)
+- **Issues**: [GitHub Issues](https://github.com/TPTBusiness/Predix/issues)
 - **Documentation**: [Read the Docs](https://rdagent.readthedocs.io/)
 
 ---
