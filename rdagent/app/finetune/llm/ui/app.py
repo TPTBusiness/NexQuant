@@ -174,6 +174,14 @@ def main():
         # Only allow paths within the base_path directory
         try:
             safe_root = Path(base_path).resolve()
+            
+            # Additional security: Validate job_folder doesn't contain path traversal sequences
+            # This prevents CodeQL path-injection warning
+            if ".." in job_folder or job_folder.startswith("/") or job_folder.startswith("\\"):
+                st.error("Invalid job folder: Path traversal sequences not allowed")
+                st.info("Please select a valid job from the sidebar.")
+                return
+            
             job_path = Path(job_folder).expanduser().resolve(strict=False)
 
             # Ensure job_path is within safe_root (prevent path traversal)
