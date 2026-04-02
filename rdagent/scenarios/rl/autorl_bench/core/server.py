@@ -151,43 +151,9 @@ class GradingServer:
         Security: Prevents path traversal attacks by validating user-provided paths.
         Only allows access to files within the workspace directory.
         
-        Validation steps:
-        1. Reject null bytes
-        2. Normalize path to remove .. and . components
-        3. Reject Windows drive letters
-        4. Reject absolute paths
-        5. Resolve to absolute path
-        6. Verify resolved path is within workspace_root using relative_to()
+        Uses _safe_resolve_path() for comprehensive path validation.
         """
-        # Reject null bytes
-        if "\x00" in model_path:
-            raise ValueError("Invalid model_path: contains null byte")
-
-        workspace_root = self.workspace.expanduser().resolve()
-
-        # Normalize path to remove .. and . components
-        normalized = os.path.normpath(model_path)
-
-        # Reject Windows drive letters (e.g., C:\)
-        if os.path.splitdrive(normalized)[0]:
-            raise ValueError("Invalid model_path: contains drive letter")
-
-        # Reject absolute paths
-        if os.path.isabs(normalized):
-            raise ValueError("Invalid model_path: must be relative path")
-
-        # Join with workspace root and resolve to absolute path
-        candidate = os.path.join(str(workspace_root), normalized)
-        resolved_path = Path(candidate).expanduser().resolve(strict=False)
-
-        # Security check: ensure resolved path is within workspace_root
-        # This validates that the user-supplied model_path didn't escape the workspace
-        try:
-            resolved_path.relative_to(workspace_root)
-        except ValueError as exc:
-            raise ValueError(f"Invalid model_path: path traversal detected - {model_path}") from exc
-
-        return resolved_path
+        return _safe_resolve_path(model_path, self.workspace)
 
     def submit(self, model_path: str, gpu: Optional[str] = None) -> dict:
         """
