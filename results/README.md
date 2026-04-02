@@ -1,246 +1,152 @@
-# Predix Results Documentation
+# Predix Results Directory
 
-Dieser Ordner enthält alle Backtesting-Ergebnisse, Faktor-Analysen und Performance-Daten.
+This directory stores all backtesting results, databases, and reports.
 
-## ⚠️ WICHTIG
-
-**Dieser Ordner ist in `.gitignore` aufgenommen!**
-
-- Ergebnisse werden **NICHT** zu Git hinzugefügt
-- Jeder Entwickler hat lokale Ergebnisse
-- Sensible Performance-Daten bleiben privat
+**⚠️ IMPORTANT:** This directory is in `.gitignore` and will NOT be committed to GitHub.
 
 ---
 
-## 📁 Ordner-Struktur
+## 📁 Directory Structure
 
 ```
 results/
-├── backtests/          # Einzelne Backtest-Ergebnisse (JSON, CSV)
-│   ├── FactorName_20240402_120000.json
-│   ├── FactorName_20240402_120000_returns.csv
-│   └── FactorName_20240402_120000_equity.csv
+├── backtests/              # Individual factor backtest results (JSON, CSV)
+│   ├── FactorName_20260402_120000.json
+│   ├── FactorName_20260402_120000_returns.csv
+│   └── FactorName_20260402_120000_equity.csv
 │
-├── factors/            # Faktor-spezifische Analysen
+├── db/                     # SQLite database for all results
+│   └── backtest_results.db
+│
+├── factors/                # Factor-specific analysis
 │   ├── factor_performance.json
 │   └── ic_history.csv
 │
-├── runs/               # Komplette Run-Ergebnisse
-│   ├── risk_report_20240402_120000.json
-│   └── portfolio_weights_20240402.json
+├── runs/                   # Complete run results & risk reports
+│   ├── risk_report_20260402_120000.json
+│   └── portfolio_weights_20260402.json
 │
-├── logs/               # Backtesting-Logs
-│   └── backtest_20240402.log
-│
-└── db/                 # SQLite-Datenbank
-    ├── backtest_results.db
-    └── test_export.json
+└── logs/                   # Backtest logs
+    └── backtest_20260402.log
 ```
 
 ---
 
-## 📊 Gespeicherte Daten
+## 📊 What Gets Stored
 
 ### Backtests (`backtests/`)
 
-Für jeden Faktor werden gespeichert:
+For each factor backtest:
+- **JSON file**: All metrics (IC, Sharpe, Drawdown, Win Rate, etc.)
+- **Returns CSV**: Daily returns time series
+- **Equity CSV**: Equity curve
 
-| Datei | Inhalt |
-|-------|--------|
-| `{Factor}_{Timestamp}.json` | Alle Metriken (IC, Sharpe, Drawdown, etc.) |
-| `{Factor}_{Timestamp}_returns.csv` | Tägliche Returns |
-| `{Factor}_{Timestamp}_equity.csv` | Equity Curve |
+**Example JSON:**
+```json
+{
+  "factor_name": "Momentum_8Bar",
+  "ic": 0.045,
+  "sharpe_ratio": 1.85,
+  "max_drawdown": -0.08,
+  "win_rate": 0.58,
+  "total_trades": 252,
+  "timestamp": "2026-04-02T12:00:00"
+}
+```
 
-**Metriken pro Faktor:**
-- IC (Information Coefficient)
-- ICIR (IC Information Ratio)
+### Database (`db/backtest_results.db`)
+
+SQLite database with tables:
+- `factors` - All generated factors
+- `backtest_runs` - Backtest results with metrics
+- `backtest_metrics` - Detailed metrics per run
+- `daily_returns` - Daily returns time series
+- `loop_results` - Loop execution summaries
+
+### Risk Reports (`runs/`)
+
+- Portfolio volatility
 - Sharpe Ratio
-- Sortino Ratio
-- Calmar Ratio
-- Annualized Return
+- Diversification Ratio
 - Max Drawdown
-- Win Rate
-- Total Trades
+- Limit Checks (Position Size, Leverage, Drawdown)
+- Correlation Matrix
 
 ---
 
-### Datenbank (`db/backtest_results.db`)
+## 🔍 Querying Results
 
-**Tabellen:**
-
-| Tabelle | Inhalt |
-|---------|--------|
-| `factors` | Alle generierten Faktoren |
-| `backtest_runs` | Backtest-Durchläufe |
-| `backtest_metrics` | Performance-Metriken pro Run |
-| `daily_returns` | Tägliche Returns pro Run |
-| `loop_results` | Loop-Zusammenfassungen |
-| `factor_correlations` | Korrelationen zwischen Faktoren |
-
-**Abfragen:**
+### Python Example
 
 ```python
 from rdagent.components.backtesting import ResultsDatabase
 
+# Connect to database
 db = ResultsDatabase()
 
-# Top 20 Faktoren nach Sharpe Ratio
+# Get top 20 factors by Sharpe Ratio
 top_factors = db.get_top_factors('sharpe_ratio', limit=20)
+print(top_factors)
 
-# Performance-Historie für Faktor
-perf = db.get_factor_performance('Momentum_8Bar')
-
-# Loop-Zusammenfassung
-loops = db.get_loop_summary()
-
-# Aggregierte Statistiken
+# Get aggregate statistics
 stats = db.get_aggregate_stats()
+print(f"Total factors: {stats['total_factors']}")
+print(f"Average IC: {stats['avg_ic']}")
+print(f"Max Sharpe: {stats['max_sharpe']}")
+
+# Close connection
+db.close()
+```
+
+### SQL Example
+
+```bash
+# Open database
+sqlite3 results/db/backtest_results.db
+
+# Query top factors
+SELECT factor_name, sharpe, ic, win_rate 
+FROM backtest_runs 
+ORDER BY sharpe DESC 
+LIMIT 10;
+
+# Get aggregate stats
+SELECT COUNT(*) as total_factors,
+       AVG(ic) as avg_ic,
+       MAX(sharpe) as max_sharpe
+FROM backtest_runs;
 ```
 
 ---
 
-### Risk Reports (`runs/`)
+## 🧹 Cleanup
 
-**Inhalt:**
-- Portfolio-Volatilität
-- Sharpe Ratio
-- Diversifikations-Ratio
-- Max Drawdown
-- Limit-Checks (Position Size, Leverage, Drawdown)
-- Korrelationsmatrix
+To clean up old results:
 
----
+```bash
+# Remove all results
+rm -rf results/*
 
-## 🔧 Verwendung
+# Remove only backtests
+rm -rf results/backtests/*
 
-### 1. Backtest durchführen
+# Remove database
+rm -f results/db/backtest_results.db
 
-```python
-from rdagent.components.backtesting import FactorBacktester, ResultsDatabase
-
-# Backtester initialisieren
-backtester = FactorBacktester()
-db = ResultsDatabase()
-
-# Faktor-Daten laden
-factor_values = pd.Series(...)  # Faktorwerte
-forward_returns = pd.Series(...)  # Forward Returns
-
-# Backtest durchführen
-metrics = backtester.run_backtest(
-    factor_values=factor_values,
-    forward_returns=forward_returns,
-    factor_name="MyFactor"
-)
-
-# In Datenbank speichern
-db.add_backtest_run(
-    factor_name="MyFactor",
-    metrics=metrics,
-    returns=...,
-    equity_curve=...
-)
-```
-
-### 2. Portfolio-Optimierung
-
-```python
-from rdagent.components.backtesting import PortfolioOptimizer, CorrelationAnalyzer
-
-# Korrelationsmatrix
-corr_analyzer = CorrelationAnalyzer()
-corr_matrix = corr_analyzer.calculate_correlation_matrix(factor_returns)
-
-# Optimierung
-optimizer = PortfolioOptimizer()
-weights = optimizer.mean_variance_optimization(
-    expected_returns=expected_returns,
-    cov_matrix=cov_matrix
-)
-
-# Speichern
-optimizer.save_optimization_results(weights, factor_names, 'mean_variance')
-```
-
-### 3. Risiko-Bericht
-
-```python
-from rdagent.components.backtesting import AdvancedRiskManager
-
-risk_manager = AdvancedRiskManager()
-
-report = risk_manager.generate_risk_report(
-    factor_returns=factor_returns,
-    portfolio_weights=weights
-)
-
-print(f"Sharpe: {report['sharpe_ratio']:.2f}")
-print(f"Alle Limits OK: {report['all_limits_ok']}")
+# Keep logs but remove everything else
+find results/ -type f ! -path "*/logs/*" -delete
 ```
 
 ---
 
-## 📈 Export
+## 📝 Notes
 
-### JSON Export
-
-```python
-db.export_to_json("results/db/full_export.json")
-```
-
-**Inhalt:**
-- Aggregierte Statistiken
-- Top-Faktoren
-- Loop-Zusammenfassung
-- Export-Datum
+- Results are stored locally and never committed to Git
+- Database is automatically created on first run
+- JSON files are human-readable for quick inspection
+- Use SQLite database for programmatic access
+- Logs are stored separately for debugging
 
 ---
 
-## 🎯 Ziel-Metriken
-
-| Metrik | Ziel | Minimum |
-|--------|------|---------|
-| **IC** | > 0.05 | > 0.02 |
-| **ICIR** | > 2.0 | > 1.0 |
-| **Sharpe Ratio** | > 2.0 | > 1.0 |
-| **Max Drawdown** | < 15% | < 25% |
-| **Win Rate** | > 55% | > 45% |
-| **Annualized Return** | > 10% | > 5% |
-
----
-
-## 📝 Dokumentation
-
-Jeder Backtest wird automatisch dokumentiert mit:
-- Timestamp
-- Faktor-Name
-- Alle Metriken
-- Returns & Equity Curve
-- Konfigurierte Parameter (Transaction Costs, etc.)
-
-**Manuelle Notizen:**
-- Erstelle `results/logs/notes_YYYYMMDD.md` für manuelle Notizen
-- Dokumentiere besondere Ereignisse (Markt-Crashes, etc.)
-
----
-
-## 🔒 Datenschutz
-
-- Ergebnisse sind **lokal** (nicht in Git)
-- Datenbank ist **lokal** (SQLite)
-- Bei Team-Nutzung: Ergebnisse manuell teilen oder zentrale DB verwenden
-
----
-
-## 🚀 Nächste Schritte
-
-1. **Backtesting für alle 110 Faktoren durchführen**
-2. **Top-20 Faktoren nach IC/Sharpe auswählen**
-3. **Portfolio-Optimierung durchführen**
-4. **4 Wochen Paper-Trading**
-5. **Live-Performance dokumentieren**
-
----
-
-**Stand:** April 2026
-**Version:** 1.0
+**For detailed usage guidelines, see [README.md](../README.md)**
