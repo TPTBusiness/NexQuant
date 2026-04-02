@@ -403,14 +403,70 @@ git commit -m "chore: Remove .qwen/ from tracking"
 
 ### Fixing Past Commits
 
-If you need to fix commit messages in history:
+**To fix the last 3-5 commits:**
 
 ```bash
-# For last 3 commits
-git rebase -i HEAD~3
+# For last 5 commits
+git rebase -i HEAD~5
 
-# Change 'pick' to 'reword' for commits to rename
-# Editor opens - write new message in English
+# In the editor, change 'pick' to 'reword' for commits to rename
+# Save and close
+# Write new English message for each commit
+```
+
+**To fix older commits (advanced):**
+
+```bash
+# Find the commit hash
+git log --oneline
+
+# Start rebase from that commit
+git rebase -i <commit-hash>^
+
+# Follow same process as above
+```
+
+**Current German commits to fix (as of April 2026):**
+```
+73140b68 test: Backtesting Tests mit 98.77% Coverage
+     → test: Add backtesting tests with 98.77% coverage
+
+5148d17d chore: QWEN.md zu .gitignore hinzugefügt
+     → chore: Add QWEN.md to .gitignore
+
+df93e162 feat: Intelligent Embedding Chunking statt Kürzung
+     → feat: Intelligent embedding chunking instead of truncation
+
+01aa183a fix: CLI Dashboard in separatem Terminal-Fenster
+     → fix: CLI dashboard in separate terminal window
+
+df356978 feat: predix.py Wrapper für Dashboard-Support
+     → feat: predix.py wrapper for dashboard support
+
+89d01f5d feat: Beautiful CLI Dashboard + korrigierter Start-Befehl
+     → feat: Beautiful CLI dashboard + corrected start command
+
+48e4f44e feat: Auto-Start Dashboard für fin_quant
+     → feat: Auto-start dashboard for fin_quant
+
+59122a19 feat: Dashboard + Live-Daten Integration (Phase 4)
+     → feat: Dashboard + live data integration (Phase 4)
+
+a0f414ed feat: EURUSD Trading-Verbesserungen (Phase 2 & 3)
+     → feat: EURUSD trading improvements (Phase 2 & 3)
+
+e8b962b5 feat: EURUSD Trading-Verbesserungen implementiert (Phase 1)
+     → feat: Implement EURUSD trading improvements (Phase 1)
+```
+
+**⚠️ Warning:** Rewriting history changes commit hashes. If you've already pushed:
+
+```bash
+# After rebasing locally
+git push --force-with-lease origin master
+
+# Tell team members to re-clone:
+git clone <repo-url>
 ```
 
 ### Push Policy
