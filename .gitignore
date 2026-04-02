@@ -87,6 +87,11 @@ prompts/local/
 *.local.yaml
 *_private.yaml
 
+# Private models (your improved versions)
+models/local/
+*.local.py
+*_private.py
+
 # Test credentials
 .env.test
 *.test.env

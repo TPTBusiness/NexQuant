@@ -29,11 +29,25 @@ STANDARD_PROMPTS_FILE = PROMPTS_DIR / "standard_prompts.yaml"
 
 
 def get_local_prompt_path(name: str) -> Optional[Path]:
-    """Find local prompt file by name."""
+    """Find local prompt file by name.
+    
+    Priority:
+    1. {name}_v2.yaml (latest version)
+    2. {name}_v1.yaml
+    3. {name}.yaml
+    """
     if not LOCAL_PROMPTS_DIR.exists():
         return None
     
-    # Try different file extensions
+    # Try versioned files first (v2, v1, etc.)
+    for version in ["v2", "v1"]:
+        for ext in ["yaml", "yml"]:
+            path = LOCAL_PROMPTS_DIR / f"{name}_{version}.{ext}"
+            if path.exists():
+                print(f"  (found versioned: {name}_{version}.{ext})")
+                return path
+    
+    # Try exact name
     for ext in ["yaml", "yml"]:
         path = LOCAL_PROMPTS_DIR / f"{name}.{ext}"
         if path.exists():
@@ -187,7 +201,19 @@ if __name__ == "__main__":
     try:
         prompt = load_prompt("factor_discovery")
         print(f"✓ Loaded factor_discovery prompt")
-        print(f"  System: {len(prompt.get('system', ''))} chars")
-        print(f"  User: {len(prompt.get('user', ''))} chars")
+        
+        # Handle nested dict structure (local prompts)
+        if isinstance(prompt, dict):
+            if 'factor_discovery' in prompt:
+                # Local prompt structure
+                fd = prompt['factor_discovery']
+                print(f"  System: {len(fd.get('system', ''))} chars")
+                print(f"  User: {len(fd.get('user', ''))} chars")
+            else:
+                # Standard prompt structure
+                print(f"  System: {len(prompt.get('system', ''))} chars")
+                print(f"  User: {len(prompt.get('user', ''))} chars")
+        else:
+            print(f"  Content: {len(str(prompt))} chars")
     except FileNotFoundError as e:
         print(f"✗ Error: {e}")
