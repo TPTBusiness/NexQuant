@@ -150,11 +150,23 @@ def main():
     # ========== Main Content ==========
     if view_mode == "Job Summary":
         st.title("📊 FT Job Summary")
-        job_path = Path(job_folder)
-        if job_path.exists():
-            render_job_summary(job_path, is_root=is_root_job)
-        else:
-            st.warning(f"Job folder not found: {job_folder}")
+        
+        # Security fix: Validate job_folder to prevent path traversal
+        # Only allow paths within the base_path directory
+        try:
+            job_path = Path(job_folder).resolve()
+            base_path_resolved = Path(base_path).resolve()
+            
+            # Ensure job_path is within base_path (prevent path traversal)
+            job_path.relative_to(base_path_resolved)
+            
+            if job_path.exists():
+                render_job_summary(job_path, is_root=is_root_job)
+            else:
+                st.warning(f"Job folder not found: {job_folder}")
+        except (ValueError, RuntimeError) as e:
+            st.error(f"Invalid job folder path: {e}")
+            st.info("Please select a valid job from the sidebar.")
         return
 
     # Single Task mode
