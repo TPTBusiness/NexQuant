@@ -359,11 +359,13 @@ if __name__ == "__main__":
     print("=== Multi-Provider LLM Fallback Test ===\n")
     
     llm = MultiProviderLLM()
-    
+
     print("Konfigurierte Provider:")
     for provider in llm.providers:
-        api_key_status = "✓" if provider.api_key else "✗"
-        print(f"  {provider.priority}. {provider.name} ({api_key_status}) - {provider.endpoint[:50]}")
+        # Security fix: Don't log API keys, only show status and masked endpoint
+        api_key_status = "✓ Key set" if provider.api_key else "✗ No key"
+        masked_endpoint = provider.endpoint[:30] + "..." if len(provider.endpoint) > 30 else provider.endpoint
+        print(f"  {provider.priority}. {provider.name} ({api_key_status}) - {masked_endpoint}")
     
     # Test 1: Health Check für alle Provider
     print("\n=== Test 1: Provider Health Check ===")
