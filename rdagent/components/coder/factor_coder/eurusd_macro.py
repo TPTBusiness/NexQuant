@@ -560,23 +560,23 @@ if __name__ == "__main__":
     ]
     
     for scenario in scenarios:
-        # Einfache Scoring-Logik
+        # Simple scoring logic
         total_score = (
-            scenario["rate_diff"] * 20 +  # Zinsdiff gewichtet
-            scenario["growth_diff"] * 10 +  # Wachstumsdiff
+            scenario["rate_diff"] * 20 +  # Rate diff weighted
+            scenario["growth_diff"] * 10 +  # Growth diff
             scenario["momentum"] * 30 +  # Momentum
             scenario["sentiment"] * 20  # Sentiment
         )
-        
+
         if total_score > 15:
-            result = "SHORT"  # Positiv für USD
+            result = "SHORT"  # Positive for USD
         elif total_score < -15:
-            result = "LONG"  # Positiv für EUR
+            result = "LONG"  # Positive for EUR
         else:
             result = "NEUTRAL"
-        
+
         status = "✓" if result == scenario["expected"] else "✗"
         print(f"  {status} {scenario['name']}: Score={total_score:+.1f} → {result}")
     
-    print("\n✅ EURUSD Macro Agent Implementierung ist funktionsfähig!")
+    print("\n✅ EURUSD Macro Agent implementation is functional!")
     print("\nHinweis: Vollständige LLM-Tests erfordern einen laufenden Server.")
