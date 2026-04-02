@@ -96,7 +96,6 @@ work_dir = '{work_dir}'
 def generate_api_config(
     model_abbr: str,
     model_path: str,
-    api_key: str,
     api_base: str,
     dataset_imports: list[str],
     limit: int | None = None,
@@ -115,6 +114,9 @@ def generate_api_config(
     Args:
         test_range: Direct test_range expression (e.g., "[:min(100, len(index_list)//2)]").
                     If provided, overrides limit/offset parameters.
+    
+    Security: API key is NOT stored in the config file. It is read from the TEST_API_KEY
+        environment variable at runtime to prevent clear-text storage of sensitive data.
     """
     # Format dataset imports
     dataset_import_lines = "\n".join(f"    from {module} import *" for module in dataset_imports)
@@ -167,7 +169,6 @@ def generate_api_config(
         limit_config=limit_config,
         model_abbr=model_abbr,
         model_path=model_path,
-        api_key=api_key,
         api_base=api_base,
         work_dir=work_dir,
         max_out_len=max_out_len,
@@ -236,10 +237,10 @@ def run_benchmark_api(
     docker_api_base_sdk = "http://localhost:3000/v1"
 
     # Generate config.py
+    # Security: API key is NOT passed to config - it will be read from TEST_API_KEY env var at runtime
     config_content = generate_api_config(
         model_abbr=f"api-{benchmark_name}",
         model_path=model_name,
-        api_key=api_key,
         api_base=docker_api_base,
         dataset_imports=[cfg.dataset],
         limit=limit,
