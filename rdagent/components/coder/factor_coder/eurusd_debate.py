@@ -1,11 +1,9 @@
 """
 EURUSD Trading-Debatte: Bull vs Bear vs Neutral
 
-Inspiriert von: TradingAgents/tradingagents/agents/researchers/
-
 Multi-Perspektiven-Debatte für bessere Trading-Entscheidungen:
 - Bull Agent: Argumentiert für LONG EURUSD
-- Bear Agent: Argumentiert für SHORT EURUSD  
+- Bear Agent: Argumentiert für SHORT EURUSD
 - Neutral Agent: Argumentiert für WAIT/Range-Trading
 
 Jeder Agent analysiert die gleichen Daten aus seiner Perspektive.

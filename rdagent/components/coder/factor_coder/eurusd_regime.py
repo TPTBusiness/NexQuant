@@ -6,7 +6,10 @@ Der Hurst Exponent identifiziert Marktregime:
 - H = 0.5: Random Walk
 - H > 0.6: Trending (Trend-Following)
 
-Inspiriert von: ai-hedge-fund/src/agents/technicals.py
+Für EURUSD 1min-Daten:
+- H < 0.4: Strong Mean-Reversion (Range-Trading bevorzugen)
+- H > 0.6: Strong Trending (Trend-Following bevorzugen)
+- 0.4-0.6: Neutral/Choppy (vorsichtig sein oder scalping)
 """
 
 import numpy as np

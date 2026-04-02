@@ -1,8 +1,6 @@
 """
 EURUSD Reflection-System für kontinuierliches Lernen
 
-Inspiriert von: TradingAgents/tradingagents/graph/reflection.py
-
 Nach jedem Trade:
 1. Reflektiere über Entscheidung und Ergebnis
 2. Extrahiere Lessons Learned

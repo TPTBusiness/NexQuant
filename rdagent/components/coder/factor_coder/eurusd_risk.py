@@ -1,13 +1,16 @@
 """
 Volatility-Adjusted Position Sizing für EURUSD
 
-Inspiriert von: ai-hedge-fund/src/agents/risk_manager.py
-
 Berechnet die optimale Positionsgröße basierend auf:
 - Kontogröße und Risikotoleranz
 - Aktueller Volatilität (ATR, Historical Volatility)
 - Marktregime (Hurst Exponent)
 - Korrelation mit anderen Positionen
+
+Druckenmiller-Prinzip:
+- Bei hoher Conviction und asymmetrischer Chance: Große Position
+- Bei niedriger Volatilität: Positionsgröße erhöhen
+- Bei hoher Korrelation: Risk reduzieren
 """
 
 from dataclasses import dataclass
