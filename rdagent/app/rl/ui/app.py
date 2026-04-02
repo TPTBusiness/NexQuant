@@ -21,38 +21,81 @@ DEFAULT_LOG_BASE = "log/"
 
 
 def _safe_resolve(user_input: str | None, safe_root: Path) -> Path:
-    """Resolve user path relative to safe_root; raise ValueError if it escapes."""
+    """
+    Resolve user path relative to safe_root; raise ValueError if it escapes.
+    
+    Security: This function prevents path traversal attacks by:
+    1. Rejecting null bytes in user input
+    2. Rejecting Windows drive letters (C:\, D:\, etc.)
+    3. Rejecting absolute paths
+    4. Normalizing path to remove .. traversal attempts
+    5. Validating resolved path is within safe_root using .relative_to()
+    
+    All user-provided paths are validated before filesystem access.
+    """
     safe_root = safe_root.expanduser().resolve()
     if not user_input:
         return safe_root
 
+    # Security check 1: Reject null bytes (path truncation attack)
     if "\x00" in user_input:
         raise ValueError("Invalid path: contains null byte")
 
     try:
+        # Security check 2: Normalize path to resolve .. and . components
         normalized = os.path.normpath(user_input)
+        
+        # Security check 3: Reject Windows drive letters (C:\, D:\, etc.)
         if os.path.splitdrive(normalized)[0]:
             raise ValueError("Absolute paths with drive letters are not allowed")
+        
+        # Security check 4: Reject absolute paths
         path_obj = Path(normalized).expanduser()
         if path_obj.is_absolute():
             raise ValueError("Absolute paths are not allowed")
+        
+        # Security check 5: Join with safe_root and resolve
         candidate = (safe_root / path_obj).resolve(strict=False)
+        
+        # Security check 6: Validate candidate is within safe_root (prevent path traversal)
         candidate.relative_to(safe_root)
+        
         return candidate
     except (OSError, ValueError) as exc:
         raise ValueError(f"Invalid path outside of allowed root: {user_input}") from exc
 
 
 def get_job_options(base_path: Path) -> list[str]:
-    """Scan directory and return job options list."""
+    """
+    Scan directory and return job options list.
+    
+    Security: Validates base_path to prevent path traversal attacks.
+    Only allows scanning directories within the current working directory.
+    """
     options = []
     has_root_tasks = False
     job_dirs = []
 
-    if not base_path.exists():
+    # Security fix: Validate base_path to prevent path traversal
+    try:
+        base_path_resolved = base_path.resolve(strict=False)
+        cwd_resolved = Path.cwd().resolve()
+        
+        # Ensure base_path is within current working directory
+        try:
+            base_path_resolved.relative_to(cwd_resolved)
+        except ValueError:
+            # Path is outside CWD, reject it
+            st.error("Invalid log base path: Must be within project directory")
+            return options
+    except (OSError, RuntimeError) as e:
+        st.error(f"Invalid path: {e}")
         return options
 
-    for d in base_path.iterdir():
+    if not base_path_resolved.exists():
+        return options
+
+    for d in base_path_resolved.iterdir():
         if not d.is_dir():
             continue
         if (d / "__session__").exists():
