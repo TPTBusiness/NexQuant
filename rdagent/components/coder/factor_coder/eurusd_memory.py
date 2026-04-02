@@ -377,7 +377,7 @@ class EURUSDTradeMemory:
             self._rebuild_bm25()
             
         except Exception as e:
-            print(f"⚠️  Fehler beim Laden des Memory: {e}")
+            print(f"⚠️  Error loading Memory: {e}")
             self.memories = []
             self.tokenized_memories = []
     
