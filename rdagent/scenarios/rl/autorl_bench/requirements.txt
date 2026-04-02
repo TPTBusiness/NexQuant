@@ -23,7 +23,7 @@ pydantic>=2.4.0  # Security fix: CVE-2024-3772 (ReDoS via crafted email)
 
 # Models
 torch>=2.6.0  # Security fix: CVE-2025-32434 (torch.load RCE with weights_only=True)
-transformers>=4.51.0  # Security fix: CVE-2024-11393 (Deserialization RCE), CVE-2025-3264 (ReDoS), CVE-2025-2099 (ReDoS in preprocess_string)
+transformers>=4.52.1  # Security: CVE-2024-11393 (RCE) + CVE-2025-3264/3933/2099 (ReDoS)
 huggingface_hub>=0.20.0
 
 # Web services
