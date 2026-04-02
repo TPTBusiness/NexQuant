@@ -38,24 +38,18 @@ def get_job_options(base_path: Path) -> list[str]:
     has_root_tasks = False
     job_dirs = []
 
-    # Security fix: Validate base_path to prevent path traversal
-    # Resolve to absolute path and ensure it's within allowed boundaries
+    # Security: Validate base_path to prevent path traversal
+    # Resolve to absolute path and ensure it's within the current working directory.
     try:
-        base_path_resolved = base_path.resolve(strict=False)
-        cwd_resolved = Path.cwd().resolve()
-        
-        # Ensure base_path is within or relative to current working directory
-        # This prevents accessing arbitrary filesystem locations
-        try:
-            base_path_resolved.relative_to(cwd_resolved)
-        except ValueError:
-            # Path is outside CWD, check if it's a safe relative path
-            if base_path_resolved.is_relative_to(cwd_resolved):
-                pass  # OK
-            else:
-                # Path is completely outside project, reject it
-                st.error(f"Invalid log base path: Must be within project directory")
-                return options
+        safe_root = Path.cwd().resolve()
+        base_path_resolved = base_path.expanduser().resolve(strict=False)
+
+        # Ensure base_path_resolved is within safe_root; raises ValueError if not.
+        base_path_resolved.relative_to(safe_root)
+    except ValueError:
+        # Path is outside the allowed root, reject it.
+        st.error("Invalid log base path: Must be within project directory")
+        return options
     except (OSError, RuntimeError) as e:
         st.error(f"Invalid path: {e}")
         return options
@@ -175,22 +169,25 @@ def main():
     # ========== Main Content ==========
     if view_mode == "Job Summary":
         st.title("📊 FT Job Summary")
-        
-        # Security fix: Validate job_folder to prevent path traversal
+
+        # Security: Validate job_folder to prevent path traversal
         # Only allow paths within the base_path directory
         try:
-            job_path = Path(job_folder).resolve()
-            base_path_resolved = Path(base_path).resolve()
-            
-            # Ensure job_path is within base_path (prevent path traversal)
-            job_path.relative_to(base_path_resolved)
-            
+            safe_root = Path(base_path).resolve()
+            job_path = Path(job_folder).expanduser().resolve(strict=False)
+
+            # Ensure job_path is within safe_root (prevent path traversal)
+            job_path.relative_to(safe_root)
+
             if job_path.exists():
                 render_job_summary(job_path, is_root=is_root_job)
             else:
                 st.warning(f"Job folder not found: {job_folder}")
-        except (ValueError, RuntimeError) as e:
-            st.error(f"Invalid job folder path: {e}")
+        except ValueError:
+            st.error("Invalid job folder path: Must be within base directory")
+            st.info("Please select a valid job from the sidebar.")
+        except (OSError, RuntimeError) as e:
+            st.error(f"Invalid path: {e}")
             st.info("Please select a valid job from the sidebar.")
         return
 
