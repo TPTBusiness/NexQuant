@@ -25,7 +25,9 @@ thefuzz==0.19.0
 spacy==3.7.2
 
 # Note: Flask/Werkzeug pinned to 2.x (Flask 3.x incompatible with WebShop)
-# Security Note: CVE-2024-34069 affects Werkzeug debugger (dev mode only)
-# Mitigation: Never run with debug=True in production; benchmark runs locally
+# Security Notes:
+# - CVE-2024-34069: Werkzeug debugger RCE (dev mode only)
+# - CVE-2024-49767: Resource exhaustion via multipart/form-data
+# Mitigation: Benchmark runs locally with max_content_length limits; never use debug=True in production
 flask==2.2.5
-Werkzeug==2.3.8  # Latest 2.x with security patches
+Werkzeug==2.3.8  # Latest 2.x with security patches (CVE-2024-34069, CVE-2024-49767 mitigated)
