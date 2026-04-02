@@ -84,3 +84,7 @@ datasets
 
 # DuckDuckGo search
 duckduckgo-search
+
+# Testing
+pytest
+pytest-cov
