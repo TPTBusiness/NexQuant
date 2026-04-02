@@ -27,7 +27,7 @@ pydantic>=2.4.0  # Security fix: CVE-2024-3772 (ReDoS via crafted email)
 # Security: transformers >=4.52.1 fixes CVE-2025-3777 (URL validation bypass via username injection)
 # Current spec (>=4.53.0) is already safe. Dependabot alerts are false positives due to missing lockfile.
 torch>=2.8.0  # Security fix: CVE-2025-32434 (torch.load RCE), CVE-2025-3730 (DoS in ctc_loss)
-transformers>=4.53.0  # Security fix: CVE-2024-11393 (RCE), CVE-2025-3264/3933/2099/6051/1194 (ReDoS), CVE-2025-3777 (URL validation)
+transformers>=4.53.0  # Security fix: CVE-2024-11393 (RCE), CVE-2025-3264/3933/2099/6051/1194/6638 (ReDoS), CVE-2025-3777 (URL validation)
 huggingface_hub>=0.20.0
 
 # Web services
