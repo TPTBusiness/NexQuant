@@ -8,6 +8,7 @@
 #   python -m spacy download en_core_web_sm
 #
 # Note: Flask/Werkzeug updated to 3.x for security fixes (previously pinned to 2.x)
+# IMPORTANT: Install webshop FIRST, then upgrade Werkzeug/Flask to override transitive deps
 
 # WebShop PyPI package
 webshop
@@ -24,12 +25,14 @@ rank_bm25==0.2.2
 thefuzz==0.19.0
 spacy==3.7.2
 
-# Note: Flask/Werkzeug updated to 3.x for security fixes
+# Security: Upgrade Werkzeug/Flask AFTER webshop to override transitive dependencies
+# webshop 0.1.0 depends on Werkzeug 2.2.3, but we force upgrade to 3.1.6+
 # Security Notes:
+# - CVE-2026-27199: Windows device names in safe_join() (fixed in 3.1.6)
 # - CVE-2025-66221: Windows device names in safe_join() (fixed in 3.1.4)
 # - CVE-2024-49766: safe_join UNC path bypass on Windows (fixed in 3.0.6)
-# - CVE-2024-34069: Werkzeug debugger RCE (fixed)
+# - CVE-2024-34069: Werkzeug debugger RCE (fixed in 3.0.3+)
 # - CVE-2024-49767: Resource exhaustion via multipart/form-data (fixed)
-# - CVE-2023-46136: DoS via multipart/form-data parser (fixed in 2.3.8)
-flask>=3.0.0
-Werkzeug>=3.1.6  # Security fix: All Werkzeug CVEs fixed (Windows + Linux)
+# - CVE-2023-46136: DoS via multipart/form-data parser (fixed in 2.3.8+)
+flask>=3.1.0  # Override webshop's Flask 2.2.5 dependency
+Werkzeug>=3.1.6  # Override webshop's Werkzeug 2.2.3 dependency - fixes all CVEs
