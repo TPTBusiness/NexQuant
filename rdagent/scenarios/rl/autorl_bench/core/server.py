@@ -90,24 +90,37 @@ class GradingServer:
 
     def resolve_model_path(self, model_path: str) -> Path:
         """将模型路径约束在 workspace 下，防止访问任意文件系统路径。"""
+        # Security fix: Validate and sanitize user-provided path to prevent path traversal
+        
+        # Reject null bytes
         if "\x00" in model_path:
-            raise ValueError("Invalid model_path")
+            raise ValueError("Invalid model_path: contains null byte")
 
         workspace_root = self.workspace.expanduser().resolve()
+        
+        # Normalize path to remove .. and . components
         normalized = os.path.normpath(model_path)
+        
+        # Reject Windows drive letters (e.g., C:\)
         if os.path.splitdrive(normalized)[0]:
-            raise ValueError("Invalid model_path")
-
+            raise ValueError("Invalid model_path: contains drive letter")
+        
+        # Reject absolute paths
         if os.path.isabs(normalized):
-            candidate = normalized
-        else:
-            candidate = os.path.join(str(workspace_root), normalized)
-
+            raise ValueError("Invalid model_path: must be relative path")
+        
+        # Join with workspace root
+        candidate = os.path.join(str(workspace_root), normalized)
+        
+        # Resolve to absolute path and verify it's under workspace_root
         resolved_path = Path(candidate).expanduser().resolve(strict=False)
+        
+        # Security check: ensure resolved path is within workspace_root
         try:
             resolved_path.relative_to(workspace_root)
         except ValueError as exc:
-            raise ValueError("Invalid model_path") from exc
+            raise ValueError(f"Invalid model_path: path traversal detected - {model_path}") from exc
+        
         return resolved_path
 
     def submit(self, model_path: str, gpu: Optional[str] = None) -> dict:
