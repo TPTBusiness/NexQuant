@@ -195,7 +195,11 @@ def main():
 
     if view_mode == "Job Summary":
         st.title("📊 RL Job Summary")
-        job_path = Path(job_folder).resolve()
+        try:
+            job_path = _safe_resolve(job_folder, safe_root)
+        except ValueError as e:
+            st.warning(str(e))
+            return
         if job_path.exists():
             render_job_summary(job_path, is_root=is_root_job)
         else:
