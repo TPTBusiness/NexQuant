@@ -82,6 +82,11 @@ QWEN.md
 # Internal documentation (not for public)
 TODO.md
 
+# Private prompts (your improved versions)
+prompts/local/
+*.local.yaml
+*_private.yaml
+
 # Test credentials
 .env.test
 *.test.env
