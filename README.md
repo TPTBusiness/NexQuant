@@ -335,7 +335,6 @@ If you use Predix in your research, please cite the underlying framework:
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/TPTBusiness/Predix/issues)
-- **Documentation**: [Read the Docs](https://rdagent.readthedocs.io/)
 
 ---
 
