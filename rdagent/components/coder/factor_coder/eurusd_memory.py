@@ -1,7 +1,11 @@
 """
 BM25 Memory-System für EURUSD Trading-Setups
 
-Inspiriert von: TradingAgents/tradingagents/agents/utils/memory.py
+Speichert vergangene Trades mit:
+- Marktsituation (Features, Regime, Indikatoren)
+- Entscheidung (LONG/SHORT/NEUTRAL, Leverage, SL, TP)
+- Ergebnis (PnL, Win/Loss)
+- Reflection (Lessons Learned)
 
 Vorteile gegenüber Vector-DBs:
 - Keine API-Kosten (offline-fähig)
