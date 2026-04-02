@@ -332,10 +332,11 @@ if __name__ == "__main__":
     os.chdir(_project_root)
 
     # ==================== API Configuration ====================
-    API_KEY = "sk-1234"
-    API_BASE = "http://localhost:3000"
-    MODEL = "gpt-4o-mini"
-    HF_TOKEN = "hf_xxxx"  # For gated datasets
+    # Use environment variables for sensitive data (fixes GitHub Security Alert #8)
+    API_KEY = os.getenv("TEST_API_KEY", "sk-1234")
+    API_BASE = os.getenv("TEST_API_BASE", "http://localhost:3000")
+    MODEL = os.getenv("TEST_MODEL", "gpt-4o-mini")
+    HF_TOKEN = os.getenv("TEST_HF_TOKEN", "hf_xxxx")  # For gated datasets
 
     # ==================== Test Configuration ====================
     MAX_OUT_LEN = 8192
