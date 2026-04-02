@@ -579,4 +579,4 @@ if __name__ == "__main__":
         print(f"  {status} {scenario['name']}: Score={total_score:+.1f} → {result}")
     
     print("\n✅ EURUSD Macro Agent implementation is functional!")
-    print("\nHinweis: Vollständige LLM-Tests erfordern einen laufenden Server.")
+    print("\nNote: Full LLM tests require a running server.")
