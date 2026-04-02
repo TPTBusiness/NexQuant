@@ -1,4 +1,4 @@
-# GitHub Release v1.0.0 - Vorlage
+# GitHub Release v1.0.0 - Komplette Vorlage
 
 ## Release Title (Titel):
 ```
@@ -7,7 +7,7 @@ v1.0.0 - Initial Release: EURUSD Trading Agent
 
 ---
 
-## Release Body (Markdown):
+## Release Body (Markdown) - KOMPLETT:
 
 ```markdown
 ## 🎉 Predix v1.0.0 - Initial Release
@@ -220,6 +220,8 @@ pytest test/backtesting/ -v
 - **README.md** - Installation and quick start
 - **QWEN.md** - Comprehensive development guide
 - **ATTRIBUTION.md** - Usage guidelines and attribution requirements
+- **CHANGELOG.md** - Version history overview
+- **changelog/v1.0.0.md** - Detailed v1.0.0 release notes
 - **docs/** - Additional documentation
 
 ---
@@ -284,7 +286,7 @@ By using this software, you agree to use it solely for learning purposes.
 
 ---
 
-**Full changelog:** [CHANGELOG.md](CHANGELOG.md)
+**Full changelog:** [v1.0.0 Release Notes](https://github.com/TPTBusiness/Predix/blob/v1.0.0/changelog/v1.0.0.md)
 
 ---
 
@@ -299,18 +301,18 @@ Made with ❤️ by Predix Team
 
 ---
 
-## Tags (Schlagwörter für Release):
+## Tags (Schlagwörter für Repository Topics):
 ```
-v1.0.0, initial-release, eurusd, trading, ai, machine-learning, quantitative-trading, forex, backtesting, llm, rd-agent, python
+eurusd, trading, ai, machine-learning, quantitative-trading, forex, backtesting, llm, rd-agent, python, mit-license
 ```
 
 ---
 
 ## Checkliste vor dem Veröffentlichen:
 
-- [ ] Release Title kopiert
-- [ ] Release Body (Markdown) kopiert
-- [ ] Tags hinzugefügt
+- [ ] Release Title kopiert: `v1.0.0 - Initial Release: EURUSD Trading Agent`
+- [ ] Release Body (Markdown oben) komplett kopiert
+- [ ] Repository Topics auf GitHub gesetzt (unter Settings → Topics)
 - [ ] "Set as latest release" angehakt
 - [ ] Publish Release geklickt
 
@@ -320,6 +322,6 @@ v1.0.0, initial-release, eurusd, trading, ai, machine-learning, quantitative-tra
 
 Falls du Screenshots oder Binaries hochladen willst:
 - [ ] Screenshot vom Dashboard
-- [ ] Screenshot von Test-Ergebnissen
+- [ ] Screenshot von Test-Ergebnissen (98.77% Coverage)
 - [ ] PDF mit Dokumentation
 - [ ] Andere relevante Dateien
