@@ -22,6 +22,8 @@ pandas>=1.5.0
 pydantic>=2.4.0  # Security fix: CVE-2024-3772 (ReDoS via crafted email)
 
 # Models
+# Security: transformers >=4.51.0 fixes CVE-2025-3263 (ReDoS in get_configuration_file)
+# Current spec (>=4.53.0) is already safe. Dependabot alert is false positive due to missing lockfile.
 torch>=2.6.0  # Security fix: CVE-2025-32434 (torch.load RCE with weights_only=True)
 transformers>=4.53.0  # Security fix: CVE-2024-11393 (RCE), CVE-2025-3264/3933/2099/6051 (ReDoS)
 huggingface_hub>=0.20.0
