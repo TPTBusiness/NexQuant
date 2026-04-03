@@ -118,4 +118,93 @@ class QlibModelRunner(CachedRunner[QlibModelExperiment]):
             logger.error(f"Failed to run {exp.sub_tasks[0].name}, because {stdout}")
             raise ModelEmptyError(f"Failed to run {exp.sub_tasks[0].name} model, because {stdout}")
 
+        # Save results to database immediately after Docker execution
+        try:
+            self._save_result_to_database(exp, result)
+        except Exception as e:
+            logger.warning(f"Failed to save model results to database: {e}")
+
         return exp
+
+    def _save_result_to_database(self, exp, result) -> None:
+        """
+        Save model backtest results to the ResultsDatabase.
+
+        Parameters
+        ----------
+        exp : QlibModelExperiment
+            The experiment with backtest results
+        result : dict or pd.Series
+            Backtest metrics from Qlib (qlib_res.csv)
+        """
+        try:
+            import pandas as pd
+            from rdagent.components.backtesting import ResultsDatabase
+
+            # Get model/factor name from hypothesis
+            factor_name = "unknown"
+            if hasattr(exp, 'hypothesis') and exp.hypothesis is not None:
+                factor_name = getattr(exp.hypothesis, 'hypothesis', 'unknown')
+
+            # Extract metrics from result (pd.Series from qlib_res.csv)
+            metrics = {}
+            if isinstance(result, pd.Series):
+                metrics['ic'] = self._safe_float(result.get('IC', None))
+                metrics['sharpe_ratio'] = self._safe_float(
+                    result.get('1day.excess_return_with_cost.shar',
+                    result.get('1day.excess_return_with_cost.sharpe', None))
+                )
+                metrics['annualized_return'] = self._safe_float(
+                    result.get('1day.excess_return_with_cost.annualized_return', None)
+                )
+                metrics['max_drawdown'] = self._safe_float(
+                    result.get('1day.excess_return_with_cost.max_drawdown', None)
+                )
+                metrics['win_rate'] = self._safe_float(result.get('win_rate', None))
+                metrics['information_ratio'] = self._safe_float(
+                    result.get('1day.excess_return_with_cost.information_ratio', None)
+                )
+                metrics['volatility'] = self._safe_float(
+                    result.get('1day.excess_return_with_cost.std',
+                    result.get('1day.excess_return_with_cost.volatility', None))
+                )
+            elif isinstance(result, dict):
+                metrics['ic'] = self._safe_float(result.get('IC', result.get('ic', None)))
+                metrics['sharpe_ratio'] = self._safe_float(
+                    result.get('sharpe', result.get('sharpe_ratio', None))
+                )
+                metrics['annualized_return'] = self._safe_float(result.get('annualized_return', None))
+                metrics['max_drawdown'] = self._safe_float(result.get('max_drawdown', None))
+                metrics['win_rate'] = self._safe_float(result.get('win_rate', None))
+                metrics['information_ratio'] = None
+                metrics['volatility'] = None
+
+            # Only save if we have at least IC or Sharpe
+            if metrics.get('ic') is None and metrics.get('sharpe_ratio') is None:
+                logger.debug(f"No valid IC/Sharpe for model {factor_name}, skipping DB save")
+                return
+
+            # Save to database
+            db = ResultsDatabase()
+            run_id = db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
+            logger.info(
+                f"Model result saved to DB: {factor_name[:50]} "
+                f"(IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}, run_id={run_id})"
+            )
+            db.close()
+
+        except Exception as e:
+            logger.warning(f"Database save failed for model {getattr(exp.hypothesis, 'hypothesis', 'unknown')}: {e}")
+
+    def _safe_float(self, value):
+        """Safely convert value to float, returning None for invalid values."""
+        import pandas as pd
+        if value is None:
+            return None
+        try:
+            f = float(value)
+            if pd.isna(f) or f == float('inf') or f == float('-inf'):
+                return None
+            return f
+        except (ValueError, TypeError):
+            return None
