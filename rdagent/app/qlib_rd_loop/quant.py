@@ -123,9 +123,58 @@ class QuantRDLoop(RDLoop):
                 feedback = self.factor_summarizer.generate_feedback(prev_out["running"], self.trace)
             elif prev_out["direct_exp_gen"]["propose"].action == "model":
                 feedback = self.model_summarizer.generate_feedback(prev_out["running"], self.trace)
+
+            # Save results to SQLite database after each successful experiment
+            self._save_experiment_to_db(prev_out)
+
         feedback = self._interact_feedback(feedback)
         logger.log_object(feedback, tag="feedback")
         return feedback
+
+    def _save_experiment_to_db(self, prev_out: dict[str, Any]) -> None:
+        """
+        Save experiment results to the results database.
+
+        Parameters
+        ----------
+        prev_out : dict
+            Output from the running experiment loop
+        """
+        try:
+            from rdagent.components.backtesting import ResultsDatabase
+
+            exp = prev_out.get("running")
+            if exp is None or exp.result is None:
+                return
+
+            db = ResultsDatabase()
+
+            # Determine factor name from hypothesis
+            factor_name = "unknown"
+            if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
+                factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
+
+            # Determine factor type based on experiment type
+            factor_type = "LLM-generated"
+            if prev_out["direct_exp_gen"]["propose"].action == "model":
+                factor_type = "ML-model"
+
+            # Extract metrics from result
+            result = exp.result
+            metrics = {
+                "ic": float(result.get("ic", 0)) if isinstance(result, dict) else 0,
+                "sharpe_ratio": float(result.get("sharpe", 0)) if isinstance(result, dict) else 0,
+                "max_drawdown": float(result.get("max_drawdown", 0)) if isinstance(result, dict) else 0,
+                "annualized_return": float(result.get("annualized_return", 0)) if isinstance(result, dict) else 0,
+                "win_rate": float(result.get("win_rate", 0)) if isinstance(result, dict) else 0,
+            }
+
+            db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
+            logger.info(f"Results saved to database for factor: {factor_name[:50]}")
+            db.close()
+
+        except Exception as e:
+            logger.warning(f"Failed to save results to database: {e}")
 
 
 def main(
