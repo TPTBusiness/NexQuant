@@ -895,3 +895,165 @@ class TestProtectionManager:
         assert StoplossGuardConfig is not None
         assert LowPerformanceConfig is not None
 
+
+# =============================================================================
+# 15. RL TRADING AGENT TESTS
+# =============================================================================
+
+
+class TestRLTrading:
+    """Test RL Trading System."""
+
+    def test_rl_env_import(self):
+        """Test RL trading environment imports."""
+        from rdagent.components.coder.rl.env import TradingEnv, TradingState
+        assert TradingEnv is not None
+        assert TradingState is not None
+
+    def test_rl_agent_import(self):
+        """Test RL trading agent imports."""
+        from rdagent.components.coder.rl.agent import RLTradingAgent
+        assert RLTradingAgent is not None
+
+    def test_costeer_import(self):
+        """Test RL Costeer imports."""
+        from rdagent.components.coder.rl.costeer import RLCosteer
+        assert RLCosteer is not None
+
+    def test_indicators_import(self):
+        """Test technical indicators import."""
+        from rdagent.components.coder.rl.indicators import (
+            calculate_rsi,
+            calculate_macd,
+            calculate_bollinger_bands,
+            calculate_cci,
+            calculate_atr,
+            prepare_features,
+        )
+        assert calculate_rsi is not None
+        assert calculate_macd is not None
+        assert calculate_bollinger_bands is not None
+
+    def test_env_creation(self):
+        """Test RL environment can be created with mock data."""
+        from rdagent.components.coder.rl.env import TradingEnv
+
+        np.random.seed(42)
+        prices = 100.0 + np.cumsum(np.random.randn(200) * 0.5)
+        env = TradingEnv(prices=prices, window_size=30, max_steps=100)
+
+        assert env is not None
+        assert env.observation_space.shape[0] > 0
+        assert env.action_space.shape == (1,)
+
+    def test_env_reset_and_step(self):
+        """Test environment reset and step work correctly."""
+        from rdagent.components.coder.rl.env import TradingEnv
+
+        np.random.seed(42)
+        prices = 100.0 + np.cumsum(np.random.randn(200) * 0.5)
+        env = TradingEnv(prices=prices, window_size=10, max_steps=50)
+
+        obs, info = env.reset()
+        assert isinstance(obs, np.ndarray)
+        assert obs.dtype == np.float32
+
+        action = np.array([0.3], dtype=np.float32)
+        obs, reward, terminated, truncated, info = env.step(action)
+
+        assert isinstance(reward, float)
+        assert isinstance(terminated, bool)
+        assert isinstance(truncated, bool)
+        assert "equity" in info
+
+    def test_agent_creation(self):
+        """Test RL trading agent can be created."""
+        from rdagent.components.coder.rl.agent import RLTradingAgent
+
+        agent = RLTradingAgent(algorithm="PPO")
+        assert agent.algorithm == "PPO"
+        assert agent.is_trained is False
+        assert agent.model is None
+
+    def test_costeer_initialization(self):
+        """Test RL Costeer can be initialized."""
+        from rdagent.components.coder.rl.costeer import RLCosteer
+
+        costeer = RLCosteer(
+            algorithm="PPO",
+            window_size=30,
+            max_position=1.0,
+            risk_limit=0.15,
+        )
+        assert costeer.algorithm == "PPO"
+        assert costeer.is_active is False
+        assert costeer.model is None
+
+    def test_full_rl_workflow(self):
+        """Test complete RL workflow: env -> indicators -> features."""
+        from rdagent.components.coder.rl.env import TradingEnv
+        from rdagent.components.coder.rl.indicators import prepare_features
+
+        # Create price data
+        np.random.seed(42)
+        n = 200
+        dates = pd.date_range("2024-01-01", periods=n, freq="B")
+        close = 100.0 + np.cumsum(np.random.randn(n) * 0.5)
+        high = close + np.abs(np.random.randn(n) * 0.3)
+        low = close - np.abs(np.random.randn(n) * 0.3)
+
+        prices_df = pd.DataFrame(
+            {"close": close, "high": high, "low": low}, index=dates
+        )
+
+        # Prepare features
+        features = prepare_features(prices_df, indicator_list=["rsi", "macd"])
+        assert "rsi" in features.columns
+        assert "macd" in features.columns
+        assert not features.isna().any().any()
+
+        # Create environment with indicators
+        indicators = features[["rsi", "macd", "signal", "histogram"]].values
+        env = TradingEnv(
+            prices=close,
+            indicators=indicators,
+            window_size=20,
+            max_steps=50,
+        )
+
+        obs, info = env.reset()
+        assert isinstance(obs, np.ndarray)
+
+        # Run a few steps
+        for _ in range(5):
+            action = np.array([0.2], dtype=np.float32)
+            obs, reward, terminated, truncated, info = env.step(action)
+            assert isinstance(reward, float)
+
+    def test_costeer_with_market_data(self):
+        """Test RLCosteer initializes with market data."""
+        from rdagent.components.coder.rl.costeer import RLCosteer
+
+        np.random.seed(42)
+        n = 200
+        dates = pd.date_range("2024-01-01", periods=n, freq="B")
+        prices = pd.Series(100.0 + np.cumsum(np.random.randn(n) * 0.5), index=dates)
+        indicators = pd.DataFrame(
+            np.random.randn(n, 3).astype(np.float32),
+            columns=["rsi", "macd", "bb"],
+            index=dates,
+        )
+
+        costeer = RLCosteer(window_size=30)
+        costeer.initialize(prices, indicators, initial_equity=100000.0)
+
+        assert costeer.is_active is True
+        assert costeer.peak_equity == 100000.0
+
+        # Step should work without model (returns 0 action)
+        trade = costeer.step(
+            current_equity=100000.0, cash=50000.0, position=0.0
+        )
+        assert "timestamp" in trade
+        assert "step" in trade
+
