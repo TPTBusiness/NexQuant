@@ -138,13 +138,22 @@ def main():
             # Job Summary mode
             st.header("Job")
             base_folder = st.text_input("Base Folder", value=default_log, key="base_folder_input")
-            base_path = Path(base_folder)
+
+            # Normalize and validate the base folder against the configured log root
+            safe_root = Path(default_log).expanduser().resolve()
+            try:
+                base_path = Path(base_folder).expanduser().resolve()
+                # Ensure the user-selected base path is within the safe root
+                base_path.relative_to(safe_root)
+            except (OSError, ValueError):
+                st.error("Invalid base folder: must be within the configured log directory.")
+                base_path = safe_root
 
             job_options = get_job_options(base_path)
             if job_options:
                 selected_job = st.selectbox("Select Job", job_options, key="job_select")
                 if selected_job.startswith("."):
-                    job_folder = base_folder
+                    job_folder = str(base_path)
                     is_root_job = True
                 else:
                     job_folder = str(base_path / selected_job)
@@ -152,7 +161,7 @@ def main():
                 state.selected_job_folder = job_folder
             else:
                 st.warning("No jobs found in this directory")
-                job_folder = base_folder
+                job_folder = str(base_path)
 
             if st.button("Refresh", type="primary", key="refresh_job"):
                 st.rerun()
@@ -208,18 +217,13 @@ def main():
         st.title("📊 FT Job Summary")
 
         # Security: Validate job_folder to prevent path traversal
-        # Only allow paths within the base_path directory
+        # Only allow paths within the configured log directory
         try:
-            safe_root = Path(base_path).resolve()
-            
-            # Additional security: Validate job_folder doesn't contain path traversal sequences
-            # This prevents CodeQL path-injection warning
-            if ".." in job_folder or job_folder.startswith("/") or job_folder.startswith("\\"):
-                st.error("Invalid job folder: Path traversal sequences not allowed")
-                st.info("Please select a valid job from the sidebar.")
-                return
-            
-            job_path = Path(job_folder).expanduser().resolve(strict=False)
+            # Derive the same safe root used when selecting the base folder
+            default_log = os.environ.get("FT_LOG_PATH", DEFAULT_LOG_BASE)
+            safe_root = Path(default_log).expanduser().resolve()
+
+            job_path = Path(job_folder).expanduser().resolve()
 
             # Ensure job_path is within safe_root (prevent path traversal)
             job_path.relative_to(safe_root)
@@ -228,12 +232,12 @@ def main():
                 render_job_summary(job_path, is_root=is_root_job)
             else:
                 st.warning(f"Job folder not found: {job_folder}")
-        except ValueError:
-            st.error("Invalid job folder path: Must be within base directory")
+        except (OSError, ValueError):
+            # ValueError from relative_to when job_path escapes safe_root,
+            # OSError from invalid paths during resolve()
+            st.error("Invalid job folder: Access outside the log directory is not allowed.")
             st.info("Please select a valid job from the sidebar.")
-        except (OSError, RuntimeError) as e:
-            st.error(f"Invalid path: {e}")
-            st.info("Please select a valid job from the sidebar.")
+            return
         return
 
     # Single Task mode
