@@ -839,3 +839,180 @@ git diff --staged
 git status
 # Should NOT show prompts/local/, models/local/, .env, results/
 ```
+
+---
+
+## Development Guidelines for AI Assistant
+
+### ⚠️ MANDATORY Rules for ALL Development
+
+**When implementing NEW features or making SIGNIFICANT changes, you MUST:**
+
+#### 1. 📝 Update QWEN.md
+
+**When:** Every time you add a new feature, module, or change existing architecture.
+
+**What to update:**
+- Architecture section (if structure changes)
+- Important Files section
+- Testing section
+- Key Metrics (if targets change)
+- Project Status
+- Next Steps
+
+**Example:**
+```markdown
+### Architecture
+├── rdagent/
+│   └── components/
+│       └── backtesting/
+│           └── protections/          # NEW: Trading protection system
+│               ├── base.py
+│               ├── max_drawdown.py
+│               └── protection_manager.py
+```
+
+#### 2. 📖 Update README.md
+
+**When:** Every user-facing feature change or major update.
+
+**What to update:**
+- Features list
+- Installation instructions
+- Usage examples
+- Configuration examples
+
+**Keep it user-focused:**
+```markdown
+## Features
+- ✅ Trading Protection System (NEW)
+  * Automatic drawdown protection
+  * Cooldown periods after losses
+  * Stoploss cluster detection
+```
+
+#### 3. 📦 Update requirements.txt
+
+**When:** Adding new dependencies or removing unused ones.
+
+**What to update:**
+- `requirements.txt` (main dependencies)
+- `requirements/lint.txt` (dev dependencies)
+- `requirements/test.txt` (test dependencies)
+
+**Example:**
+```bash
+# If you add a new library
+echo "new-library==1.0.0" >> requirements.txt
+
+# If you add a new test dependency
+echo "pytest-mock" >> requirements/test.txt
+```
+
+#### 4. ✅ Extend Tests
+
+**When:** EVERY time you add new code.
+
+**Rule:** New features MUST have tests with >80% coverage.
+
+**What to create:**
+- Unit tests in `test/` directory
+- Integration tests in `test/integration/`
+- Update existing tests if behavior changed
+
+**Test structure:**
+```python
+# test/feature_type/test_new_feature.py
+"""Tests for New Feature"""
+
+class TestNewFeature:
+    """Test new feature thoroughly."""
+    
+    def test_basic_functionality(self): ...
+    def test_edge_cases(self): ...
+    def test_error_handling(self): ...
+    def test_integration_with_existing(self): ...
+```
+
+**Update integration tests:**
+```python
+# Add to test/integration/test_all_features.py
+class TestNewFeature:
+    """Test new feature integration."""
+    
+    def test_imports(self): ...
+    def test_initialization(self): ...
+    def test_full_workflow(self): ...
+```
+
+#### 5. 🔄 Pre-Commit Checklist
+
+**BEFORE every commit with new features:**
+
+```bash
+# 1. Run ALL tests
+pytest test/ -v
+
+# 2. Run integration tests
+pytest test/integration/test_all_features.py -v
+
+# 3. Check test coverage
+pytest --cov=rdagent.components.new_module -v
+
+# 4. Run security scan
+bandit -r rdagent/ -c .bandit.yml
+
+# 5. Verify tests updated
+git status
+# Should show test files modified
+```
+
+### Documentation Priority Order
+
+1. **QWEN.md** - Internal AI assistant context (UPDATE ALWAYS)
+2. **Test files** - Code documentation through tests (MANDATORY)
+3. **README.md** - User-facing documentation (UPDATE for user-visible changes)
+4. **requirements.txt** - Dependencies (UPDATE when adding libraries)
+5. **Inline code comments** - English only (ALWAYS)
+
+### Example Workflow: Adding New Feature
+
+```
+1. Plan feature
+   ↓
+2. Implement code
+   ↓
+3. Write unit tests (test/...)
+   ↓
+4. Write integration tests (test/integration/...)
+   ↓
+5. Run ALL tests → Must pass
+   ↓
+6. Update QWEN.md ← MANDATORY
+   ↓
+7. Update README.md (if user-visible)
+   ↓
+8. Update requirements.txt (if new deps)
+   ↓
+9. Commit with clear message
+   ↓
+10. Pre-commit hooks run automatically
+    ↓
+11. Push to remote
+```
+
+### Penalties for Not Following Rules
+
+**If you forget to update:**
+- ❌ Missing tests → Code cannot be committed (pre-commit blocks)
+- ❌ Missing QWEN.md update → Next AI assistant will work with outdated context
+- ❌ Missing README update → Users won't understand new features
+- ❌ Missing requirements.txt → Installation will fail
+
+**Remember:** These rules ensure:
+1. Code quality through tests
+2. AI assistant has current context
+3. Users understand changes
+4. Dependencies are tracked
+
+---
