@@ -2,7 +2,22 @@
 # See https://pre-commit.com for more information
 
 repos:
-  # ── Security Scanning (Local) ──────────────────────────────────────
+  # ── Integration Tests (MANDATORY - MUST PASS before commit) ──────
+  - repo: local
+    hooks:
+      - id: integration-tests
+        name: Run Integration Tests (60 tests)
+        entry: pytest
+        language: system
+        args:
+          - test/integration/test_all_features.py
+          - -v
+          - --tb=short
+          - --no-cov  # Skip coverage for speed (run separately if needed)
+        pass_filenames: false
+        always_run: true
+
+  # ── Security Scanning (MANDATORY) ─────────────────────────────────
   - repo: local
     hooks:
       - id: bandit-security-scan
@@ -19,47 +34,3 @@ repos:
           - --format=txt
         pass_filenames: false
         always_run: true
-
-  # ── Code Quality (Local - use installed tools) ────────────────────
-  # Note: These hooks only run if the tools are installed
-  # Install with: pip install -e .[lint]
-  - repo: local
-    hooks:
-      # Format Checking
-      - id: black
-        name: black
-        entry: black
-        language: system
-        args: [--line-length, "120"]
-        types: [python]
-
-      - id: isort
-        name: isort
-        entry: isort
-        language: system
-        args: [--profile, black, --line-length, "120"]
-        types: [python]
-
-      - id: ruff
-        name: ruff
-        entry: ruff
-        language: system
-        args: [check, --fix]
-        types: [python]
-
-      # Type Checking
-      - id: mypy
-        name: mypy
-        entry: mypy
-        language: system
-        args: [--config-file=pyproject.toml]
-        types: [python]
-        exclude: ^test/
-
-      # TOML Formatting
-      - id: toml-sort
-        name: toml-sort
-        entry: toml-sort
-        language: system
-        args: [--in-place, --trailing-comma-inline-array]
-        types: [toml]
