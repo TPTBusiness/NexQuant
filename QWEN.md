@@ -70,12 +70,24 @@ Predix/
 
 ### Open Source vs. Closed Source
 
-**🟢 OPEN SOURCE (Public on GitHub):**
-- `rdagent/` - Core framework
+**🟢 OPEN SOURCE (Public on GitHub - FULLY WORKING):**
+- `rdagent/` - Core framework (ALL components)
 - `models/standard/` - Base models (XGBoost, LightGBM)
 - `prompts/standard_prompts.yaml` - Base prompts
 - `web/` - Dashboards
-- `test/` - Tests
+- `test/` - ALL tests (integration, unit, security)
+- `rdagent/components/coder/rl/` - RL Trading System (with fallback)
+- `rdagent/components/backtesting/protections/` - Trading Protection System
+- `scripts/` - Utility scripts
+
+**GitHub users get:**
+✅ Full working trading system
+✅ RL Trading with graceful fallback (no stable-baselines3 needed)
+✅ Protection Manager (drawdown, cooldown, stoploss guard)
+✅ Backtesting Engine with RL support
+✅ CLI commands (`fin_quant`, `rl_trading`, etc.)
+✅ Web and CLI dashboards
+✅ All 200+ integration tests
 
 **🔒 CLOSED SOURCE (Local Only - NOT on GitHub):**
 - `models/local/` - Your improved models (Transformer, TCN, PatchTST, CNN+LSTM)
@@ -89,6 +101,22 @@ Predix/
 - `.gitignore` excludes all `local/` directories
 - Your competitive edge (alpha) stays private
 - Framework is open, but your best models/prompts are closed
+
+### Open Source Fallback Strategy
+
+**For users without stable-baselines3:**
+The RL system provides graceful degradation:
+- ❌ No stable-baselines3 → Uses simple momentum-based fallback
+- ✅ Still fully functional: CLI, backtesting, protections work
+- ✅ No errors or broken features
+- ✅ Clear warning message with installation instructions
+
+**For users without LLM (llama.cpp):**
+- Factor evolution degrades gracefully
+- System still works with standard models
+- Clear error messages for missing LLM
+
+**PRINCIPLE:** Every GitHub user MUST be able to run the full system. Missing optional components should never break the project.
 
 ## Building and Running
 
@@ -404,20 +432,28 @@ report = risk_manager.generate_risk_report(returns, weights)
 ### Project Status
 
 - ✅ Factor Generation (110+ factors created)
-- ✅ Backtesting Engine (IC, Sharpe, Drawdown)
+- ✅ Backtesting Engine (IC, Sharpe, Drawdown, RL support)
 - ✅ Results Database (SQLite with queries)
 - ✅ Risk Management (Correlation, Portfolio Optimization)
+- ✅ Trading Protection System (Drawdown, Cooldown, Stoploss Guard, Low Performance)
+- ✅ RL Trading Agent (PPO/A2C/SAC with Gymnasium environment + fallback)
 - ✅ Dashboards (Web + CLI)
-- ✅ RL Trading Agent (PPO/A2C/SAC with Gym environment)
-- ⏳ Live Trading (Paper trading pending)
+- ✅ CLI Commands (`fin_quant`, `rl_trading`, `health_check`, etc.)
+- ✅ Integration Tests (200+ tests, run before EVERY commit)
+- ✅ Security Scanning (Bandit pre-commit hook)
+- ⏳ Live Trading (Paper trading - in development)
 
 ### Next Steps
 
-1. Backtest all 110 factors
-2. Select top 20 by IC/Sharpe
-3. Portfolio optimization
-4. 4 weeks paper trading
-5. Live trading with small capital
+1. ✅ Connect RL with Protection Manager (DONE)
+2. ✅ Connect RL with Backtesting Engine (DONE)
+3. ✅ Add CLI command for RL Trading (DONE)
+4. ✅ Ensure GitHub users can run full system (DONE - fallback system)
+5. Backtest all 110 factors
+6. Select top 20 by IC/Sharpe
+7. Portfolio optimization
+8. 4 weeks paper trading
+9. Live trading with small capital
 
 ---
 
@@ -849,6 +885,24 @@ git status
 ---
 
 ## Development Guidelines for AI Assistant
+
+### 🌍 CRITICAL: Open Source Compatibility
+
+**BEFORE implementing ANY feature, ask yourself:**
+
+1. **Can a GitHub user run this without our local files?**
+   - ✅ YES → Good, proceed
+   - ❌ NO → Add fallback or graceful degradation
+
+2. **Does this break if optional dependencies are missing?**
+   - Example: `stable-baselines3`, `llama.cpp`, `Ollama`
+   - Solution: Try/except with clear warning messages
+
+3. **Is this feature documented for external users?**
+   - Update README.md with usage instructions
+   - Ensure installation guide covers all dependencies
+
+**PRINCIPLE:** The project on GitHub MUST be fully functional for users. Our closed-source assets (`models/local/`, `prompts/local/`, `.env`) are ENHANCEMENTS, not requirements.
 
 ### ⚠️ MANDATORY Rules for ALL Development
 

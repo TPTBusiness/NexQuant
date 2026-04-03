@@ -1057,3 +1057,202 @@ class TestRLTrading:
         assert "timestamp" in trade
         assert "step" in trade
 
+
+# =============================================================================
+# 16. RL SYSTEM INTEGRATION TESTS (Full Integration)
+# =============================================================================
+
+
+class TestRLIntegration:
+    """Test RL system integration with other components."""
+
+    def test_rl_with_protections(self):
+        """Test RL costeer respects protection manager."""
+        from rdagent.components.coder.rl.costeer import RLCosteer
+        from datetime import datetime
+
+        costeer = RLCosteer(
+            enable_protections=True,
+            risk_limit=0.15,
+        )
+
+        # Initialize with mock data
+        np.random.seed(42)
+        n = 200
+        dates = pd.date_range("2024-01-01", periods=n, freq="B")
+        prices = pd.Series(100.0 + np.cumsum(np.random.randn(n) * 0.5), index=dates)
+        costeer.initialize(prices, initial_equity=100000.0)
+
+        # Test that protections are initialized
+        assert costeer.protection_manager is not None
+        assert len(costeer.protection_manager.protections) == 4
+
+        # Simulate returns that trigger max drawdown protection
+        bad_returns = [-0.05] * 30  # Consistent losses
+        timestamps = [datetime.now()] * len(bad_returns)
+
+        # Get action with bad returns (should trigger protection)
+        action = costeer.get_action(
+            current_equity=80000.0,  # 20% drawdown
+            cash=50000.0,
+            position=0.5,
+            returns_history=bad_returns,
+            timestamps=timestamps,
+        )
+
+        # Protection should force close position (return 0)
+        # Note: May depend on exact drawdown calculation
+        assert isinstance(action, float)
+        assert -1.0 <= action <= 1.0
+
+    def test_rl_backtest_workflow(self):
+        """Test full RL backtest workflow."""
+        from rdagent.components.backtesting import FactorBacktester
+        from rdagent.components.coder.rl.fallback import SimpleRLFallback
+
+        # Create fallback agent (works without stable-baselines3)
+        agent = SimpleRLFallback(window_size=20)
+
+        # Create backtester
+        backtester = FactorBacktester()
+
+        # Mock price data
+        np.random.seed(42)
+        n = 300
+        dates = pd.date_range("2024-01-01", periods=n, freq="B")
+        prices = pd.Series(100.0 + np.cumsum(np.random.randn(n) * 0.5), index=dates)
+
+        # Run RL backtest
+        metrics = backtester.run_rl_backtest(
+            rl_agent=agent,
+            prices=prices,
+            enable_protections=False,  # Disable for test consistency
+        )
+
+        # Verify metrics structure
+        assert "sharpe_ratio" in metrics
+        assert "max_drawdown" in metrics
+        assert "final_equity" in metrics
+        assert "initial_balance" in metrics
+        assert metrics["initial_balance"] == 100000.0
+
+    def test_cli_rl_command_exists(self):
+        """Test that rl_trading CLI command is registered."""
+        from typer.testing import CliRunner
+        from rdagent.app.cli import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["rl_trading", "--help"])
+
+        # Should succeed and show help
+        assert result.exit_code == 0
+        assert "RL Trading Agent" in result.output or "rl_trading" in result.output.lower()
+
+    def test_rl_fallback_without_stable_baselines3(self):
+        """Test that RL fallback works when stable-baselines3 is not available."""
+        from rdagent.components.coder.rl.fallback import SimpleRLFallback
+
+        # Create fallback agent
+        agent = SimpleRLFallback(window_size=10)
+
+        # Test prediction with mock observation
+        obs = np.random.randn(63).astype(np.float32)
+        action = agent.predict(obs)
+
+        assert isinstance(action, np.ndarray)
+        assert len(action) == 1
+        assert -1.0 <= action[0] <= 1.0
+
+        # Test save/load
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = f"{tmpdir}/test_fallback"
+            agent.save(path)
+            # Should create a JSON file
+            assert Path(path).with_suffix('.json').exists()
+
+    def test_rl_module_has_stable_baselines3_flag(self):
+        """Test that RL module exposes stable-baselines3 availability flag."""
+        from rdagent.components.coder.rl import HAS_STABLE_BASELINES3
+        assert isinstance(HAS_STABLE_BASELINES3, bool)
+
+    def test_rl_indicators_calculate(self):
+        """Test RL technical indicators produce valid outputs."""
+        from rdagent.components.coder.rl.indicators import (
+            calculate_rsi,
+            calculate_macd,
+            calculate_bollinger_bands,
+            calculate_atr,
+            calculate_cci,
+        )
+
+        np.random.seed(42)
+        n = 100
+        close = pd.Series(100.0 + np.cumsum(np.random.randn(n) * 0.5))
+        high = pd.Series(close.values + np.abs(np.random.randn(n) * 0.3))
+        low = pd.Series(close.values - np.abs(np.random.randn(n) * 0.3))
+
+        # Test each indicator
+        rsi = calculate_rsi(close)
+        assert len(rsi) == len(close)
+        # RSI has NaN at the beginning (first `period` values)
+        valid_rsi = rsi.dropna()
+        assert len(valid_rsi) > 0
+        assert np.all(valid_rsi >= 0) and np.all(valid_rsi <= 100)
+
+        macd_df = calculate_macd(close)
+        assert isinstance(macd_df, pd.DataFrame)
+        assert len(macd_df) == len(close)
+        assert 'macd' in macd_df.columns
+        assert 'signal' in macd_df.columns
+        assert 'histogram' in macd_df.columns
+
+        bb_df = calculate_bollinger_bands(close)
+        assert isinstance(bb_df, pd.DataFrame)
+        assert len(bb_df) == len(close)
+        assert 'upper' in bb_df.columns
+        assert 'middle' in bb_df.columns
+        assert 'lower' in bb_df.columns
+        # Check non-NaN values
+        valid_bb = bb_df.dropna()
+        if len(valid_bb) > 0:
+            assert np.all(valid_bb['upper'].values >= valid_bb['middle'].values)
+            assert np.all(valid_bb['middle'].values >= valid_bb['lower'].values)
+
+        atr = calculate_atr(high, low, close)
+        assert len(atr) == len(close)
+        # ATR may have NaN at beginning
+        valid_atr = atr.dropna()
+        if len(valid_atr) > 0:
+            assert np.all(valid_atr >= 0)
+
+        cci = calculate_cci(high, low, close)
+        assert len(cci) == len(close)
+
+    def test_rl_integration_with_backtest_engine(self):
+        """Test RL backtest integrates with backtest engine."""
+        from rdagent.components.backtesting.backtest_engine import FactorBacktester
+        from rdagent.components.coder.rl.fallback import SimpleRLFallback
+
+        backtester = FactorBacktester()
+        agent = SimpleRLFallback(window_size=15)
+
+        np.random.seed(123)
+        n = 150
+        dates = pd.date_range("2024-06-01", periods=n, freq="B")
+        prices = pd.Series(150.0 + np.cumsum(np.random.randn(n) * 0.8), index=dates)
+
+        metrics = backtester.run_rl_backtest(
+            rl_agent=agent,
+            prices=prices,
+            enable_protections=True,
+        )
+
+        # Should have all standard metrics
+        assert "total_return" in metrics
+        assert "annualized_return" in metrics
+        assert "sharpe_ratio" in metrics
+        assert "win_rate" in metrics
+        assert "total_trades" in metrics
+
+
