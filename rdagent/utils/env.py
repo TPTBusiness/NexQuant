@@ -272,6 +272,23 @@ class Env(Generic[ASpecificEnvConf]):
                         os.path.relpath(os.path.join(root, file), folder_path),
                     )
 
+    def _safe_extract_zip(self, z: zipfile.ZipFile, path: str, files_to_extract: list[str] | None = None) -> None:
+        """Extract zipfile safely, preventing path traversal attacks (CWE-22)."""
+        abs_path = os.path.realpath(path)
+        members = [z.getinfo(f) for f in files_to_extract] if files_to_extract else z.infolist()
+        for member in members:
+            member_path = os.path.realpath(os.path.join(abs_path, member.filename))
+            if not member_path.startswith(abs_path):
+                raise ValueError(f"Attempted path traversal in zip file: {member.filename}")
+        if files_to_extract is not None:
+            for file_name in files_to_extract:
+                try:
+                    z.extract(file_name, path)
+                except KeyError:
+                    logger.warning(f"File {file_name} not found in cache zip.")
+        else:
+            z.extractall(path=path)  # nosec B202:tarfile_unsafe_members - validated above
+
     def unzip_a_file_into_a_folder(
         self, zip_file_path: str, folder_path: str, files_to_extract: list[str] | None = None
     ) -> None:
@@ -285,14 +302,7 @@ class Env(Generic[ASpecificEnvConf]):
             os.makedirs(folder_path)
 
         with zipfile.ZipFile(zip_file_path, "r") as z:
-            if files_to_extract is not None:
-                for file_name in files_to_extract:
-                    try:
-                        z.extract(file_name, folder_path)
-                    except KeyError:
-                        logger.warning(f"File {file_name} not found in cache zip.")
-            else:
-                z.extractall(folder_path)
+            self._safe_extract_zip(z, folder_path, files_to_extract)
 
     @abstractmethod
     def prepare(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
