@@ -626,9 +626,19 @@ def try_get_loop_id(trace: Trace, exp: DSExperiment):
     return index
 
 
+def _safe_extract(tar: tarfile.TarFile, path: str) -> None:
+    """Extract tarfile safely, preventing path traversal attacks (CWE-22)."""
+    abs_path = os.path.realpath(path)
+    for member in tar.getmembers():
+        member_path = os.path.realpath(os.path.join(abs_path, member.name))
+        if not member_path.startswith(abs_path):
+            raise ValueError(f"Attempted path traversal in tar file: {member.name}")
+    tar.extractall(path=path)  # nosec B202:tarfile_unsafe_members - validated above
+
+
 def extract_tar(tar_path: str, to_dir: str = "log") -> str:
     with tarfile.open(tar_path, mode="r:*") as tar:
-        tar.extractall(path=to_dir)
+        _safe_extract(tar, to_dir)
 
 
 # ==============================================================================

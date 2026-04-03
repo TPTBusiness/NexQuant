@@ -1,6 +1,7 @@
 # %%
 import bisect
 import json
+import os
 import shutil
 import subprocess
 import tarfile
@@ -200,9 +201,19 @@ def download_data(competition: str, settings: ExtendedBaseSettings, enable_creat
         create_debug_data(competition, dataset_path=local_path)
 
 
+def _safe_extract_zip(zip_ref: zipfile.ZipFile, path: str) -> None:
+    """Extract zipfile safely, preventing path traversal attacks (CWE-22)."""
+    abs_path = os.path.realpath(path)
+    for member in zip_ref.infolist():
+        member_path = os.path.realpath(os.path.join(abs_path, member.filename))
+        if not member_path.startswith(abs_path):
+            raise ValueError(f"Attempted path traversal in zip file: {member.filename}")
+    zip_ref.extractall(path=path)  # nosec B202:tarfile_unsafe_members - validated above
+
+
 def unzip_data(unzip_file_path: str, unzip_target_path: str) -> None:
     with zipfile.ZipFile(unzip_file_path, "r") as zip_ref:
-        zip_ref.extractall(unzip_target_path)
+        _safe_extract_zip(zip_ref, unzip_target_path)
 
 
 @cache_with_pickle(hash_func=lambda x: x, force=True)
