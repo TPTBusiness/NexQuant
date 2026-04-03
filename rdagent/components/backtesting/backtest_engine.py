@@ -1,10 +1,12 @@
 """
 Predix Backtesting Engine - IC, Sharpe, Drawdown
+
+Supports both factor-based backtesting and RL agent backtesting.
 """
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Any, List
 from datetime import datetime
 import json
 
@@ -67,6 +69,139 @@ class FactorBacktester:
         with open(self.results_path / f"{safe_name}_{timestamp}.json", 'w') as f:
             json.dump({k: (None if isinstance(v, float) and np.isnan(v) else v) for k, v in metrics.items()}, f, indent=2)
         
+        return metrics
+
+    def run_rl_backtest(
+        self,
+        rl_agent: Any,
+        prices: pd.Series,
+        indicators: Optional[pd.DataFrame] = None,
+        initial_balance: float = 100000.0,
+        transaction_cost: float = 0.00015,
+        window_size: int = 60,
+        enable_protections: bool = True,
+    ) -> Dict:
+        """
+        Run backtest with RL agent.
+
+        Parameters
+        ----------
+        rl_agent : Any
+            Trained RL agent (RLTradingAgent or model with predict method)
+        prices : pd.Series
+            Price time series for backtesting
+        indicators : pd.DataFrame, optional
+            Technical indicators DataFrame
+        initial_balance : float
+            Starting balance
+        transaction_cost : float
+            Transaction cost per trade
+        window_size : int
+            Lookback window for observations
+        enable_protections : bool
+            Enable trading protections
+
+        Returns
+        -------
+        dict
+            Backtest metrics
+        """
+        from rdagent.components.coder.rl import RLCosteer
+
+        # Create costeer with protections
+        costeer = RLCosteer(
+            model_path=None,
+            algorithm=getattr(rl_agent, 'algorithm', 'PPO'),
+            window_size=window_size,
+            enable_protections=enable_protections,
+        )
+
+        # Attach trained model directly
+        if hasattr(rl_agent, 'model'):
+            costeer.model = rl_agent.model
+            costeer.is_active = True
+        elif hasattr(rl_agent, 'predict'):
+            # Agent has predict method directly
+            costeer.model = rl_agent
+            costeer.is_active = True
+        else:
+            raise ValueError("RL agent must have 'model' or 'predict' attribute")
+
+        # Initialize with price data
+        costeer.initialize(
+            prices=prices,
+            indicators=indicators,
+            initial_equity=initial_balance,
+        )
+
+        # Run simulation
+        equity_curve: List[float] = [initial_balance]
+        position = 0.0
+        cash = initial_balance
+        returns_history: List[float] = []
+
+        price_values = prices.values if isinstance(prices, pd.Series) else np.array(prices)
+
+        for step in range(len(price_values) - 1):
+            # Ensure costeer doesn't go beyond available data
+            if costeer.current_step >= len(price_values):
+                break
+
+            current_price = float(price_values[step])
+            current_equity = cash + position * current_price
+
+            # Get RL action with protections
+            trade_info = costeer.step(
+                current_equity=current_equity,
+                cash=cash,
+                position=position,
+                returns_history=returns_history[-100:] if returns_history else None,  # Last 100 returns
+            )
+
+            # Execute trade (simplified)
+            target_position = trade_info["target_position"]
+            position_change = target_position - position
+
+            # Calculate transaction cost
+            trade_value = abs(position_change) * current_price
+            cost = trade_value * transaction_cost
+
+            # Update position and cash
+            position = target_position
+            cash -= cost
+
+            # Calculate return for this step
+            if step > 0:
+                prev_price = float(price_values[step - 1]) if step > 0 else current_price
+                if prev_price > 0:
+                    step_return = (current_price - prev_price) / prev_price * position
+                    returns_history.append(step_return)
+
+            # Calculate new equity
+            new_equity = cash + position * current_price
+            equity_curve.append(new_equity)
+
+        # Calculate metrics
+        equity_series = pd.Series(equity_curve)
+        returns_series = equity_series.pct_change().dropna()
+
+        metrics = self.metrics.calculate_all(returns_series, equity_series)
+        metrics["factor_name"] = f"RL_{getattr(rl_agent, 'algorithm', 'Unknown')}"
+        metrics["timestamp"] = datetime.now().isoformat()
+        metrics["initial_balance"] = initial_balance
+        metrics["final_equity"] = equity_curve[-1]
+        metrics["total_steps"] = len(price_values) - 1
+
+        # Save results
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        rl_name = f"RL_{getattr(rl_agent, 'algorithm', 'Unknown')}"
+
+        with open(self.results_path / f"{rl_name}_{timestamp}.json", 'w') as f:
+            json.dump(
+                {k: (None if isinstance(v, float) and np.isnan(v) else v) for k, v in metrics.items()},
+                f, indent=2
+            )
+
         return metrics
 
 if __name__ == "__main__":
