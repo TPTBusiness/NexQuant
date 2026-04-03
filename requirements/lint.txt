@@ -1,4 +1,5 @@
 # Requirements for lint.
+bandit
 black
 isort
 mypy
