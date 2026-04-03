@@ -199,4 +199,54 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         exp.result = result
         exp.stdout = stdout
 
+        # Protection Manager: Check if factor passes risk criteria
+        try:
+            self._run_protection_check(exp, result)
+        except Exception as e:
+            logger.warning(f"Protection check failed for factor {exp.hypothesis.hypothesis}: {e}")
+            # Don't block the workflow, just log the warning
+
         return exp
+
+    def _run_protection_check(self, exp, result: dict) -> None:
+        """
+        Run protection checks on backtest results.
+
+        Parameters
+        ----------
+        exp : QlibFactorExperiment
+            The experiment with backtest results
+        result : dict
+            Backtest metrics dictionary
+        """
+        from rdagent.components.backtesting.protections import ProtectionManager
+
+        protection_manager = ProtectionManager()
+        protection_manager.create_default_protections()
+
+        # Extract returns and equity curve from backtest results
+        returns = result.get("returns", [])
+        timestamps = result.get("timestamps", [])
+        current_equity = result.get("final_equity", 100000)
+        peak_equity = result.get("peak_equity", current_equity)
+
+        # Get factor name from hypothesis
+        factor_name = "unknown"
+        if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
+            factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
+
+        protection_result = protection_manager.check_all(
+            returns=returns,
+            timestamps=timestamps,
+            current_equity=current_equity,
+            peak_equity=peak_equity,
+            factor_name=factor_name,
+        )
+
+        if protection_result.should_block:
+            logger.warning(
+                f"Factor {factor_name} rejected by protection manager: {protection_result.reason}"
+            )
+            # Mark factor as rejected by protection
+            exp.rejected_by_protection = True
+            exp.protection_reason = protection_result.reason
