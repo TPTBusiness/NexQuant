@@ -158,7 +158,7 @@ class RLCoSTEER(CoSTEER):
 
 class RLCosteer:
     """
-    RL-based trading controller.
+    RL-based trading controller with protection manager integration.
 
     Takes market data, technical indicators, and portfolio state,
     then uses a trained RL model to decide position sizing.
@@ -175,6 +175,8 @@ class RLCosteer:
         Maximum position size (0 to 1)
     risk_limit : float
         Maximum drawdown before forcing position close
+    enable_protections : bool
+        Enable trading protection manager (default: True)
 
     Examples
     --------
@@ -190,12 +192,14 @@ class RLCosteer:
         window_size: int = 60,
         max_position: float = 1.0,
         risk_limit: float = 0.15,
+        enable_protections: bool = True,
     ) -> None:
         self.model_path = model_path
         self.algorithm = algorithm.upper()
         self.window_size = window_size
         self.max_position = max_position
         self.risk_limit = risk_limit
+        self.enable_protections = enable_protections
 
         # State
         self.is_active = False
@@ -203,12 +207,32 @@ class RLCosteer:
         self.current_position: float = 0.0
         self.peak_equity: float = 0.0
         self.trade_history: List[Dict[str, Any]] = []
+        self.equity_history: List[float] = []
+
+        # Protection Manager
+        self.protection_manager: Optional[Any] = None
+        if enable_protections:
+            try:
+                from rdagent.components.backtesting.protections.protection_manager import (
+                    ProtectionManager,
+                )
+
+                self.protection_manager = ProtectionManager()
+                self.protection_manager.create_default_protections()
+            except ImportError:
+                import warnings
+
+                warnings.warn(
+                    "Protection manager not available. Trading protections disabled."
+                )
+                self.protection_manager = None
 
         # Market data (set during initialize)
         self.prices: np.ndarray = np.array([])
         self.indicators: Optional[np.ndarray] = None
         self.initial_equity: float = 0.0
         self.current_step: int = 0
+        self.timestamps_history: List[datetime] = []
 
         # Load model if path provided
         if model_path is not None and model_path.exists():
@@ -243,9 +267,11 @@ class RLCosteer:
         current_equity: float,
         cash: float,
         position: float,
+        returns_history: Optional[List[float]] = None,
+        timestamps: Optional[List[datetime]] = None,
     ) -> float:
         """
-        Get trading action from RL model.
+        Get trading action from RL model with protection checks.
 
         Parameters
         ----------
@@ -255,21 +281,47 @@ class RLCosteer:
             Available cash
         position : float
             Current position size
+        returns_history : list, optional
+            Historical returns for protection checks
+        timestamps : list, optional
+            Historical timestamps for protection checks
 
         Returns
         -------
         float
             Target position (-1 to 1)
         """
-        if not self.is_active or self.model is None:
-            return 0.0  # Hold if not active
+        # Check protections first (if enabled and available)
+        if self.protection_manager and returns_history and len(returns_history) > 0:
+            peak_equity = max(self.equity_history + [current_equity]) if self.equity_history else current_equity
 
-        # Build observation
+            protection_result = self.protection_manager.check_all(
+                returns=returns_history,
+                timestamps=timestamps or self.timestamps_history[-len(returns_history):] if timestamps is None else [],
+                current_equity=current_equity,
+                peak_equity=peak_equity,
+            )
+
+            if protection_result.should_block:
+                # Protection triggered - force close position
+                return 0.0
+
+        # If not active or no model, hold
+        if not self.is_active or self.model is None:
+            return 0.0
+
+        # Build observation for RL model
         observation = self._build_observation(current_equity, cash, position)
 
         # Get action from model
-        prediction = self.model.predict(observation)
-        target_position = float(np.asarray(prediction[0]).flatten()[0])
+        try:
+            prediction = self.model.predict(observation)
+            target_position = float(np.asarray(prediction[0]).flatten()[0])
+        except Exception as e:
+            import warnings
+
+            warnings.warn(f"RL model prediction failed: {e}. Returning hold.")
+            return 0.0
 
         # Apply risk limits
         drawdown = (self.peak_equity - current_equity) / self.peak_equity if self.peak_equity > 0 else 0.0
@@ -356,6 +408,8 @@ class RLCosteer:
         current_equity: float,
         cash: float,
         position: float,
+        returns_history: Optional[List[float]] = None,
+        timestamps: Optional[List[datetime]] = None,
     ) -> Dict[str, Any]:
         """
         Execute one trading step.
@@ -368,14 +422,24 @@ class RLCosteer:
             Available cash
         position : float
             Current position size
+        returns_history : list, optional
+            Historical returns for protection checks
+        timestamps : list, optional
+            Historical timestamps for protection checks
 
         Returns
         -------
         dict
             Step information including action taken
         """
-        # Get action
-        target_position = self.get_action(current_equity, cash, position)
+        # Get action with protections
+        target_position = self.get_action(
+            current_equity=current_equity,
+            cash=cash,
+            position=position,
+            returns_history=returns_history,
+            timestamps=timestamps,
+        )
 
         # Record trade
         trade = {
@@ -387,6 +451,13 @@ class RLCosteer:
             "action": target_position - position,
         }
         self.trade_history.append(trade)
+
+        # Track equity and timestamps
+        self.equity_history.append(current_equity)
+        if timestamps:
+            self.timestamps_history.extend(timestamps)
+        else:
+            self.timestamps_history.append(datetime.now())
 
         # Update peak equity
         if current_equity > self.peak_equity:
