@@ -1,8 +1,8 @@
 qlib_init:
-    provider_uri: "~/.qlib/qlib_data/cn_data"
+    provider_uri: "~/.qlib/qlib_data/eurusd_1min_data"
     region: cn
 
-market: &market csi300
+market: &market eurusd
 benchmark: &benchmark EURUSD
 
 data_handler_config: &data_handler_config
@@ -47,19 +47,19 @@ port_analysis_config: &port_analysis_config
         module_path: qlib.contrib.strategy
         kwargs:
             signal: <PRED>
-            topk: 50
-            n_drop: 5
+            topk: 1
+            n_drop: 0
     backtest:
         start_time: {{ test_start | default("2017-01-01", true) }}
         end_time: {{ test_end | default("null", true) }}
         account: 100000000
         benchmark: *benchmark
         exchange_kwargs:
-            limit_threshold: 0.095
+            limit_threshold: 0.0
             deal_price: close
             open_cost: 0.0005
             close_cost: 0.0015
-            min_cost: 5
+            min_cost: 0
 
 task:
     model:
