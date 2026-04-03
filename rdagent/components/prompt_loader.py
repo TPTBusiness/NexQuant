@@ -6,7 +6,7 @@ Loads prompts from:
 2. prompts/standard_prompts.yaml (default prompts - in Git)
 
 Usage:
-    from rdagent.components.loader import load_prompt
+    from rdagent.components.prompt_loader import load_prompt
     
     # Load factor discovery prompt
     prompt = load_prompt("factor_discovery")
