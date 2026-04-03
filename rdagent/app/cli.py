@@ -249,5 +249,200 @@ def collect_info_cli():
 app.command(name="ds_user_interact")(ds_user_interact)
 
 
+@app.command(name="rl_trading")
+def rl_trading_cli(
+    mode: str = typer.Option("train", help="Mode: train, backtest, live"),
+    algorithm: str = typer.Option("PPO", help="RL algorithm: PPO, A2C, SAC"),
+    model_path: str = typer.Option(None, help="Path to trained model"),
+    total_timesteps: int = typer.Option(100000, help="Training timesteps"),
+    data_config: str = typer.Option("data_config.yaml", help="Data config file"),
+    with_protections: bool = typer.Option(True, help="Enable trading protections"),
+    n_episodes: int = typer.Option(10, help="Number of evaluation episodes"),
+):
+    """
+    RL Trading Agent - Train and run reinforcement learning trading agents.
+
+    Examples:
+        # Train new RL agent
+        rdagent rl_trading --mode train --algorithm PPO --total-timesteps 100000
+
+        # Run backtest with trained model
+        rdagent rl_trading --mode backtest --model-path models/rl_trader.zip
+
+        # Run with protections disabled
+        rdagent rl_trading --mode backtest --no-with-protections
+    """
+    from pathlib import Path
+    import yaml
+
+    console = Console()
+
+    # Load config
+    config_path = Path(data_config)
+    config = {}
+    if config_path.exists():
+        with open(config_path) as f:
+            config = yaml.safe_load(f) or {}
+
+    console.print(f"\n[bold blue]🤖 RL Trading Agent[/bold blue]")
+    console.print(f"Mode: [cyan]{mode}[/cyan]")
+    console.print(f"Algorithm: [cyan]{algorithm.upper()}[/cyan]")
+    console.print(f"Protections: {'[green]Enabled[/green]' if with_protections else '[red]Disabled[/red]'}")
+
+    try:
+        from rdagent.components.coder.rl import RLTradingAgent, RLCosteer, TradingEnv
+    except ImportError as e:
+        console.print(f"[bold red]Error: RL components not available.[/bold red]")
+        console.print(f"Details: {e}")
+        console.print(f"\n[yellow]Install RL dependencies:[/yellow]")
+        console.print(f"  pip install stable-baselines3 gymnasium")
+        raise typer.Exit(code=1)
+
+    if mode == "train":
+        console.print("\n[yellow]📊 Training RL agent...[/yellow]")
+        console.print(f"  Algorithm: {algorithm.upper()}")
+        console.print(f"  Timesteps: {total_timesteps:,}")
+
+        try:
+            # Create RL agent
+            agent = RLTradingAgent(algorithm=algorithm.upper())
+
+            # Load data for environment
+            console.print("[dim]Loading market data...[/dim]")
+            # TODO: Load actual data from config
+            # For now, create mock environment
+            import numpy as np
+            import gymnasium as gym
+
+            # Create simple mock environment for demonstration
+            class MockTradingEnv(gym.Env):
+                """Mock environment for demonstration."""
+                def __init__(self):
+                    super().__init__()
+                    self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(1,))
+                    self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(63,))
+                    self.current_step = 0
+                    self.max_steps = 1000
+
+                def reset(self, seed=None):
+                    super().reset(seed=seed)
+                    self.current_step = 0
+                    return np.zeros(63, dtype=np.float32), {}
+
+                def step(self, action):
+                    self.current_step += 1
+                    reward = np.random.randn() * 0.01
+                    done = self.current_step >= self.max_steps
+                    obs = np.random.randn(63).astype(np.float32)
+                    return obs, reward, done, False, {}
+
+            env = MockTradingEnv()
+            console.print("[dim]Environment created (mock for demonstration)[/dim]")
+
+            # Train
+            console.print("[yellow]Starting training...[/yellow]")
+            result = agent.train(env, total_timesteps=total_timesteps)
+
+            # Save model
+            model_path_out = Path("models") / f"rl_{algorithm.lower()}_trained.zip"
+            model_path_out.parent.mkdir(parents=True, exist_ok=True)
+            agent.save(model_path_out)
+
+            console.print(f"\n[bold green]✅ Training complete![/bold green]")
+            console.print(f"Model saved to: [cyan]{model_path_out}[/cyan]")
+            console.print(f"Algorithm: {result['algorithm']}")
+            console.print(f"Timesteps: {result['total_timesteps']:,}")
+
+        except Exception as e:
+            console.print(f"\n[bold red]❌ Training failed: {e}[/bold red]")
+            raise typer.Exit(code=1)
+
+    elif mode == "backtest":
+        console.print("\n[yellow]📈 Running RL backtest...[/yellow]")
+
+        if model_path:
+            console.print(f"  Model: [cyan]{model_path}[/cyan]")
+        else:
+            console.print("[yellow]No model specified, using untrained agent[/yellow]")
+
+        try:
+            # Load agent
+            if model_path:
+                agent = RLTradingAgent(algorithm=algorithm.upper())
+                agent.load(Path(model_path))
+            else:
+                agent = RLTradingAgent(algorithm=algorithm.upper())
+
+            # Run backtest
+            from rdagent.components.backtesting import FactorBacktester
+            import pandas as pd
+            import numpy as np
+
+            backtester = FactorBacktester()
+
+            # Mock data for demonstration
+            console.print("[dim]Loading market data...[/dim]")
+            n_steps = 500
+            mock_prices = pd.Series(100 + np.cumsum(np.random.randn(n_steps) * 0.5))
+            mock_indicators = pd.DataFrame({
+                'rsi': np.random.uniform(30, 70, n_steps),
+                'macd': np.random.randn(n_steps) * 0.1,
+            })
+
+            console.print("[yellow]Running backtest...[/yellow]")
+            metrics = backtester.run_rl_backtest(
+                rl_agent=agent,
+                prices=mock_prices,
+                indicators=mock_indicators,
+                enable_protections=with_protections,
+            )
+
+            console.print(f"\n[bold green]✅ Backtest complete![/bold green]")
+            console.print(f"  Final Equity: [green]${metrics.get('final_equity', 0):,.2f}[/green]")
+            console.print(f"  Sharpe Ratio: {metrics.get('sharpe_ratio', 0):.3f}")
+            console.print(f"  Max Drawdown: {metrics.get('max_drawdown', 0):.2%}")
+            console.print(f"  Win Rate: {metrics.get('win_rate', 0):.2%}")
+
+        except Exception as e:
+            console.print(f"\n[bold red]❌ Backtest failed: {e}[/bold red]")
+            import traceback
+            console.print(f"[dim]{traceback.format_exc()}[/dim]")
+            raise typer.Exit(code=1)
+
+    elif mode == "live":
+        console.print("\n[yellow]🔴 Starting live RL trading...[/yellow]")
+        console.print("[bold red]⚠️  WARNING: Live trading carries real financial risk![/bold red]")
+
+        if not model_path:
+            console.print("[bold red]Error: Live trading requires a trained model (--model-path)[/bold red]")
+            raise typer.Exit(code=1)
+
+        try:
+            # Load costeer with protections
+            costeer = RLCosteer(
+                model_path=Path(model_path),
+                algorithm=algorithm.upper(),
+                enable_protections=with_protections,
+            )
+
+            console.print(f"  Model: [cyan]{model_path}[/cyan]")
+            console.print(f"  Algorithm: [cyan]{algorithm.upper()}[/cyan]")
+            console.print(f"  Protections: {'[green]Enabled[/green]' if with_protections else '[red]Disabled[/red]'}")
+
+            # TODO: Implement live trading loop
+            console.print("\n[yellow]Live trading mode initialized.[/yellow]")
+            console.print("[dim]Connect to your broker API to execute trades.[/dim]")
+            console.print("[dim]See documentation for broker integration guide.[/dim]")
+
+        except Exception as e:
+            console.print(f"\n[bold red]❌ Live trading setup failed: {e}[/bold red]")
+            raise typer.Exit(code=1)
+
+    else:
+        console.print(f"[bold red]Error: Unknown mode '{mode}'[/bold red]")
+        console.print("Valid modes: train, backtest, live")
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
