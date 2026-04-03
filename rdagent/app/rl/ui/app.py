@@ -23,17 +23,20 @@ DEFAULT_LOG_BASE = "log/"
 def _safe_resolve(user_input: str | None, safe_root: Path) -> Path:
     """
     Resolve user path relative to safe_root; raise ValueError if it escapes.
-    
+
     Security: This function prevents path traversal attacks by:
     1. Rejecting null bytes in user input
     2. Rejecting Windows drive letters (C:\, D:\, etc.)
     3. Rejecting absolute paths
     4. Normalizing path to remove .. traversal attempts
-    5. Validating resolved path is within safe_root using .relative_to()
-    
+    5. Validating resolved path is within safe_root using a realpath-based check
+
     All user-provided paths are validated before filesystem access.
     """
+    # Treat the provided safe_root as trusted and canonicalize it once.
     safe_root = safe_root.expanduser().resolve()
+
+    # Empty input maps to the safe root directory.
     if not user_input:
         return safe_root
 
@@ -43,24 +46,26 @@ def _safe_resolve(user_input: str | None, safe_root: Path) -> Path:
 
     try:
         # Security check 2: Normalize path to resolve .. and . components
-        normalized = os.path.normpath(user_input)
-        
+        normalized = os.path.normpath(user_input.strip())
+
         # Security check 3: Reject Windows drive letters (C:\, D:\, etc.)
-        if os.path.splitdrive(normalized)[0]:
+        drive, _ = os.path.splitdrive(normalized)
+        if drive:
             raise ValueError("Absolute paths with drive letters are not allowed")
-        
-        # Security check 4: Reject absolute paths
-        path_obj = Path(normalized).expanduser()
-        if path_obj.is_absolute():
+
+        # Security check 4: Reject absolute paths (/, //server/share, etc.)
+        if os.path.isabs(normalized):
             raise ValueError("Absolute paths are not allowed")
-        
-        # Security check 5: Join with safe_root and resolve
-        candidate = (safe_root / path_obj).resolve(strict=False)
-        
+
+        # Security check 5: Build candidate path under safe_root and fully resolve it.
+        joined = os.path.join(str(safe_root), normalized)
+        resolved_candidate = os.path.realpath(joined)
+
         # Security check 6: Validate candidate is within safe_root (prevent path traversal)
-        candidate.relative_to(safe_root)
-        
-        return candidate
+        candidate_path = Path(resolved_candidate)
+        candidate_path.relative_to(safe_root)
+
+        return candidate_path
     except (OSError, ValueError) as exc:
         raise ValueError(f"Invalid path outside of allowed root: {user_input}") from exc
 
