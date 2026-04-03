@@ -221,14 +221,22 @@ class WorkspaceResultExtractor:
         """
         csv_files = self.scan_workspace()
 
-        for csv_path in csv_files:
+        total = len(csv_files)
+        print(f"\nProcessing {total} qlib_res.csv files...")
+
+        for i, csv_path in enumerate(csv_files, 1):
+            # Progress indicator for large workspaces
+            if i % 100 == 0 or i == total:
+                print(f"  Progress: {i}/{total} ({i*100//max(total,1)}%)")
+
             result = self.extract_from_csv(csv_path)
             if result is not None:
                 result['factor_name'] = self.extract_factor_name_from_path(csv_path)
                 result['extraction_time'] = datetime.now().isoformat()
                 self.extracted_results.append(result)
 
-        print(f"\nExtracted {len(self.extracted_results)} results from workspace")
+        print(f"\nExtracted {len(self.extracted_results)} valid results from {total} files")
+        print(f"  Skipped {total - len(self.extracted_results)} empty/failed backtests")
         return self.extracted_results
 
     def import_to_database(self) -> int:
@@ -244,13 +252,25 @@ class WorkspaceResultExtractor:
             print("\n[DRY RUN] Skipping database import")
             return 0
 
+        if not self.extracted_results:
+            print("\nNo results to import")
+            return 0
+
         try:
             from rdagent.components.backtesting import ResultsDatabase
 
             db = ResultsDatabase()
             imported = 0
+            failed = 0
+            total = len(self.extracted_results)
 
-            for result in self.extracted_results:
+            print(f"\nImporting {total} results to database...")
+
+            for i, result in enumerate(self.extracted_results, 1):
+                # Progress indicator
+                if i % 100 == 0 or i == total:
+                    print(f"  DB Progress: {i}/{total} ({i*100//max(total,1)}%) - Imported: {imported}, Failed: {failed}")
+
                 try:
                     factor_name = result.get('factor_name', 'unknown')[:100]
                     metrics = {
@@ -270,15 +290,25 @@ class WorkspaceResultExtractor:
                         if self.verbose:
                             print(f"  Imported: {factor_name} (IC={metrics['ic']}, Sharpe={metrics['sharpe_ratio']})")
                     else:
-                        print(f"  WARNING: Failed to import {factor_name}")
+                        failed += 1
+                        if self.verbose:
+                            print(f"  WARNING: Failed to import {factor_name}")
 
                 except Exception as e:
-                    print(f"  ERROR importing {result.get('factor_name', 'unknown')}: {e}")
+                    failed += 1
                     if self.verbose:
+                        print(f"  ERROR importing {result.get('factor_name', 'unknown')}: {e}")
                         traceback.print_exc()
 
             db.close()
-            print(f"\nImported {imported}/{len(self.extracted_results)} results to database")
+            print(f"\n{'=' * 60}")
+            print(f"IMPORT COMPLETE")
+            print(f"{'=' * 60}")
+            print(f"  Total processed: {total}")
+            print(f"  Successfully imported: {imported}")
+            print(f"  Failed: {failed}")
+            print(f"  Database: {db.db_path}")
+            print(f"{'=' * 60}")
             return imported
 
         except Exception as e:

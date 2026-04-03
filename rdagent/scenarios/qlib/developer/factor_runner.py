@@ -214,9 +214,9 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
         return exp
 
-    def _save_result_to_database(self, exp, result: dict) -> None:
+    def _save_result_to_database(self, exp, result) -> None:
         """
-        Save backtest results to the ResultsDatabase.
+        Save backtest results to the ResultsDatabase and write factor JSON summary.
 
         This method is called immediately after Docker execution to ensure
         results are persisted before any potential failures.
@@ -225,11 +225,14 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         ----------
         exp : QlibFactorExperiment
             The experiment with backtest results
-        result : dict or pd.Series
-            Backtest metrics from Qlib (qlib_res.csv)
+        result : pd.Series
+            Backtest metrics from Qlib (qlib_res.csv) - a pd.Series with index
+            containing metric names like 'IC', '1day.excess_return_with_cost.shar', etc.
         """
         try:
+            import json
             import pandas as pd
+            from pathlib import Path
             from rdagent.components.backtesting import ResultsDatabase
 
             # Get factor name from hypothesis
@@ -244,6 +247,15 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                     f"{getattr(exp, 'protection_reason', 'unknown')}"
                 )
                 return
+
+            # Log result structure for debugging
+            logger.info(f"Saving result for factor: {factor_name}")
+            logger.info(f"Result type: {type(result)}")
+            if isinstance(result, pd.Series):
+                logger.info(f"Result index (metric names): {list(result.index)}")
+                logger.info(f"Result values:\n{result.to_string()}")
+            elif isinstance(result, dict):
+                logger.info(f"Result keys: {list(result.keys())}")
 
             # Extract metrics from result (pd.Series from qlib_res.csv)
             metrics = {}
@@ -267,6 +279,8 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                     result.get('1day.excess_return_with_cost.std',
                     result.get('1day.excess_return_with_cost.volatility', None))
                 )
+                # Store raw metrics for JSON export
+                metrics['raw_metrics'] = result.to_dict()
             elif isinstance(result, dict):
                 metrics['ic'] = self._safe_float(result.get('IC', result.get('ic', None)))
                 metrics['sharpe_ratio'] = self._safe_float(
@@ -277,24 +291,96 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 metrics['win_rate'] = self._safe_float(result.get('win_rate', None))
                 metrics['information_ratio'] = None
                 metrics['volatility'] = None
+                metrics['raw_metrics'] = result
 
             # Only save if we have at least IC or Sharpe
             if metrics.get('ic') is None and metrics.get('sharpe_ratio') is None:
-                logger.debug(f"No valid IC/Sharpe for {factor_name}, skipping DB save")
+                logger.warning(
+                    f"No valid IC/Sharpe for factor '{factor_name}', skipping DB save. "
+                    f"IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}"
+                )
                 return
 
+            # Ensure DB directory exists before creating database
+            db_path = Path(__file__).parent.parent.parent.parent / "results" / "db"
+            db_path.mkdir(parents=True, exist_ok=True)
+            db_file = db_path / "backtest_results.db"
+
             # Save to database
-            db = ResultsDatabase()
+            db = ResultsDatabase(db_path=str(db_file))
             run_id = db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
             logger.info(
-                f"Factor result saved to DB: {factor_name[:50]} "
+                f"Factor result saved to DB: {factor_name[:60]} "
                 f"(IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}, run_id={run_id})"
             )
+
+            # Also write a JSON summary to results/factors/ for file-based access
+            self._save_factor_json(factor_name, metrics, run_id)
+
             db.close()
 
         except Exception as e:
-            # Don't block the workflow if DB save fails
-            logger.warning(f"Database save failed for factor {getattr(exp.hypothesis, 'hypothesis', 'unknown')}: {e}")
+            import traceback
+            logger.error(
+                f"Database save failed for factor '{getattr(exp.hypothesis, 'hypothesis', 'unknown')}': {e}\n"
+                f"Traceback: {traceback.format_exc()}"
+            )
+
+    def _save_factor_json(self, factor_name: str, metrics: dict, run_id: int) -> None:
+        """
+        Save factor metrics as a JSON file for easy file-based access.
+
+        Parameters
+        ----------
+        factor_name : str
+            Name of the factor
+        metrics : dict
+            Extracted metrics dictionary
+        run_id : int
+            Database run ID
+        """
+        import json
+        from datetime import datetime
+        from pathlib import Path
+
+        try:
+            # Ensure factors directory exists
+            factors_dir = Path(__file__).parent.parent.parent.parent / "results" / "factors"
+            factors_dir.mkdir(parents=True, exist_ok=True)
+
+            # Sanitize factor name for filename
+            safe_name = factor_name.replace("/", "_").replace("\\", "_").replace(" ", "_")
+            # Truncate if too long (filesystem limits)
+            if len(safe_name) > 150:
+                safe_name = safe_name[:150]
+
+            json_path = factors_dir / f"{safe_name}.json"
+
+            # Build summary document
+            factor_summary = {
+                "factor_name": factor_name,
+                "run_id": run_id,
+                "saved_at": datetime.now().isoformat(),
+                "metrics": {
+                    "ic": metrics.get("ic"),
+                    "sharpe_ratio": metrics.get("sharpe_ratio"),
+                    "annualized_return": metrics.get("annualized_return"),
+                    "max_drawdown": metrics.get("max_drawdown"),
+                    "win_rate": metrics.get("win_rate"),
+                    "information_ratio": metrics.get("information_ratio"),
+                    "volatility": metrics.get("volatility"),
+                },
+                "raw_metrics": {
+                    k: v for k, v in metrics.get("raw_metrics", {}).items()
+                    if isinstance(v, (int, float, str, bool, type(None)))
+                },
+            }
+
+            json_path.write_text(json.dumps(factor_summary, indent=2, default=str), encoding="utf-8")
+            logger.info(f"Factor JSON saved: {json_path}")
+
+        except Exception as e:
+            logger.warning(f"Failed to save factor JSON for '{factor_name}': {e}")
 
     def _safe_float(self, value):
         """Safely convert value to float, returning None for invalid values."""
