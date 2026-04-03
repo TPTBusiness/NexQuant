@@ -5,7 +5,7 @@ import pandas as pd
 
 def calculate_md5(file_path):
     with open(file_path, "rb") as f:
-        file_hash = hashlib.md5(f.read()).hexdigest()
+        file_hash = hashlib.md5(f.read(), usedforsecurity=False).hexdigest()
     return file_hash
 
 
