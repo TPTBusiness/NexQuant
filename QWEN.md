@@ -29,7 +29,12 @@ Predix/
 │   ├── components/
 │   │   ├── backtesting/        # Backtest engine, metrics, database
 │   │   ├── coder/
-│   │   │   └── factor_coder/   # Factor generation & EURUSD-specific modules
+│   │   │   ├── factor_coder/   # Factor generation & EURUSD-specific modules
+│   │   │   └── rl/             # RL Trading Agent (NEW)
+│   │   │       ├── env.py      # Gym-compatible trading environment
+│   │   │       ├── agent.py    # Stable Baselines3 wrapper (PPO/A2C/SAC)
+│   │   │       ├── costeer.py  # RL trading controller + LLM code generation
+│   │   │       └── indicators.py # Technical indicators (RSI, MACD, BB, CCI, ATR)
 │   │   ├── loader.py           # Prompt loader (auto-loads local prompts)
 │   │   └── model_loader.py     # Model loader (auto-loads local models)
 │   └── scenarios/
@@ -403,6 +408,7 @@ report = risk_manager.generate_risk_report(returns, weights)
 - ✅ Results Database (SQLite with queries)
 - ✅ Risk Management (Correlation, Portfolio Optimization)
 - ✅ Dashboards (Web + CLI)
+- ✅ RL Trading Agent (PPO/A2C/SAC with Gym environment)
 - ⏳ Live Trading (Paper trading pending)
 
 ### Next Steps
