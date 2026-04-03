@@ -220,6 +220,7 @@ class WorkspaceResultExtractor:
             List of extracted result dictionaries
         """
         csv_files = self.scan_workspace()
+        self.failed_extractions: List[Dict] = []
 
         total = len(csv_files)
         print(f"\nProcessing {total} qlib_res.csv files...")
@@ -234,10 +235,56 @@ class WorkspaceResultExtractor:
                 result['factor_name'] = self.extract_factor_name_from_path(csv_path)
                 result['extraction_time'] = datetime.now().isoformat()
                 self.extracted_results.append(result)
+            else:
+                # Track failed extraction
+                self.failed_extractions.append({
+                    "timestamp": datetime.now().isoformat(),
+                    "factor_name": self.extract_factor_name_from_path(csv_path),
+                    "source_file": str(csv_path),
+                    "error_type": "empty_or_failed_backtest",
+                    "stdout": "No meaningful metrics found in qlib_res.csv",
+                })
 
         print(f"\nExtracted {len(self.extracted_results)} valid results from {total} files")
-        print(f"  Skipped {total - len(self.extracted_results)} empty/failed backtests")
+        print(f"  Skipped/Failed: {total - len(self.extracted_results)} empty/failed backtests")
+
+        # Save failed extractions to failed_runs.json
+        if self.failed_extractions:
+            self._save_failed_extractions()
+
         return self.extracted_results
+
+    def _save_failed_extractions(self) -> None:
+        """Save failed extractions to results/failed_runs/failed_runs.json."""
+        import json
+        from pathlib import Path
+
+        try:
+            failed_dir = project_root / "results" / "failed_runs"
+            failed_dir.mkdir(parents=True, exist_ok=True)
+            failed_file = failed_dir / "failed_runs.json"
+
+            existing_records = []
+            if failed_file.exists():
+                try:
+                    existing_records = json.loads(failed_file.read_text(encoding="utf-8"))
+                    if not isinstance(existing_records, list):
+                        existing_records = [existing_records]
+                except (json.JSONDecodeError, Exception):
+                    existing_records = []
+
+            existing_records.extend(self.failed_extractions)
+            if len(existing_records) > 500:
+                existing_records = existing_records[-500:]
+
+            failed_file.write_text(
+                json.dumps(existing_records, indent=2, default=str, ensure_ascii=False),
+                encoding="utf-8"
+            )
+            print(f"  Failed runs tracked: {len(self.failed_extractions)} entries → {failed_file}")
+
+        except Exception as e:
+            print(f"  WARNING: Could not save failed extractions: {e}")
 
     def import_to_database(self) -> int:
         """
@@ -389,8 +436,27 @@ def main():
         action='store_true',
         help='Only show summary, skip extraction'
     )
+    parser.add_argument(
+        '--generate-db-summary',
+        action='store_true',
+        help='Generate RESULTS_SUMMARY.md from the database'
+    )
 
     args = parser.parse_args()
+
+    # Handle DB summary generation separately
+    if args.generate_db_summary:
+        try:
+            from rdagent.components.backtesting import ResultsDatabase
+            db = ResultsDatabase()
+            summary = db.generate_results_summary(print_to_console=True)
+            db.close()
+            print(f"\nResults summary written to: results/RESULTS_SUMMARY.md")
+        except Exception as e:
+            print(f"ERROR: Could not generate DB summary: {e}")
+            import traceback
+            traceback.print_exc()
+        return
 
     workspace_path = Path(args.workspace_dir).resolve()
 

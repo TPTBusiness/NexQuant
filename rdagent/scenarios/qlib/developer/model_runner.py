@@ -1,4 +1,5 @@
 import pandas as pd
+from typing import Optional
 
 from rdagent.app.qlib_rd_loop.conf import ModelBasePropSetting
 from rdagent.components.runner import CachedRunner
@@ -115,8 +116,21 @@ class QlibModelRunner(CachedRunner[QlibModelExperiment]):
         exp.stdout = stdout
 
         if result is None:
-            logger.error(f"Failed to run {exp.sub_tasks[0].name}, because {stdout}")
+            logger.error(
+                f"Failed to run {exp.sub_tasks[0].name} model (result is None), because {stdout}"
+            )
+            # Save failed run info for debugging
+            self._save_failed_run(exp, stdout, error_type="result_none")
             raise ModelEmptyError(f"Failed to run {exp.sub_tasks[0].name} model, because {stdout}")
+
+        # Validate result before proceeding
+        validation_result = self._validate_result(exp, result)
+        if validation_result.get("has_issues"):
+            logger.warning(
+                f"Model result validation warnings for '{exp.sub_tasks[0].name}': "
+                f"{validation_result['warnings']}"
+            )
+            self._save_failed_run(exp, stdout, error_type="validation_warnings", validation=validation_result)
 
         # Save results to database immediately after Docker execution
         try:
@@ -184,6 +198,9 @@ class QlibModelRunner(CachedRunner[QlibModelExperiment]):
                 logger.debug(f"No valid IC/Sharpe for model {factor_name}, skipping DB save")
                 return
 
+            # Log warnings about result quality
+            self._log_result_warnings(factor_name, result, metrics)
+
             # Save to database
             db = ResultsDatabase()
             run_id = db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
@@ -195,6 +212,32 @@ class QlibModelRunner(CachedRunner[QlibModelExperiment]):
 
         except Exception as e:
             logger.warning(f"Database save failed for model {getattr(exp.hypothesis, 'hypothesis', 'unknown')}: {e}")
+
+    def _log_result_warnings(self, factor_name: str, result, metrics: dict) -> None:
+        """Log warnings about model result quality before saving."""
+        warnings_list = []
+
+        ic = metrics.get('ic')
+        if ic is None:
+            warnings_list.append("IC is None — model has no predictive power")
+        elif abs(ic) < 0.001:
+            warnings_list.append(f"IC near zero ({ic:.6f})")
+
+        if isinstance(result, pd.Series):
+            pos_value = result.get('1day.pos', None)
+            if pos_value is not None:
+                try:
+                    pos_float = float(pos_value)
+                    if pos_float == 0:
+                        warnings_list.append(
+                            "1day.pos == 0 — ZERO positions! Check config topk=1."
+                        )
+                except (ValueError, TypeError):
+                    pass
+
+        if warnings_list:
+            for warn_msg in warnings_list:
+                logger.warning(f"[MODEL {factor_name[:50]}] {warn_msg}")
 
     def _safe_float(self, value):
         """Safely convert value to float, returning None for invalid values."""
@@ -208,3 +251,137 @@ class QlibModelRunner(CachedRunner[QlibModelExperiment]):
             return f
         except (ValueError, TypeError):
             return None
+
+    def _validate_result(self, exp, result) -> dict:
+        """
+        Validate model backtest result for common issues before saving.
+
+        Parameters
+        ----------
+        exp : QlibModelExperiment
+            The experiment with backtest results
+        result : pd.Series or dict
+            Backtest metrics from Qlib
+
+        Returns
+        -------
+        dict
+            Validation result with 'has_issues' (bool), 'warnings' (list), and 'details' (dict)
+        """
+        warnings = []
+        details = {}
+        model_name = exp.sub_tasks[0].name if exp.sub_tasks else "unknown"
+
+        if isinstance(result, pd.Series):
+            # Check IC
+            ic_value = result.get('IC', None)
+            details['ic_raw'] = ic_value
+            if ic_value is None or (isinstance(ic_value, float) and (ic_value != ic_value)):
+                warnings.append("IC is None/NaN — model has no predictive power")
+            else:
+                try:
+                    ic_float = float(ic_value)
+                    details['ic'] = ic_float
+                    if abs(ic_float) < 0.001:
+                        warnings.append(f"IC is near zero ({ic_float:.6f})")
+                except (ValueError, TypeError):
+                    warnings.append(f"IC value is not numeric: {ic_value}")
+
+            # Check positions
+            pos_value = result.get('1day.pos', None)
+            details['positions_raw'] = pos_value
+            if pos_value is not None:
+                try:
+                    pos_float = float(pos_value)
+                    details['positions'] = pos_float
+                    if pos_float == 0:
+                        warnings.append(
+                            "1day.pos == 0 — model opened ZERO positions. "
+                            "Check Qlib config: topk=1 for single-asset."
+                        )
+                except (ValueError, TypeError):
+                    pass
+
+            non_null_count = result.notna().sum()
+            details['non_null_metrics'] = int(non_null_count)
+            if non_null_count < 3:
+                warnings.append(f"Only {non_null_count} non-null metrics — likely empty results")
+
+        elif isinstance(result, dict):
+            ic_value = result.get('IC', result.get('ic', None))
+            details['ic_raw'] = ic_value
+            if ic_value is None:
+                warnings.append("IC is None — model has no predictive power")
+
+        return {
+            "has_issues": len(warnings) > 0,
+            "warnings": "; ".join(warnings),
+            "details": details,
+        }
+
+    def _save_failed_run(self, exp, stdout: str, error_type: str = "unknown",
+                         validation: Optional[dict] = None) -> None:
+        """
+        Save failed model run information to results/failed_runs.json.
+
+        Parameters
+        ----------
+        exp : QlibModelExperiment
+            The experiment that failed
+        stdout : str
+            Standard output from Docker execution
+        error_type : str
+            Type of error
+        validation : dict, optional
+            Validation result dict
+        """
+        import json
+        from datetime import datetime
+        from pathlib import Path
+
+        try:
+            # 5 levels up to project root
+            project_root = Path(__file__).parent.parent.parent.parent.parent
+            failed_dir = project_root / "results" / "failed_runs"
+            failed_dir.mkdir(parents=True, exist_ok=True)
+
+            model_name = exp.sub_tasks[0].name if exp.sub_tasks else "unknown"
+            factor_name = "unknown"
+            if hasattr(exp, 'hypothesis') and exp.hypothesis is not None:
+                factor_name = getattr(exp.hypothesis, 'hypothesis', model_name)
+
+            failed_record = {
+                "timestamp": datetime.now().isoformat(),
+                "factor_name": f"[MODEL] {factor_name}",
+                "model_name": model_name,
+                "error_type": error_type,
+                "stdout": stdout if stdout else "(empty)",
+                "validation": validation,
+                "experiment_details": {
+                    "model_type": exp.sub_tasks[0].model_type if exp.sub_tasks else "unknown",
+                    "hypothesis": factor_name,
+                },
+            }
+
+            failed_file = failed_dir / "failed_runs.json"
+            existing_records = []
+            if failed_file.exists():
+                try:
+                    existing_records = json.loads(failed_file.read_text(encoding="utf-8"))
+                    if not isinstance(existing_records, list):
+                        existing_records = [existing_records]
+                except (json.JSONDecodeError, Exception):
+                    existing_records = []
+
+            existing_records.append(failed_record)
+            if len(existing_records) > 500:
+                existing_records = existing_records[-500:]
+
+            failed_file.write_text(
+                json.dumps(existing_records, indent=2, default=str, ensure_ascii=False),
+                encoding="utf-8"
+            )
+            logger.info(f"Failed model run saved: {model_name} (type={error_type}) → {failed_file}")
+
+        except Exception as e:
+            logger.warning(f"Could not save failed model run info: {e}")
