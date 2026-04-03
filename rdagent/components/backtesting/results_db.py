@@ -8,13 +8,15 @@ import json
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 
 class ResultsDatabase:
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
-            db_path = Path(__file__).parent.parent.parent / "results" / "db" / "backtest_results.db"
+            # Go up from rdagent/components/backtesting/ to project root (4 levels)
+            project_root = Path(__file__).parent.parent.parent.parent
+            db_path = str(project_root / "results" / "db" / "backtest_results.db")
         self.db_path = db_path
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(db_path)
@@ -273,6 +275,226 @@ class ResultsDatabase:
             self.conn
         )
     
+    def generate_results_summary(self, output_path: Optional[str] = None,
+                                  print_to_console: bool = True) -> Dict:
+        """
+        Generate a comprehensive results summary report.
+
+        Scans the database and factors directory to produce a summary report
+        with total runs, successful/failed counts, best metrics, and statistics.
+
+        Parameters
+        ----------
+        output_path : str, optional
+            Path to write the summary as Markdown file.
+            Defaults to results/RESULTS_SUMMARY.md
+        print_to_console : bool
+            If True, print the summary to console
+
+        Returns
+        -------
+        Dict
+            Summary statistics dictionary
+        """
+        # Database stats
+        db_stats = self.get_aggregate_stats()
+
+        # Get all results
+        all_results = self.get_all_results()
+
+        # Top factors
+        top_sharpe = self.get_top_factors('sharpe', limit=10)
+        top_ic = self.get_top_factors('ic', limit=10)
+
+        # Count successful vs failed runs
+        total_runs = len(all_results)
+        runs_with_ic = int(all_results['ic'].notna().sum()) if total_runs > 0 else 0
+        runs_with_sharpe = int(all_results['sharpe'].notna().sum()) if total_runs > 0 else 0
+
+        # Count unique factors
+        unique_factors = all_results['factor_name'].nunique() if total_runs > 0 else 0
+
+        # Best metrics
+        best_ic = all_results['ic'].max() if total_runs > 0 and all_results['ic'].notna().any() else None
+        best_sharpe = all_results['sharpe'].max() if total_runs > 0 and all_results['sharpe'].notna().any() else None
+        best_return = all_results['annual_return'].max() if total_runs > 0 and all_results['annual_return'].notna().any() else None
+        worst_drawdown = all_results['max_drawdown'].min() if total_runs > 0 and all_results['max_drawdown'].notna().any() else None
+
+        # Scan factors directory for JSON files
+        factors_dir = Path(__file__).parent.parent.parent / "results" / "factors"
+        json_factor_files = 0
+        if factors_dir.exists():
+            json_factor_files = len(list(factors_dir.glob("*.json")))
+
+        # Scan failed runs
+        failed_dir = Path(__file__).parent.parent.parent / "results" / "failed_runs"
+        failed_runs_file = failed_dir / "failed_runs.json"
+        failed_runs_count = 0
+        failed_runs_data = []
+        if failed_runs_file.exists():
+            try:
+                failed_runs_data = json.loads(failed_runs_file.read_text(encoding="utf-8"))
+                if isinstance(failed_runs_data, list):
+                    failed_runs_count = len(failed_runs_data)
+                elif isinstance(failed_runs_data, dict):
+                    failed_runs_count = 1
+            except (json.JSONDecodeError, Exception):
+                failed_runs_count = 0
+
+        # Build summary
+        summary = {
+            "generated_at": datetime.now().isoformat(),
+            "database_path": str(self.db_path),
+            "overview": {
+                "total_runs": int(total_runs),
+                "unique_factors": int(unique_factors),
+                "runs_with_ic": int(runs_with_ic),
+                "runs_with_sharpe": int(runs_with_sharpe),
+                "json_factor_files": json_factor_files,
+                "failed_runs": failed_runs_count,
+            },
+            "best_metrics": {
+                "best_ic": float(best_ic) if best_ic is not None else None,
+                "best_sharpe": float(best_sharpe) if best_sharpe is not None else None,
+                "best_annual_return": float(best_return) if best_return is not None else None,
+                "worst_drawdown": float(worst_drawdown) if worst_drawdown is not None else None,
+            },
+            "aggregate_stats": db_stats,
+            "top_10_by_sharpe": top_sharpe.to_dict(orient='records') if len(top_sharpe) > 0 else [],
+            "top_10_by_ic": top_ic.to_dict(orient='records') if len(top_ic) > 0 else [],
+        }
+
+        # Write to Markdown
+        if output_path is None:
+            # Go up from rdagent/components/backtesting/ to project root (4 levels)
+            project_root = Path(__file__).parent.parent.parent.parent
+            output_path = str(project_root / "results" / "RESULTS_SUMMARY.md")
+
+        self._write_summary_markdown(summary, output_path)
+
+        if print_to_console:
+            self._print_summary_console(summary)
+
+        return summary
+
+    def _fmt_float(self, value, fmt: str = ".4f") -> str:
+        """Format float value, returning 'N/A' for None."""
+        if value is None:
+            return "N/A"
+        return f"{value:{fmt}}"
+
+    def _write_summary_markdown(self, summary: Dict, output_path: str) -> None:
+        """Write summary as Markdown file."""
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        overview = summary['overview']
+        best = summary['best_metrics']
+        top_sharpe = summary['top_10_by_sharpe']
+        top_ic = summary['top_10_by_ic']
+
+        # Pre-format best metrics for display
+        best_ic_str = self._fmt_float(best['best_ic'], ".6f")
+        best_sharpe_str = self._fmt_float(best['best_sharpe'], ".4f")
+        best_return_str = self._fmt_float(best['best_annual_return'], ".4f")
+        worst_dd_str = self._fmt_float(best['worst_drawdown'], ".4f")
+
+        md_lines = [
+            "# Predix Results Summary",
+            "",
+            f"**Generated:** {summary['generated_at']}",
+            f"**Database:** `{summary['database_path']}`",
+            "",
+            "## Overview",
+            "",
+            f"| Metric | Value |",
+            f"|--------|-------|",
+            f"| Total Runs | {overview['total_runs']} |",
+            f"| Unique Factors | {overview['unique_factors']} |",
+            f"| Runs with IC | {overview['runs_with_ic']} |",
+            f"| Runs with Sharpe | {overview['runs_with_sharpe']} |",
+            f"| JSON Factor Files | {overview['json_factor_files']} |",
+            f"| Failed Runs | {overview['failed_runs']} |",
+            "",
+            "## Best Metrics",
+            "",
+            f"| Metric | Value |",
+            f"|--------|-------|",
+            f"| Best IC | {best_ic_str} |",
+            f"| Best Sharpe | {best_sharpe_str} |",
+            f"| Best Annual Return | {best_return_str} |",
+            f"| Worst Drawdown | {worst_dd_str} |",
+            "",
+        ]
+
+        if top_sharpe:
+            md_lines.extend([
+                "## Top 10 by Sharpe Ratio",
+                "",
+                "| # | Factor | Sharpe | IC | Annual Return | Max Drawdown |",
+                "|---|--------|--------|-----|---------------|--------------|",
+            ])
+            for i, row in enumerate(top_sharpe[:10], 1):
+                md_lines.append(
+                    f"| {i} | {row.get('factor_name', 'N/A')[:50]} | "
+                    f"{self._fmt_float(row.get('sharpe'), '.4f')} | "
+                    f"{self._fmt_float(row.get('ic'), '.6f')} | "
+                    f"{self._fmt_float(row.get('annual_return'), '.4f')} | "
+                    f"{self._fmt_float(row.get('max_drawdown'), '.4f')} |"
+                )
+            md_lines.append("")
+
+        if top_ic:
+            md_lines.extend([
+                "## Top 10 by IC",
+                "",
+                "| # | Factor | IC | Sharpe | Annual Return |",
+                "|---|--------|-----|--------|---------------|",
+            ])
+            for i, row in enumerate(top_ic[:10], 1):
+                md_lines.append(
+                    f"| {i} | {row.get('factor_name', 'N/A')[:50]} | "
+                    f"{self._fmt_float(row.get('ic'), '.6f')} | "
+                    f"{self._fmt_float(row.get('sharpe'), '.4f')} | "
+                    f"{self._fmt_float(row.get('annual_return'), '.4f')} |"
+                )
+            md_lines.append("")
+
+        md_lines.extend([
+            "## Failed Runs",
+            "",
+            f"Total failed runs tracked: **{overview['failed_runs']}**",
+            "",
+            "Failed runs are stored in `results/failed_runs/failed_runs.json`.",
+            "",
+        ])
+
+        path.write_text("\n".join(md_lines), encoding="utf-8")
+
+    def _print_summary_console(self, summary: Dict) -> None:
+        """Print summary to console."""
+        overview = summary['overview']
+        best = summary['best_metrics']
+
+        print("\n" + "=" * 70)
+        print("  PREDIX RESULTS SUMMARY")
+        print("=" * 70)
+        print(f"  Generated:    {summary['generated_at']}")
+        print(f"  Database:     {summary['database_path']}")
+        print("-" * 70)
+        print(f"  Total Runs:        {overview['total_runs']}")
+        print(f"  Unique Factors:    {overview['unique_factors']}")
+        print(f"  Runs with IC:      {overview['runs_with_ic']}")
+        print(f"  Runs with Sharpe:  {overview['runs_with_sharpe']}")
+        print(f"  JSON Factor Files: {overview['json_factor_files']}")
+        print(f"  Failed Runs:       {overview['failed_runs']}")
+        print("-" * 70)
+        print(f"  Best IC:           {self._fmt_float(best['best_ic'], '.6f')}")
+        print(f"  Best Sharpe:       {self._fmt_float(best['best_sharpe'], '.4f')}")
+        print(f"  Best Ann. Return:  {self._fmt_float(best['best_annual_return'], '.4f')}")
+        print(f"  Worst Drawdown:    {self._fmt_float(best['worst_drawdown'], '.4f')}")
+        print("=" * 70 + "\n")
+
     def close(self):
         self.conn.close()
 
