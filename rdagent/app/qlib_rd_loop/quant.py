@@ -3,9 +3,10 @@ Quant (Factor & Model) workflow with session control
 """
 
 import asyncio
-from typing import Any
+from typing import Any, Optional
 
 import fire
+import pandas as pd
 
 from rdagent.app.qlib_rd_loop.conf import QUANT_PROP_SETTING
 from rdagent.components.workflow.conf import BasePropSetting
@@ -135,6 +136,10 @@ class QuantRDLoop(RDLoop):
         """
         Save experiment results to the results database.
 
+        This method is called after each successful Docker backtest run.
+        It extracts metrics from the experiment result (which is a pandas Series
+        from Qlib's MLflow output) and saves them to the SQLite database.
+
         Parameters
         ----------
         prev_out : dict
@@ -144,37 +149,116 @@ class QuantRDLoop(RDLoop):
             from rdagent.components.backtesting import ResultsDatabase
 
             exp = prev_out.get("running")
-            if exp is None or exp.result is None:
+            if exp is None:
+                logger.warning("No experiment found in prev_out['running']")
                 return
 
-            db = ResultsDatabase()
+            # Check if experiment was rejected by protection manager
+            if getattr(exp, 'rejected_by_protection', False):
+                logger.info(
+                    f"Factor rejected by protection manager, skipping DB save: "
+                    f"{getattr(exp, 'protection_reason', 'unknown')}"
+                )
+                return
+
+            # exp.result is a pandas Series from qlib_res.csv (MLflow metrics)
+            result = exp.result
+            if result is None:
+                logger.warning("Experiment has no result, skipping DB save")
+                return
 
             # Determine factor name from hypothesis
             factor_name = "unknown"
             if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
                 factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
 
-            # Determine factor type based on experiment type
-            factor_type = "LLM-generated"
-            if prev_out["direct_exp_gen"]["propose"].action == "model":
-                factor_type = "ML-model"
+            # Determine factor type based on experiment action
+            action = prev_out.get("direct_exp_gen", {}).get("propose", {}).get("action", "unknown")
+            factor_type = "ML-model" if action == "model" else "LLM-generated"
 
-            # Extract metrics from result
-            result = exp.result
-            metrics = {
-                "ic": float(result.get("ic", 0)) if isinstance(result, dict) else 0,
-                "sharpe_ratio": float(result.get("sharpe", 0)) if isinstance(result, dict) else 0,
-                "max_drawdown": float(result.get("max_drawdown", 0)) if isinstance(result, dict) else 0,
-                "annualized_return": float(result.get("annualized_return", 0)) if isinstance(result, dict) else 0,
-                "win_rate": float(result.get("win_rate", 0)) if isinstance(result, dict) else 0,
-            }
+            # Extract metrics from result (pandas Series from Qlib)
+            metrics = {}
+            if isinstance(result, pd.Series):
+                # Map Qlib metric names to our database schema
+                metrics["ic"] = self._safe_float(result.get("IC", None))
+                metrics["sharpe_ratio"] = self._safe_float(
+                    result.get("1day.excess_return_with_cost.shar",
+                    result.get("1day.excess_return_with_cost.sharpe", None))
+                )
+                metrics["annualized_return"] = self._safe_float(
+                    result.get("1day.excess_return_with_cost.annualized_return", None)
+                )
+                metrics["max_drawdown"] = self._safe_float(
+                    result.get("1day.excess_return_with_cost.max_drawdown", None)
+                )
+                metrics["win_rate"] = self._safe_float(result.get("win_rate", None))
+                metrics["information_ratio"] = self._safe_float(
+                    result.get("1day.excess_return_with_cost.information_ratio", None)
+                )
+                metrics["volatility"] = self._safe_float(
+                    result.get("1day.excess_return_with_cost.std",
+                    result.get("1day.excess_return_with_cost.volatility", None))
+                )
 
-            db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
-            logger.info(f"Results saved to database for factor: {factor_name[:50]}")
+            elif isinstance(result, dict):
+                # Fallback for dict-type results
+                metrics["ic"] = self._safe_float(result.get("ic", result.get("IC", 0)))
+                metrics["sharpe_ratio"] = self._safe_float(
+                    result.get("sharpe", result.get("sharpe_ratio", 0))
+                )
+                metrics["annualized_return"] = self._safe_float(result.get("annualized_return", 0))
+                metrics["max_drawdown"] = self._safe_float(result.get("max_drawdown", 0))
+                metrics["win_rate"] = self._safe_float(result.get("win_rate", 0))
+                metrics["information_ratio"] = None
+                metrics["volatility"] = None
+
+            # Only save if we have at least IC or Sharpe
+            if metrics["ic"] is None and metrics["sharpe_ratio"] is None:
+                logger.warning(
+                    f"No valid IC or Sharpe found for factor {factor_name[:50]}, "
+                    f"skipping DB save"
+                )
+                return
+
+            # Save to database
+            db = ResultsDatabase()
+            run_id = db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
+            logger.info(
+                f"Results saved to database for factor: {factor_name[:50]} "
+                f"(IC={metrics['ic']:.4f}, Sharpe={metrics['sharpe_ratio']:.4f}, "
+                f"run_id={run_id})"
+            )
             db.close()
 
         except Exception as e:
             logger.warning(f"Failed to save results to database: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+
+    def _safe_float(self, value) -> Optional[float]:
+        """
+        Safely convert a value to float, returning None for invalid values.
+
+        Parameters
+        ----------
+        value : Any
+            Value to convert
+
+        Returns
+        -------
+        Optional[float]
+            Converted float or None if invalid (NaN, Inf, or non-numeric)
+        """
+        if value is None:
+            return None
+        try:
+            f = float(value)
+            # Check for NaN or Inf
+            if pd.isna(f) or f == float('inf') or f == float('-inf'):
+                return None
+            return f
+        except (ValueError, TypeError):
+            return None
 
 
 def main(
