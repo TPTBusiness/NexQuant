@@ -1277,16 +1277,25 @@ class TestFinQuantCriticalIntegrations:
         assert "_run_protection_check" in develop_source
 
     def test_results_database_in_quant_loop(self):
-        """Test that Results Database is integrated in quant.py loop."""
-        from rdagent.app.qlib_rd_loop.quant import QuantRDLoop
+        """Test that Results Database is integrated in factor_runner.py (called from quant loop)."""
+        from rdagent.scenarios.qlib.developer.factor_runner import QlibFactorRunner
         import inspect
 
-        # Verify _save_experiment_to_db method exists
-        assert hasattr(QuantRDLoop, "_save_experiment_to_db")
+        # Verify _save_result_to_database method exists in QlibFactorRunner
+        assert hasattr(QlibFactorRunner, "_save_result_to_database")
 
-        # Verify feedback method calls database save
+        # Verify _save_factor_json helper method exists
+        assert hasattr(QlibFactorRunner, "_save_factor_json")
+
+        # Verify develop method calls database save
+        develop_source = inspect.getsource(QlibFactorRunner.develop)
+        assert "_save_result_to_database" in develop_source
+
+        # Verify QuantRDLoop does NOT duplicate the DB save (it's done in runner)
+        from rdagent.app.qlib_rd_loop.quant import QuantRDLoop
         feedback_source = inspect.getsource(QuantRDLoop.feedback)
-        assert "_save_experiment_to_db" in feedback_source
+        # DB save should NOT be in feedback (it's in factor_runner)
+        assert "_save_experiment_to_db" not in feedback_source
 
     def test_model_loader_baseline_in_model_coder(self):
         """Test that Model Loader is used for baselines in model_coder.py."""
