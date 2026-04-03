@@ -88,3 +88,9 @@ duckduckgo-search
 # Testing
 pytest
 pytest-cov
+
+# RL Trading (optional - system works without these)
+# Install for full RL training: pip install stable-baselines3[extra] gymnasium
+# Without these, RL trading uses simple momentum fallback
+# stable-baselines3[extra]>=2.0.0
+# gymnasium>=0.29.0
