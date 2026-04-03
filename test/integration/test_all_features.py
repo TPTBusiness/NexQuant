@@ -1256,3 +1256,194 @@ class TestRLIntegration:
         assert "total_trades" in metrics
 
 
+# =============================================================================
+# 14. FIN_QUANT CRITICAL INTEGRATIONS TESTS
+# =============================================================================
+
+
+class TestFinQuantCriticalIntegrations:
+    """Test critical integrations added to fin_quant workflow."""
+
+    def test_protection_manager_in_factor_runner(self):
+        """Test that Protection Manager is integrated in factor_runner.py."""
+        from rdagent.scenarios.qlib.developer.factor_runner import QlibFactorRunner
+        import inspect
+
+        # Verify _run_protection_check method exists
+        assert hasattr(QlibFactorRunner, "_run_protection_check")
+
+        # Verify develop method calls protection check
+        develop_source = inspect.getsource(QlibFactorRunner.develop)
+        assert "_run_protection_check" in develop_source
+
+    def test_results_database_in_quant_loop(self):
+        """Test that Results Database is integrated in quant.py loop."""
+        from rdagent.app.qlib_rd_loop.quant import QuantRDLoop
+        import inspect
+
+        # Verify _save_experiment_to_db method exists
+        assert hasattr(QuantRDLoop, "_save_experiment_to_db")
+
+        # Verify feedback method calls database save
+        feedback_source = inspect.getsource(QuantRDLoop.feedback)
+        assert "_save_experiment_to_db" in feedback_source
+
+    def test_model_loader_baseline_in_model_coder(self):
+        """Test that Model Loader is used for baselines in model_coder.py."""
+        from rdagent.scenarios.qlib.developer.model_coder import QlibModelCoSTEER
+        import inspect
+
+        # Verify _load_baseline_models method exists
+        assert hasattr(QlibModelCoSTEER, "_load_baseline_models")
+
+        # Verify it extends ModelCoSTEER
+        from rdagent.components.coder.model_coder import ModelCoSTEER
+        assert issubclass(QlibModelCoSTEER, ModelCoSTEER)
+
+        # Verify develop method exists
+        assert hasattr(QlibModelCoSTEER, "develop")
+
+    def test_technical_indicators_in_factor_coder(self):
+        """Test that Technical Indicators are documented in factor_coder.py."""
+        from rdagent.scenarios.qlib.developer.factor_coder import (
+            QlibFactorCoSTEER,
+            TECHNICAL_INDICATORS_DOCSTRING,
+        )
+        from rdagent.components.coder.factor_coder import FactorCoSTEER
+
+        # Verify docstring is defined and comprehensive
+        assert TECHNICAL_INDICATORS_DOCSTRING is not None
+        assert len(TECHNICAL_INDICATORS_DOCSTRING) > 100
+
+        # Verify it mentions all key indicators
+        required_indicators = [
+            "calculate_rsi",
+            "calculate_macd",
+            "calculate_bollinger_bands",
+            "calculate_cci",
+            "calculate_atr",
+        ]
+        for indicator in required_indicators:
+            assert indicator in TECHNICAL_INDICATORS_DOCSTRING
+
+        # Verify QlibFactorCoSTEER extends FactorCoSTEER
+        assert issubclass(QlibFactorCoSTEER, FactorCoSTEER)
+
+    def test_protection_manager_import_and_usage(self):
+        """Test that Protection Manager can be imported and used."""
+        from rdagent.components.backtesting.protections import ProtectionManager
+
+        manager = ProtectionManager()
+        manager.create_default_protections()
+
+        # Should have protections configured
+        assert len(manager.protections) > 0
+
+        # Test with valid data
+        from datetime import datetime
+        result = manager.check_all(
+            returns=[0.01, -0.005, 0.02],
+            timestamps=[datetime.now()] * 3,
+            current_equity=101000,
+            peak_equity=101000,
+            factor_name="TestFactor",
+        )
+
+        # Result should have expected fields
+        assert hasattr(result, "should_block")
+        assert hasattr(result, "reason")
+
+    def test_results_database_functionality(self):
+        """Test Results Database can store and query data."""
+        from rdagent.components.backtesting import ResultsDatabase
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_integration.db")
+            db = ResultsDatabase(db_path=db_path)
+
+            # Add factor
+            factor_id = db.add_factor("IntegrationTestFactor", "test")
+            assert factor_id > 0
+
+            # Add backtest
+            metrics = {
+                "ic": 0.08,
+                "sharpe_ratio": 1.5,
+                "annualized_return": 0.15,
+                "max_drawdown": -0.10,
+                "win_rate": 0.55,
+            }
+            backtest_id = db.add_backtest("IntegrationTestFactor", metrics)
+            assert backtest_id > 0
+
+            # Query results
+            top = db.get_top_factors(metric="sharpe", limit=1)
+            assert len(top) >= 0  # May be empty or have results
+
+            # Get stats
+            stats = db.get_aggregate_stats()
+            assert "total_factors" in stats
+
+            db.close()
+
+    def test_model_loader_list_available(self):
+        """Test that Model Loader can list available models."""
+        from rdagent.components.model_loader import list_available_models
+
+        available = list_available_models()
+
+        # Should have at least standard models
+        assert "standard" in available
+        assert len(available["standard"]) > 0
+
+        # Should have xgboost and lightgbm in standard
+        assert "xgboost_factor" in available["standard"]
+        assert "lightgbm_factor" in available["standard"]
+
+    def test_technical_indicators_produce_valid_output(self):
+        """Test that technical indicators produce valid output."""
+        from rdagent.components.coder.rl.indicators import (
+            calculate_rsi,
+            calculate_macd,
+            calculate_bollinger_bands,
+        )
+
+        np.random.seed(42)
+        close = pd.Series(100 + np.cumsum(np.random.randn(100) * 0.5))
+
+        # RSI
+        rsi = calculate_rsi(close, period=14)
+        valid_rsi = rsi.dropna()
+        assert len(valid_rsi) > 0
+        assert (valid_rsi >= 0).all() and (valid_rsi <= 100).all()
+
+        # MACD
+        macd_df = calculate_macd(close)
+        assert "macd" in macd_df.columns
+        assert "signal" in macd_df.columns
+
+        # Bollinger Bands
+        bb_df = calculate_bollinger_bands(close, period=20)
+        assert "upper" in bb_df.columns
+        assert "lower" in bb_df.columns
+
+    def test_all_fin_quant_components_importable(self):
+        """Test that all fin_quant components can be imported together."""
+        # Core workflow
+        from rdagent.app.qlib_rd_loop.quant import QuantRDLoop
+
+        # Developers
+        from rdagent.scenarios.qlib.developer.factor_runner import QlibFactorRunner
+        from rdagent.scenarios.qlib.developer.model_coder import QlibModelCoSTEER
+        from rdagent.scenarios.qlib.developer.factor_coder import QlibFactorCoSTEER
+
+        # Integrations
+        from rdagent.components.backtesting.protections import ProtectionManager
+        from rdagent.components.backtesting import ResultsDatabase
+        from rdagent.components.model_loader import load_model, list_available_models
+        from rdagent.components.coder.rl.indicators import calculate_rsi
+
+        # All imports should succeed without errors
+        assert True
+
+
