@@ -196,6 +196,15 @@ Predix continuously proposes, implements, and validates new alpha factors:
 - Avoids overfitting through walk-forward validation
 - Discovers non-obvious patterns in order flow, volatility, and session dynamics
 
+### 🛡️ Trading Protection System
+
+Automatic risk management to prevent excessive losses:
+
+- **Max Drawdown Protection** - Pauses trading when drawdown exceeds threshold (default: 15%)
+- **Cooldown Period** - Enforces mandatory rest period after significant losses (default: 4h after 5% loss)
+- **Stoploss Guard** - Detects clusters of stoplosses and blocks trading (default: max 5 per day)
+- **Low Performance Filter** - Filters out consistently underperforming factors (Sharpe < 0.5, Win Rate < 40%)
+
 ### 🧠 Model Architecture Search
 
 Automatically explores and refines predictive models:
@@ -221,6 +230,14 @@ Real-time dashboard for monitoring:
 - Cumulative returns and drawdowns
 - Code diffs and implementation history
 
+### 🔒 Security & Quality
+
+Automated quality assurance:
+
+- **60 Integration Tests** - All features tested automatically
+- **Bandit Security Scanner** - Pre-commit security checks
+- **Pre-commit Hooks** - Tests run before EVERY commit
+
 ---
 
 ## Project Structure
@@ -230,9 +247,27 @@ predix/
 ├── rdagent/                 # Core agent framework
 │   ├── app/                 # CLI and scenario apps
 │   ├── components/          # Reusable agent components
+│   │   ├── backtesting/     # Backtest engine & protections
+│   │   │   ├── backtest_engine.py
+│   │   │   ├── results_db.py
+│   │   │   ├── risk_management.py
+│   │   │   └── protections/ # Trading protection system (NEW)
+│   │   │       ├── base.py
+│   │   │       ├── max_drawdown.py
+│   │   │       ├── cooldown.py
+│   │   │       ├── stoploss_guard.py
+│   │   │       ├── low_performance.py
+│   │   │       └── protection_manager.py
+│   │   ├── coder/           # Factor & model coding
+│   │   └── loader.py        # Prompt & model loaders
 │   ├── core/                # Core abstractions
 │   ├── scenarios/           # Domain-specific scenarios
 │   └── utils/               # Utilities
+├── test/                    # Test suite
+│   ├── integration/         # Integration tests (60 tests)
+│   │   └── test_all_features.py
+│   └── backtesting/         # Unit tests
+│       └── test_protections.py
 ├── constraints/             # Constraint definitions
 ├── docs/                    # Documentation
 ├── web/                     # Web UI frontend

@@ -800,3 +800,98 @@ class TestIntegrationWorkflow:
         checks = risk_manager.check_limits(weights, vol=0.15, dd=-0.08)
         assert isinstance(checks, dict)
         assert all(key in checks for key in ["position_limit", "leverage_limit", "drawdown_limit"])
+
+
+# =============================================================================
+# 14. PROTECTION MANAGER TESTS
+# =============================================================================
+
+
+class TestProtectionManager:
+    """Test Protection Manager system."""
+
+    def test_protections_import(self):
+        """Test that protections can be imported."""
+        from rdagent.components.backtesting.protections import (
+            ProtectionManager,
+            MaxDrawdownProtection,
+            CooldownProtection,
+            StoplossGuardProtection,
+            LowPerformanceProtection
+        )
+
+    def test_protection_manager_creates(self):
+        """Test ProtectionManager can be created."""
+        from rdagent.components.backtesting.protections import ProtectionManager
+        manager = ProtectionManager()
+        assert manager is not None
+
+    def test_default_protections_configured(self):
+        """Test default protections can be configured."""
+        from rdagent.components.backtesting.protections import ProtectionManager
+        manager = ProtectionManager()
+        manager.create_default_protections()
+        assert len(manager.protections) == 4
+
+    def test_protection_manager_blocks(self):
+        """Test ProtectionManager can block trading."""
+        from rdagent.components.backtesting.protections import ProtectionManager
+        from datetime import datetime
+
+        manager = ProtectionManager()
+        manager.create_default_protections()
+
+        # Trigger max drawdown
+        result = manager.check_all(
+            returns=[-0.10, -0.05, -0.05],
+            timestamps=[datetime.now()] * 3,
+            current_equity=80000,
+            peak_equity=100000
+        )
+
+        assert result.should_block
+
+    def test_protection_manager_allows(self):
+        """Test ProtectionManager allows good conditions."""
+        from rdagent.components.backtesting.protections import ProtectionManager
+        from datetime import datetime
+
+        manager = ProtectionManager()
+        manager.create_default_protections()
+
+        result = manager.check_all(
+            returns=[0.01, 0.02, 0.015],
+            timestamps=[datetime.now()] * 3,
+            current_equity=105000,
+            peak_equity=105000
+        )
+
+        assert not result.should_block
+
+    def test_protection_base_classes(self):
+        """Test that base classes and enums are importable."""
+        from rdagent.components.backtesting.protections import (
+            BaseProtection,
+            ProtectionConfig,
+            ProtectionResult,
+            ProtectionType,
+            ProtectionScope
+        )
+        assert BaseProtection is not None
+        assert ProtectionResult is not None
+        assert ProtectionType is not None
+        assert ProtectionScope is not None
+
+    def test_protection_configs_importable(self):
+        """Test that all config classes are importable."""
+        from rdagent.components.backtesting.protections import (
+            MaxDrawdownConfig,
+            CooldownConfig,
+            StoplossGuardConfig,
+            LowPerformanceConfig
+        )
+        assert MaxDrawdownConfig is not None
+        assert CooldownConfig is not None
+        assert StoplossGuardConfig is not None
+        assert LowPerformanceConfig is not None
+
