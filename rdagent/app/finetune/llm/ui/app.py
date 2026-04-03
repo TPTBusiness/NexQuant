@@ -28,33 +28,41 @@ DEFAULT_LOG_BASE = "log/"
 def validate_path_within_cwd(user_path: Path) -> Path:
     """
     Validate that a user-provided path is within the current working directory.
-    
+
     Security: This function prevents path traversal attacks by:
     1. Resolving the path to its absolute canonical form
-    2. Verifying it's within the CWD boundary using relative_to()
+    2. Verifying it's within the CWD boundary using a normalized common prefix
     3. Rejecting paths outside the boundary with ValueError
-    
+
     Parameters
     ----------
     user_path : Path
         User-provided path to validate
-    
+
     Returns
     -------
     Path
         Resolved absolute path if valid
-    
+
     Raises
     ------
     ValueError
         If path is outside the current working directory
     """
     safe_root = Path.cwd().resolve()
+    # Expand any user home reference and resolve without requiring the path to exist.
     resolved_path = user_path.expanduser().resolve(strict=False)
-    
+
+    # Ensure the resolved path is absolute and remains within the safe root.
+    safe_root_str = str(safe_root)
+    resolved_str = str(resolved_path)
+    common = os.path.commonpath([safe_root_str, resolved_str])
+    if common != safe_root_str:
+        raise ValueError("Path is outside the allowed project directory")
+
     # This will raise ValueError if resolved_path is not within safe_root
     resolved_path.relative_to(safe_root)
-    
+
     return resolved_path
 
 
