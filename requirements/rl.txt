@@ -1,0 +1,20 @@
+# RL Trading Dependencies (Optional)
+#
+# Install with: pip install -r requirements/rl.txt
+#
+# These dependencies are OPTIONAL.
+# The Predix RL trading system works without them using a simple momentum fallback.
+#
+# Only install if you want to use full PPO/A2C/SAC training.
+
+# Core RL library
+stable-baselines3[extra]>=2.0.0
+
+# Gymnasium environment (OpenAI Gym successor)
+gymnasium>=0.29.0
+
+# Optional: TensorBoard for training visualization
+tensorboard
+
+# Optional: Progress bars during training
+tqdm

@@ -303,9 +303,29 @@ Expected data columns: `$open`, `$close`, `$high`, `$low`, `$volume`
 | `rdagent fin_model` | Model-only evolution |
 | `rdagent fin_factor_report --report-folder=<path>` | Extract factors from financial reports |
 | `rdagent general_model <paper-url>` | Extract model from research paper |
+| `rdagent rl_trading --mode train --algorithm PPO` | Train RL trading agent |
+| `rdagent rl_trading --mode backtest --model-path <path>` | Backtest with trained RL model |
 | `rdagent data_science --competition <name>` | Kaggle/data science competition mode |
 | `rdagent ui --port 19899 --log-dir <path>` | Start monitoring dashboard |
 | `rdagent health_check` | Validate environment setup |
+
+### RL Trading Examples
+
+```bash
+# Train new RL agent with PPO
+rdagent rl_trading --mode train --algorithm PPO --total-timesteps 100000
+
+# Backtest with trained model
+rdagent rl_trading --mode backtest --model-path models/rl_trader.zip
+
+# Disable trading protections (not recommended)
+rdagent rl_trading --mode backtest --no-with-protections
+
+# Get help
+rdagent rl_trading --help
+```
+
+**Note:** RL Trading works without `stable-baselines3` (uses simple fallback strategy). For full RL features, install: `pip install -r requirements/rl.txt`
 
 ---
 
