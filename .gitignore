@@ -99,3 +99,6 @@ models/local/
 .env.test
 *.test.env
 test_credentials.py
+
+# Closed source local components
+rdagent/scenarios/qlib/local/
