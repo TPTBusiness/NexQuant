@@ -39,6 +39,11 @@ def quant(
         "--cli-dashboard/-c",
         help="Start CLI dashboard",
     ),
+    log_file: str = typer.Option(
+        "fin_quant.log",
+        "--log-file",
+        help="Log file path (default: fin_quant.log). Use 'none' to disable.",
+    ),
     step_n: int = typer.Option(None, help="Number of steps to run"),
     loop_n: int = typer.Option(None, help="Number of loops to run"),
 ):
@@ -54,6 +59,42 @@ def quant(
     import subprocess
     import threading
     import time
+    import sys
+
+    # ---- Log File Setup ----
+    if log_file.lower() != "none":
+        log_path = Path(__file__).parent / log_file
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Open log file for appending
+        log_f = open(log_path, "a", encoding="utf-8")
+
+        # Redirect stdout and stderr to both console and log file
+        class TeeWriter:
+            def __init__(self, *streams):
+                self._streams = streams
+
+            def write(self, data):
+                for s in self._streams:
+                    try:
+                        s.write(data)
+                        s.flush()
+                    except:
+                        pass
+
+            def flush(self):
+                for s in self._streams:
+                    try:
+                        s.flush()
+                    except:
+                        pass
+
+        sys.stdout = TeeWriter(sys.__stdout__, log_f)
+        sys.stderr = TeeWriter(sys.__stderr__, log_f)
+
+        console.print(f"\n[dim]📝 Logging to: {log_path}[/dim]")
+    else:
+        console.print("\n[dim]⚠️  Logging disabled (console only)[/dim]")
 
     # ---- LLM Model Selection ----
     if model == "openrouter":
