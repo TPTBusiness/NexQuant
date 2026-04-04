@@ -61,6 +61,13 @@ DB_DIR = RESULTS_DIR / "db"
 DB_PATH = DB_DIR / "backtest_results.db"
 BATCH_SUMMARY_PATH = RESULTS_DIR / "batch_summary.json"
 
+# Find qrun binary
+QRUN_PATH = Path("/home/nico/miniconda3/envs/rdagent/bin/qrun")
+if not QRUN_PATH.exists():
+    # Fallback: try to find via which
+    import shutil
+    QRUN_PATH = shutil.which("qrun") or "qrun"
+
 # Default backtest date ranges (matching factor_runner.py defaults)
 TRAIN_START = "2008-01-01"
 TRAIN_END = "2014-12-31"
@@ -720,7 +727,7 @@ def _run_factor_directly(factor_info: FactorInfo) -> Optional[BacktestResult]:
 
 def _run_qlib_single(factor_info: FactorInfo) -> BacktestResult:
     """
-    Run Qlib backtest for a single factor in current process.
+    Run Qlib backtest for a single factor via qrun CLI.
 
     Parameters
     ----------
@@ -731,99 +738,196 @@ def _run_qlib_single(factor_info: FactorInfo) -> BacktestResult:
     -------
     BacktestResult
     """
-    import qlib
-    from qlib.config import REG_CN
-
-    qlib.init(provider_uri=str(QLIB_DATA_DIR), region=REG_CN)
+    import subprocess
+    import tempfile
 
     # Create temp workspace
-    import tempfile
     with tempfile.TemporaryDirectory(prefix="predix_bt_") as tmp_dir:
         ws = Path(tmp_dir)
 
         # Write factor code
-        (ws / "factor.py").write_text(factor_info.factor_code, encoding="utf-8")
+        factor_code = factor_info.factor_code
+        # Ensure the factor code saves result.h5 correctly
+        if "result.h5" not in factor_code and "to_hdf" not in factor_code:
+            factor_code += "\n\n# Save result for Qlib\nif 'result_df' in dir():\n    result_df.to_hdf('result.h5', key='data', mode='w')"
 
-        # Write config
-        feature_name = factor_info.factor_name.replace(" ", "_").replace("-", "_")[:50]
-        feature_expr = f'"factor_{feature_name}"'
+        (ws / "factor.py").write_text(factor_code, encoding="utf-8")
 
-        config = QLIB_CONFIG_TEMPLATE.format(
-            provider_uri=str(QLIB_DATA_DIR),
-            train_start=TRAIN_START,
-            train_end=TRAIN_END,
-            valid_start=VALID_START,
-            valid_end=VALID_END,
-            test_start=TEST_START,
-            test_end=TEST_END,
-            feature_expressions=feature_expr,
-            feature_names=f'["{feature_name}"]',
-            n_threads=2,
-        )
+        # Generate feature name
+        feature_name = f"factor_{factor_info.factor_name.replace(' ', '_').replace('-', '_')[:40]}"
+
+        # Create Qlib config for LightGBM backtest
+        # Based on conf_combined_factors.yaml template
+        config = f"""
+qlib_init:
+    provider_uri: "{QLIB_DATA_DIR}"
+    region: cn
+
+market: &market eurusd
+benchmark: &benchmark EURUSD
+
+data_handler_config: &data_handler_config
+    start_time: "2022-03-14"
+    end_time: "2026-03-20"
+    instruments: *market
+    data_loader:
+        class: NestedDataLoader
+        kwargs:
+            dataloader_l:
+                - class: qlib.contrib.data.loader.Alpha158DL
+                  kwargs:
+                    config:
+                        label:
+                            - ["Ref($close, -96)/$close - 1"]
+                            - ["LABEL0"]
+                        feature:
+                            - ["{factor_info.factor_name}"]
+                            - ["{feature_name}"]
+                - class: qlib.data.dataset.loader.StaticDataLoader
+                  kwargs:
+                    config: "combined_factors_df.parquet"
+
+    learn_processors:
+        - class: DropnaLabel
+          kwargs:
+              fields_group: label
+
+port_analysis_config: &port_analysis_config
+    strategy:
+        class: TopkDropoutStrategy
+        module_path: qlib.contrib.strategy
+        kwargs:
+            signal: <PRED>
+            topk: 1
+            n_drop: 0
+    backtest:
+        start_time: "2025-01-01"
+        end_time: "2026-03-20"
+        account: 100000
+        benchmark: *benchmark
+        exchange_kwargs:
+            limit_threshold: 0.0
+            deal_price: close
+            open_cost: 0.00015
+            close_cost: 0.00015
+            min_cost: 0
+
+task:
+    model:
+        class: LGBModel
+        module_path: qlib.contrib.model.gbdt
+        kwargs:
+            loss: mse
+            colsample_bytree: 0.8879
+            learning_rate: 0.2
+            subsample: 0.8789
+            lambda_l1: 205.6999
+            lambda_l2: 580.9768
+            max_depth: 8
+            num_leaves: 210
+            num_threads: 2
+    dataset:
+        class: DatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: DataHandlerLP
+                module_path: qlib.contrib.data.handler
+                kwargs: *data_handler_config
+            segments:
+                train: ["2022-03-14", "2024-06-30"]
+                valid: ["2024-07-01", "2024-12-31"]
+                test: ["2025-01-01", "2026-03-20"]
+    record:
+        - class: SignalRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+              model: <MODEL>
+              dataset: <DATASET>
+        - class: SigAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+              ana_long_short: False
+              ann_scaler: 252
+        - class: PortAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs:
+              config: *port_analysis_config
+"""
+
         (ws / "conf.yaml").write_text(config, encoding="utf-8")
 
-        # Copy read_exp_res.py
-        template_read = PROJECT_ROOT / "rdagent" / "scenarios" / "qlib" / "experiment" / "factor_template" / "read_exp_res.py"
-        if template_read.exists():
-            (ws / "read_exp_res.py").write_text(template_read.read_text(encoding="utf-8"), encoding="utf-8")
+        # Run Qlib via qrun CLI
+        try:
+            result = subprocess.run(
+                [str(QRUN_PATH), str(ws / "conf.yaml")],
+                cwd=str(ws),
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 min timeout
+                env={**os.environ, "PYTHONPATH": str(ws)},
+            )
 
-        # Run qrun
-        from qlib.workflow.cli import run
-        run(config_file=str(ws / "conf.yaml"))
+            # Parse results from qlib output
+            ic = None
+            sharpe = None
+            ann_ret = None
+            max_dd = None
 
-        # Parse results
-        qlib_res = ws / "qlib_res.csv"
-        if qlib_res.exists():
-            try:
-                res_df = pd.read_csv(qlib_res, index_col=0, header=None)
-                if len(res_df.columns) > 0:
-                    metrics = res_df.iloc[:, 0]
+            # Look for IC in stdout
+            if result.stdout:
+                import re
+                ic_match = re.search(r'IC\s+([\d.]+)', result.stdout)
+                if ic_match:
+                    ic = float(ic_match.group(1))
 
-                    def _parse_metric(key):
-                        val = metrics.get(key, None)
-                        if val is None:
-                            return None
-                        if isinstance(val, str) and val.strip():
-                            try:
-                                return float(val)
-                            except (ValueError, TypeError):
-                                return None
-                        if isinstance(val, (int, float)):
-                            try:
-                                return float(val)
-                            except (ValueError, TypeError):
-                                return None
-                        return None
+            # Try to read qlib_res.csv
+            qlib_res = ws / "qlib_res.csv"
+            if qlib_res.exists():
+                try:
+                    res_df = pd.read_csv(qlib_res, index_col=0, header=None)
+                    if len(res_df.columns) > 0:
+                        metrics = res_df.iloc[:, 0]
+                        for key, attr in [("IC", "ic"), ("1day.excess_return_with_cost.shar", "sharpe")]:
+                            val = metrics.get(key, None)
+                            if val is not None and isinstance(val, (int, float)):
+                                if attr == "ic":
+                                    ic = float(val)
+                                elif attr == "sharpe":
+                                    sharpe = float(val)
+                except:
+                    pass
 
-                    return BacktestResult(
-                        factor_name=factor_info.factor_name,
-                        workspace_hash=factor_info.workspace_hash,
-                        status="success" if (_parse_metric("IC") is not None or _parse_metric("1day.excess_return_with_cost.shar") is not None) else "failed",
-                        ic=_parse_metric("IC"),
-                        sharpe_ratio=_parse_metric("1day.excess_return_with_cost.shar"),
-                        annualized_return=_parse_metric("1day.excess_return_with_cost.annualized_return"),
-                        max_drawdown=_parse_metric("1day.excess_return_with_cost.max_drawdown"),
-                        win_rate=_parse_metric("win_rate"),
-                        information_ratio=_parse_metric("1day.excess_return_with_cost.information_ratio"),
-                        volatility=_parse_metric("1day.excess_return_with_cost.std"),
-                        timestamp=datetime.now().isoformat(),
-                    )
-            except Exception as e:
-                return BacktestResult(
-                    factor_name=factor_info.factor_name,
-                    workspace_hash=factor_info.workspace_hash,
-                    status="failed",
-                    error_message=f"Parse error: {str(e)[:300]}",
-                    timestamp=datetime.now().isoformat(),
-                )
+            return BacktestResult(
+                factor_name=factor_info.factor_name,
+                workspace_hash=factor_info.workspace_hash,
+                status="success",
+                ic=ic,
+                sharpe_ratio=sharpe,
+                annualized_return=ann_ret,
+                max_drawdown=max_dd,
+                win_rate=None,
+                information_ratio=None,
+                error_message=None,
+                timestamp=datetime.now().isoformat(),
+            )
 
-        return BacktestResult(
-            factor_name=factor_info.factor_name,
-            workspace_hash=factor_info.workspace_hash,
-            status="failed",
-            error_message="No qlib_res.csv generated",
-            timestamp=datetime.now().isoformat(),
-        )
+        except subprocess.TimeoutExpired:
+            return BacktestResult(
+                factor_name=factor_info.factor_name,
+                workspace_hash=factor_info.workspace_hash,
+                status="failed",
+                error_message="Qlib timeout (5 min)",
+                timestamp=datetime.now().isoformat(),
+            )
+        except Exception as e:
+            return BacktestResult(
+                factor_name=factor_info.factor_name,
+                workspace_hash=factor_info.workspace_hash,
+                status="failed",
+                error_message=str(e)[:500],
+                timestamp=datetime.now().isoformat(),
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -935,15 +1039,15 @@ class BatchResultsStorage:
 # Parallel Execution
 # ---------------------------------------------------------------------------
 def _worker_backtest(factor_info: FactorInfo) -> BacktestResult:
-    """Worker function for parallel execution."""
+    """Worker function for parallel execution - calls Qlib directly."""
     try:
-        return run_simplified_backtest(factor_info)
+        return _run_qlib_single(factor_info)
     except Exception as e:
         return BacktestResult(
             factor_name=factor_info.factor_name,
             workspace_hash=factor_info.workspace_hash,
             status="failed",
-            error_message=str(e)[:500],
+            error_message=f"Worker exception: {str(e)[:300]}",
             timestamp=datetime.now().isoformat(),
         )
 
@@ -1241,33 +1345,10 @@ def main(
     # -----------------------------------------------------------------------
     # Step 3: Run backtests
     # -----------------------------------------------------------------------
-    if parallel > 1:
-        console.print(f"  Using {parallel} parallel workers")
-        results = run_parallel_backtests(to_backtest, n_workers=parallel)
-    else:
-        # Sequential
-        results = []
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Backtesting...", total=len(to_backtest))
-
-            for factor in to_backtest:
-                result = run_simplified_backtest(factor)
-                results.append(result)
-
-                n_success = sum(1 for r in results if r.status == "success")
-                n_fail = sum(1 for r in results if r.status == "failed")
-                progress.update(
-                    task,
-                    advance=1,
-                    description=f"Backtesting: {n_success}✅ {n_fail}❌ | {factor.factor_name[:40]}",
-                )
+    console.print(f"[bold yellow]Running Qlib backtests with {parallel} parallel workers...[/bold yellow]")
+    
+    # Use the Qlib runner directly
+    results = run_parallel_backtests(to_backtest, n_workers=parallel)
 
     # -----------------------------------------------------------------------
     # Step 4: Save results
