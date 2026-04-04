@@ -26,6 +26,8 @@ from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
+from rich.markdown import Markdown
+from rich.layout import Layout
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 # Load environment variables from .env file
@@ -352,28 +354,19 @@ class ParallelRunner:
 
         # Summary panel
         total = len(self.runs)
-        summary_lines = [
-            f"[bold]Summary:[/bold] {total} total | ",
-            f"[green]{success} done[/green] | ",
-            f"[cyan]{running} running[/cyan] | ",
-            f"[yellow]{pending} pending[/yellow] | ",
-            f"[red]{failed} failed[/red]",
-        ]
-        summary = "".join(summary_lines)
-
-        content = []
-        content.append(table)
-        content.append("")
-        content.append(summary)
+        summary_text = (
+            f"**Summary:** {total} total | "
+            f"{success} done | "
+            f"{running} running | "
+            f"{pending} pending | "
+            f"{failed} failed"
+        )
 
         if self._shutdown_requested:
-            content.append("\n[bold yellow]⚠️  Shutdown requested - stopping all runs...[/bold yellow]")
+            summary_text += "\n⚠️  **Shutdown requested - stopping all runs...**"
 
-        return Panel(
-            "\n".join(content),
-            title="🤖 Predix Parallel Runner",
-            border_style="blue",
-        )
+        from rich.console import Group
+        return Group(table, Panel(Markdown(summary_text), border_style="blue"))
 
     def _signal_handler(self, signum, frame) -> None:
         """Handle SIGINT/SIGTERM for graceful shutdown."""
@@ -425,7 +418,8 @@ class ParallelRunner:
             time.sleep(1)
 
         # Monitor loop with live dashboard
-        with Live(self._render_dashboard(), refresh_per_second=2, screen=True) as live:
+        with Live(refresh_per_second=2, screen=True) as live:
+            live.update(self._render_dashboard())
             while True:
                 if self._shutdown_requested:
                     # Check if all runs are stopped
