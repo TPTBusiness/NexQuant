@@ -21,19 +21,19 @@ def generate_data_folder_from_qlib():
         entry=f"python generate.py",
     )
 
-    assert (Path(__file__).parent / "factor_data_template" / "daily_pv_all.h5").exists(), (
-        "daily_pv_all.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"
+    assert (Path(__file__).parent / "factor_data_template" / "intraday_pv_all.h5").exists(), (
+        "intraday_pv_all.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"
         + execute_log
     )
-    assert (Path(__file__).parent / "factor_data_template" / "daily_pv_debug.h5").exists(), (
-        "daily_pv_debug.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"
+    assert (Path(__file__).parent / "factor_data_template" / "intraday_pv_debug.h5").exists(), (
+        "intraday_pv_debug.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"
         + execute_log
     )
 
     Path(FACTOR_COSTEER_SETTINGS.data_folder).mkdir(parents=True, exist_ok=True)
     shutil.copy(
-        Path(__file__).parent / "factor_data_template" / "daily_pv_all.h5",
-        Path(FACTOR_COSTEER_SETTINGS.data_folder) / "daily_pv.h5",
+        Path(__file__).parent / "factor_data_template" / "intraday_pv_all.h5",
+        Path(FACTOR_COSTEER_SETTINGS.data_folder) / "intraday_pv.h5",
     )
     shutil.copy(
         Path(__file__).parent / "factor_data_template" / "README.md",
@@ -42,8 +42,8 @@ def generate_data_folder_from_qlib():
 
     Path(FACTOR_COSTEER_SETTINGS.data_folder_debug).mkdir(parents=True, exist_ok=True)
     shutil.copy(
-        Path(__file__).parent / "factor_data_template" / "daily_pv_debug.h5",
-        Path(FACTOR_COSTEER_SETTINGS.data_folder_debug) / "daily_pv.h5",
+        Path(__file__).parent / "factor_data_template" / "intraday_pv_debug.h5",
+        Path(FACTOR_COSTEER_SETTINGS.data_folder_debug) / "intraday_pv.h5",
     )
     shutil.copy(
         Path(__file__).parent / "factor_data_template" / "README.md",
