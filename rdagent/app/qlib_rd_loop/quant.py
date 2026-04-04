@@ -90,12 +90,98 @@ class QuantRDLoop(RDLoop):
             await asyncio.sleep(1)
 
     def coding(self, prev_out: dict[str, Any]):
-        if prev_out["direct_exp_gen"]["propose"].action == "factor":
-            exp = self.factor_coder.develop(prev_out["direct_exp_gen"]["exp_gen"])
-        elif prev_out["direct_exp_gen"]["propose"].action == "model":
-            exp = self.model_coder.develop(prev_out["direct_exp_gen"]["exp_gen"])
-        logger.log_object(exp, tag="coder result")
+        exp = None
+        try:
+            if prev_out["direct_exp_gen"]["propose"].action == "factor":
+                exp = self.factor_coder.develop(prev_out["direct_exp_gen"]["exp_gen"])
+            elif prev_out["direct_exp_gen"]["propose"].action == "model":
+                exp = self.model_coder.develop(prev_out["direct_exp_gen"]["exp_gen"])
+            logger.log_object(exp, tag="coder result")
+        except (FactorEmptyError, ModelEmptyError) as e:
+            logger.warning(f"Coding failed with {type(e).__name__}: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected coding error: {e}")
+            raise
+        finally:
+            # Always save results, even on partial failure
+            if exp is not None:
+                self._save_coder_results(exp)
+
         return exp
+
+    def _save_coder_results(self, exp) -> None:
+        """
+        Save CoSTEER-generated code and evaluation to results/ directory.
+
+        This ensures we have a record of generated factors even if
+        the full Qlib backtest pipeline fails or is skipped.
+
+        Parameters
+        ----------
+        exp : Experiment
+            The experiment with generated code
+        """
+        import json
+        from datetime import datetime
+        from pathlib import Path
+
+        try:
+            project_root = Path(__file__).parent.parent.parent.parent
+            results_dir = project_root / "results" / "runs"
+            results_dir.mkdir(parents=True, exist_ok=True)
+
+            # Build result summary
+            summary = {
+                "timestamp": datetime.now().isoformat(),
+                "hypothesis": None,
+                "factors": [],
+                "status": "generated",
+            }
+
+            if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
+                summary["hypothesis"] = getattr(exp.hypothesis, "hypothesis", None)
+
+            # Extract generated code from sub_workspace_list
+            if hasattr(exp, "sub_workspace_list") and exp.sub_workspace_list:
+                for i, ws in enumerate(exp.sub_workspace_list):
+                    factor_info = {
+                        "index": i,
+                        "code": None,
+                        "file_count": 0,
+                    }
+                    if hasattr(ws, "file_dict") and ws.file_dict:
+                        factor_info["file_count"] = len(ws.file_dict)
+                        factor_info["code"] = ws.file_dict.get("factor.py", None)
+                    summary["factors"].append(factor_info)
+
+            # Check if experiment was accepted or rejected
+            if hasattr(exp, "accepted_tasks"):
+                accepted = getattr(exp, "accepted_tasks", [])
+                summary["accepted_count"] = len(accepted)
+                summary["status"] = "accepted" if accepted else "rejected"
+
+            # Write JSON summary
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_name = (summary["hypothesis"] or "unknown_factor")[:80].replace("/", "_").replace(" ", "_")
+            json_path = results_dir / f"{timestamp}_{safe_name}.json"
+
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(summary, f, ensure_ascii=False, indent=2, default=str)
+
+            logger.info(f"CoSTEER result saved to {json_path}")
+
+            # Also write a consolidated log entry
+            log_dir = project_root / "results" / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            today = datetime.now().strftime("%Y-%m-%d")
+            log_file = log_dir / f"coder_runs_{today}.jsonl"
+
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(summary, ensure_ascii=False, default=str) + "\n")
+
+        except Exception as e:
+            logger.warning(f"Failed to save CoSTEER results: {e}")
 
     def running(self, prev_out: dict[str, Any]):
         if prev_out["direct_exp_gen"]["propose"].action == "factor":

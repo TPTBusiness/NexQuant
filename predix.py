@@ -40,12 +40,17 @@ def quant(
         help="Start CLI dashboard",
     ),
     log_file: str = typer.Option(
-        "fin_quant.log",
+        None,  # None means auto-detect based on run_id
         "--log-file",
-        help="Log file path (default: fin_quant.log). Use 'none' to disable.",
+        help="Log file path (default: auto-detected). Use 'none' to disable.",
     ),
     step_n: int = typer.Option(None, help="Number of steps to run"),
     loop_n: int = typer.Option(None, help="Number of loops to run"),
+    run_id: int = typer.Option(
+        0,
+        "--run-id",
+        help="Parallel run ID (for isolated results). 0 = single run mode.",
+    ),
 ):
     """
     Start EURUSD quantitative trading loop.
@@ -55,11 +60,38 @@ def quant(
         predix quant -m openrouter            # OpenRouter cloud model
         predix quant -d                       # With web dashboard
         predix quant -m openrouter -d         # Both
+        predix quant --run-id 1               # Parallel run #1 (isolated)
     """
     import subprocess
     import threading
     import time
     import sys
+
+    # ---- Parallel Run Isolation ----
+    # When run_id > 0, isolate all outputs (logs, results, workspace)
+    if run_id > 0:
+        os.environ["PARALLEL_RUN_ID"] = str(run_id)
+        console.print(f"\n[bold yellow]🔀 Parallel Run Mode:[/bold yellow] [cyan]ID={run_id}[/cyan]")
+
+        # Auto-detect log file for parallel run
+        if log_file is None:
+            log_file = f"fin_quant_run{run_id}.log"
+
+        # Isolate results directories
+        results_base = Path(__file__).parent / "results" / "runs" / f"run{run_id}"
+        results_base.mkdir(parents=True, exist_ok=True)
+
+        # Isolate workspace directory
+        workspace_dir = Path(__file__).parent / f"RD-Agent_workspace_run{run_id}"
+        os.environ["RD_AGENT_WORKSPACE"] = str(workspace_dir)
+
+        console.print(f"   [dim]Log: {log_file}[/dim]")
+        console.print(f"   [dim]Results: results/runs/run{run_id}/[/dim]")
+        console.print(f"   [dim]Workspace: {workspace_dir.name}/[/dim]")
+    else:
+        # Single run mode: default log file
+        if log_file is None:
+            log_file = "fin_quant.log"
 
     # ---- Log File Setup ----
     if log_file.lower() != "none":
@@ -99,17 +131,28 @@ def quant(
     # ---- LLM Model Selection ----
     if model == "openrouter":
         api_key = os.getenv("OPENROUTER_API_KEY", "")
+        api_key_2 = os.getenv("OPENROUTER_API_KEY_2", "")
         if not api_key:
             console.print("\n[bold red]❌ OPENROUTER_API_KEY not set in .env[/bold red]")
             console.print("[yellow]Add your API key to .env:[/yellow]")
             console.print('  OPENROUTER_API_KEY=sk-or-your-key-here')
             raise typer.Exit(code=1)
 
-        os.environ["OPENAI_API_KEY"] = api_key
+        # Setup both API keys for load balancing
         os.environ["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
-        os.environ["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/google/gemini-2.0-flash:free")
+        os.environ["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/qwen/qwen3.6-plus:free")
 
-        console.print(f"\n[bold blue]🌐 Using OpenRouter:[/bold blue] [cyan]{os.environ['CHAT_MODEL']}[/cyan]")
+        # If second key exists, configure LiteLLM for load balancing
+        if api_key_2:
+            os.environ["OPENAI_API_KEY"] = f"{api_key},{api_key_2}"
+            os.environ["LITELLM_PARALLEL_CALLS"] = "2"
+            console.print(f"\n[bold blue]🌐 Using OpenRouter (2 API Keys):[/bold blue] [cyan]{os.environ['CHAT_MODEL']}[/cyan]")
+            console.print(f"   [dim]Keys: {api_key[:15]}*** + {api_key_2[:15]}***[/dim]")
+            console.print(f"   [dim]Parallel: 2 concurrent requests[/dim]")
+        else:
+            os.environ["OPENAI_API_KEY"] = api_key
+            console.print(f"\n[bold blue]🌐 Using OpenRouter:[/bold blue] [cyan]{os.environ['CHAT_MODEL']}[/cyan]")
+            console.print(f"   [dim]Key: {api_key[:15]}***[/dim]")
     elif model == "local":
         os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "local")
         os.environ["OPENAI_API_BASE"] = os.getenv("OPENAI_API_BASE", "http://localhost:8081/v1")

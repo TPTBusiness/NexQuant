@@ -114,7 +114,13 @@ class CoSTEER(Developer[Experiment]):
         reached_max_seconds = False
 
         evo_fb = None
+        iteration_count = 0
+
+        # Save initial state before first iteration
+        self._save_intermediate_results(evo_exp, None, 0, start_datetime)
+
         for evo_exp in self.evolve_agent.multistep_evolve(evo_exp, self.evaluator):
+            iteration_count += 1
             assert isinstance(evo_exp, Experiment)  # multiple inheritance
             evo_fb = self._get_last_fb()
             update_fallback = self.should_use_new_evo(
@@ -129,6 +135,10 @@ class CoSTEER(Developer[Experiment]):
             logger.log_object(evo_exp.sub_workspace_list, tag="evolving code")
             for sw in evo_exp.sub_workspace_list:
                 logger.info(f"evolving workspace: {sw}")
+
+            # Save intermediate results after each iteration
+            self._save_intermediate_results(evo_exp, evo_fb, iteration_count, start_datetime)
+
             if max_seconds is not None and (datetime.now() - start_datetime).total_seconds() > max_seconds:
                 logger.info(f"Reached max time limit {max_seconds} seconds, stop evolving")
                 reached_max_seconds = True
@@ -153,6 +163,100 @@ class CoSTEER(Developer[Experiment]):
         exp.sub_workspace_list = evo_exp.sub_workspace_list
         exp.experiment_workspace = evo_exp.experiment_workspace
         return exp
+
+    def _save_intermediate_results(self, evo_exp, evo_fb, iteration: int, start_datetime) -> None:
+        """
+        Save intermediate CoSTEER results to results/ directory after each iteration.
+
+        This ensures results are visible even if CoSTEER takes a long time
+        or ultimately fails.
+
+        Parameters
+        ----------
+        evo_exp : EvolvingItem
+            Current evolving experiment
+        evo_fb : CoSTEERMultiFeedback
+            Feedback from the evaluator
+        iteration : int
+            Current iteration number
+        start_datetime : datetime
+            When the develop process started
+        """
+        import json as _json
+        import os as _os
+        from datetime import datetime as _dt
+
+        try:
+            # Go up from rdagent/components/coder/CoSTEER/ to project root (5 levels)
+            project_root = Path(__file__).parent.parent.parent.parent.parent
+
+            # Parallel run isolation: use run-specific directory if PARALLEL_RUN_ID is set
+            parallel_run_id = _os.getenv("PARALLEL_RUN_ID", "0")
+            if parallel_run_id != "0":
+                results_dir = project_root / "results" / "runs" / f"run{parallel_run_id}" / "costeer"
+            else:
+                results_dir = project_root / "results" / "runs"
+            results_dir.mkdir(parents=True, exist_ok=True)
+
+            # Build summary
+            summary = {
+                "timestamp": _dt.now().isoformat(),
+                "iteration": iteration,
+                "elapsed_seconds": (_dt.now() - start_datetime).total_seconds(),
+                "factors": [],
+            }
+
+            # Extract factor info from sub_workspace_list
+            if hasattr(evo_exp, "sub_workspace_list") and evo_exp.sub_workspace_list:
+                for i, sw in enumerate(evo_exp.sub_workspace_list):
+                    factor = {"index": i, "file_count": 0, "code_preview": None}
+                    if hasattr(sw, "file_dict") and sw.file_dict:
+                        factor["file_count"] = len(sw.file_dict)
+                        code = sw.file_dict.get("factor.py", "")
+                        if code:
+                            # First 200 chars as preview
+                            factor["code_preview"] = code[:200]
+                    summary["factors"].append(factor)
+
+            # Extract feedback info
+            if evo_fb is not None:
+                summary["feedback_count"] = len(evo_fb) if hasattr(evo_fb, "__len__") else 0
+                accepted = 0
+                rejected = 0
+                for fb in evo_fb:
+                    if fb is not None:
+                        if fb.is_acceptable():
+                            accepted += 1
+                        else:
+                            rejected += 1
+                summary["accepted"] = accepted
+                summary["rejected"] = rejected
+                summary["status"] = "accepted" if accepted > 0 else "rejected"
+            else:
+                summary["feedback_count"] = 0
+                summary["accepted"] = 0
+                summary["rejected"] = 0
+                summary["status"] = "initialized"
+
+            # Write JSON file
+            ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+            if parallel_run_id != "0":
+                json_path = results_dir / f"costeer_run{parallel_run_id}_iter{iteration:02d}_{ts}.json"
+            else:
+                json_path = results_dir / f"costeer_iter{iteration:02d}_{ts}.json"
+
+            with open(json_path, "w", encoding="utf-8") as f:
+                _json.dump(summary, f, ensure_ascii=False, indent=2, default=str)
+
+            logger.info(
+                f"CoSTEER iteration {iteration}: "
+                f"accepted={summary.get('accepted', 0)}, "
+                f"rejected={summary.get('rejected', 0)}, "
+                f"saved to {json_path.name}"
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to save intermediate CoSTEER results: {e}")
 
     def _exp_postprocess_by_feedback(self, evo: Experiment, feedback: CoSTEERMultiFeedback) -> Experiment:
         """
