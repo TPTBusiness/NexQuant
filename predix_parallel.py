@@ -510,7 +510,7 @@ if __name__ == "__main__":
         "--runs", "-n",
         type=int,
         default=5,
-        help="Number of concurrent runs (default: 5)",
+        help="Number of concurrent runs (default: 5, max recommended: 25)",
     )
     parser.add_argument(
         "--api-keys", "-k",
@@ -525,8 +525,27 @@ if __name__ == "__main__":
         choices=["local", "openrouter"],
         help="LLM backend: 'local' (llama.cpp) or 'openrouter' (cloud)",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Skip resource warnings (allow >25 runs)",
+    )
 
     args = parser.parse_args()
+
+    # Resource warnings for high run counts
+    if args.runs > 50 and not args.force:
+        console.print(f"\n[bold red]⚠️  {args.runs} runs exceeds safe limit (50)[/bold red]")
+        console.print("[yellow]This will likely cause memory exhaustion and API throttling.[/yellow]")
+        console.print("[yellow]Use --force to override.[/yellow]")
+        sys.exit(1)
+    elif args.runs > 25:
+        console.print(f"\n[yellow]⚠️  {args.runs} runs - high resource usage expected[/yellow]")
+        console.print(f"   Estimated RAM: ~{args.runs * 0.65:.0f} GB")
+        console.print(f"   Use --force to confirm.\n")
+        import time
+        time.sleep(2)
+
     result = main(runs=args.runs, api_keys=args.api_keys, model=args.model)
 
     # Exit with appropriate code
