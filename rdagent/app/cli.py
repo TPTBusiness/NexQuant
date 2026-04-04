@@ -114,24 +114,67 @@ def fin_quant_cli(
     with_dashboard: bool = typer.Option(False, "--with-dashboard/-d", help="Start web dashboard automatically"),
     with_cli_dashboard: bool = typer.Option(False, "--cli-dashboard/-c", help="Show beautiful CLI dashboard"),
     dashboard_port: int = typer.Option(5000, "--dashboard-port", help="Dashboard port"),
+    model: str = typer.Option(
+        "local",
+        "--model",
+        "-m",
+        help="LLM backend to use: 'local' (llama.cpp), 'openrouter' (cloud models), or custom env var prefix",
+    ),
 ):
     """
     Start EURUSD quantitative trading loop.
-    
+
     Options:
       --with-dashboard/-d: Start web dashboard at http://localhost:5000
       --cli-dashboard/-c: Show beautiful terminal UI with live stats
-    
+      --model/-m: LLM backend ('local' | 'openrouter')
+
     Examples:
-      rdagent fin_quant
-      rdagent fin_quant -d              # Web dashboard
-      rdagent fin_quant -c              # CLI dashboard
-      rdagent fin_quant -d -c           # Both dashboards
+      rdagent fin_quant                          # Local llama.cpp (default)
+      rdagent fin_quant -m local                 # Explicit local
+      rdagent fin_quant -m openrouter            # Use OpenRouter model
+      rdagent fin_quant -d                       # Web dashboard
+      rdagent fin_quant -d -c                    # Both dashboards
+
+    OpenRouter Setup:
+      1. Set OPENROUTER_API_KEY in .env
+      2. Set OPENROUTER_MODEL (default: openrouter/google/gemini-2.0-flash:free)
+      3. Run: rdagent fin_quant -m openrouter
     """
     import subprocess
     import threading
     import time
-    
+
+    from rich.console import Console
+
+    console = Console()
+
+    # ---- LLM Model Selection ----
+    if model == "openrouter":
+        api_key = os.getenv("OPENROUTER_API_KEY", "")
+        if not api_key:
+            console.print("\n[bold red]❌ OPENROUTER_API_KEY not set in .env[/bold red]")
+            console.print("[yellow]Add your API key to .env and retry:[/yellow]")
+            console.print('  OPENROUTER_API_KEY=sk-or-your-key-here')
+            raise typer.Exit(code=1)
+
+        os.environ["OPENAI_API_KEY"] = api_key
+        os.environ["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
+        os.environ["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/google/gemini-2.0-flash:free")
+
+        console.print(f"\n[bold blue]🌐 Using OpenRouter model:[/bold blue] [cyan]{os.environ['CHAT_MODEL']}[/cyan]")
+    elif model == "local":
+        # Ensure local defaults are set
+        if not os.getenv("OPENAI_API_BASE"):
+            os.environ["OPENAI_API_BASE"] = "http://localhost:8081/v1"
+        if not os.getenv("CHAT_MODEL"):
+            os.environ["CHAT_MODEL"] = "openai/qwen3.5-35b"
+
+        console.print(f"\n[bold green]🏠 Using local LLM:[/bold green] [cyan]{os.environ['CHAT_MODEL']}[/cyan]")
+        console.print(f"   [dim]Base URL: {os.environ['OPENAI_API_BASE']}[/dim]")
+    else:
+        console.print(f"\n[yellow]⚠️  Unknown model backend: '{model}'. Using current .env settings.[/yellow]")
+
     # Start Web Dashboard wenn gewünscht
     if with_dashboard:
         def start_web_dashboard():
@@ -143,21 +186,21 @@ def fin_quant_cli(
                 cwd=str(Path(__file__).parent.parent.parent),
                 env={**os.environ, "FLASK_ENV": "development"}
             )
-        
+
         dashboard_thread = threading.Thread(target=start_web_dashboard, daemon=True)
         dashboard_thread.start()
         time.sleep(2)
-    
+
     # Start CLI Dashboard wenn gewünscht
     if with_cli_dashboard:
         def start_cli_dash():
             from rdagent.log.ui.predix_dashboard import run_dashboard
             run_dashboard(log_path="fin_quant.log", refresh_interval=3)
-        
+
         cli_thread = threading.Thread(target=start_cli_dash, daemon=True)
         cli_thread.start()
         time.sleep(1)
-    
+
     # Fin Quant starten
     fin_quant(path=path, step_n=step_n, loop_n=loop_n, all_duration=all_duration, checkout=checkout)
 
