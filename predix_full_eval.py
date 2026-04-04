@@ -73,7 +73,9 @@ class EvalResult:
     """Evaluation result for a single factor."""
     factor_name: str
     workspace_hash: str
-    status: str  # success, failed
+    factor_code: str = ""
+    factor_description: str = ""
+    status: str = ""  # success, failed
     ic: Optional[float] = None
     rank_ic: Optional[float] = None
     sharpe: Optional[float] = None
@@ -87,6 +89,27 @@ class EvalResult:
 
     def to_dict(self) -> dict:
         return {k: v for k, v in self.__dict__.items()}
+
+
+# ---------------------------------------------------------------------------
+# Factor description extractor
+# ---------------------------------------------------------------------------
+def _extract_factor_description(code: str) -> str:
+    """Extract docstring or description from factor code."""
+    import re
+    # Try to extract docstring
+    match = re.search(r'"""(.*?)"""', code, re.DOTALL)
+    if match:
+        return match.group(1).strip()[:500]
+    # Try to extract from comments
+    lines = code.split('\n')
+    desc_lines = []
+    for line in lines[:20]:
+        if line.strip().startswith('#') and not line.strip().startswith('#!'):
+            desc_lines.append(line.strip()[1:].strip())
+    if desc_lines:
+        return ' '.join(desc_lines)[:500]
+    return "No description available"
 
 
 # ---------------------------------------------------------------------------
@@ -269,6 +292,8 @@ def evaluate_factor_full(factor: FactorInfo, full_data: pd.DataFrame,
             return EvalResult(
                 factor_name=factor.factor_name,
                 workspace_hash=factor.workspace_hash,
+                factor_code=factor.factor_code,
+                factor_description=_extract_factor_description(factor.factor_code),
                 status="success",
                 ic=float(ic) if ic is not None and not np.isnan(ic) else None,
                 rank_ic=float(rank_ic) if rank_ic is not None and not np.isnan(rank_ic) else None,
