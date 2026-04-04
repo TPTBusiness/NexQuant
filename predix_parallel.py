@@ -125,7 +125,7 @@ class ParallelRunner:
         # Initialize run states
         for i in range(1, num_runs + 1):
             # Round-robin API key assignment
-            api_key_idx = (i - 1) % max(len(self.api_keys), 1)
+            api_key_idx = (i - 1) % max(self.num_api_keys, 1)
             run_state = RunState(run_id=i, api_key_idx=api_key_idx, model=model)
             self.runs.append(run_state)
 
@@ -180,8 +180,8 @@ class ParallelRunner:
             env["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
             env["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/qwen/qwen3.6-plus:free")
 
-            # If we have 2 API keys, configure LiteLLM for load balancing
-            if len(self.api_keys) >= 2:
+            # If we configured multiple API keys AND have enough keys, use load balancing
+            if self.num_api_keys >= 2 and len(self.api_keys) >= 2:
                 env["OPENAI_API_KEY"] = f"{self.api_keys[0]},{self.api_keys[1]}"
                 env["LITELLM_PARALLEL_CALLS"] = "2"
         elif self.model == "local":
