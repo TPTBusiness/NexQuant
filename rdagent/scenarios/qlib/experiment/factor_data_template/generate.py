@@ -12,7 +12,7 @@ fields = ["$open", "$close", "$high", "$low", "$volume"]
 # Start: 2020-01-01, End: 2026-03-20
 data = D.features(instruments, fields, freq="1min").swaplevel().sort_index()
 
-data.to_hdf("./daily_pv_all.h5", key="data")
+data.to_hdf("./intraday_pv_all.h5", key="data")
 
 
 # Debug-Daten: Nur letzte ~100 Instrumente für schnelleres Testing
@@ -32,8 +32,8 @@ data_debug = (
     .sort_index()
 )
 
-data_debug.to_hdf("./daily_pv_debug.h5", key="data")
+data_debug.to_hdf("./intraday_pv_debug.h5", key="data")
 
-print(f"Generated daily_pv_all.h5 with {len(data)} rows")
-print(f"Generated daily_pv_debug.h5 with {len(data_debug)} rows")
+print(f"Generated intraday_pv_all.h5 with {len(data)} rows")
+print(f"Generated intraday_pv_debug.h5 with {len(data_debug)} rows")
 print(f"Date range: {data.index.min()} to {data.index.max()}")

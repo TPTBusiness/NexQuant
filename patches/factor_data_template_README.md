@@ -9,7 +9,7 @@ NOTE: **key is always "data" for all hdf5 files **.
 # Here is a short description about the data
 | Filename       | Description                                                      |
 | -------------- | -----------------------------------------------------------------|
-| "daily_pv.h5"  | EURUSD 1-minute OHLCV intraday data (2020-2026).                 |
+| "intraday_pv.h5"  | EURUSD 1-minute OHLCV intraday data (2020-2026).                 |
 
 # For different data, We have some basic knowledge for them
 
