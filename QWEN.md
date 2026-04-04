@@ -1076,3 +1076,201 @@ git status
 4. Dependencies are tracked
 
 ---
+
+---
+
+## 🚀 COMPLETE 5-PHASE ARCHITECTURE
+
+### Phase 1: Factor Generation (Open Source - ALWAYS ACTIVE)
+
+```
+1. Hypothesis Generation (LLM v3 Prompt)
+   → MultiIndex code examples (unstack/stack pattern)
+   → Working code templates
+   → Volume warning (FX volume = 0 often)
+
+2. CoSTEER Code Validation
+   → Execute factor code
+   → Validate result.h5 output
+   → Retry with feedback (max 3 retries)
+
+3. Qlib Docker Backtest
+   → LightGBM training on factor
+   → Portfolio backtest (TopkDropoutStrategy)
+   → IC, Sharpe, Max DD, Win Rate calculation
+
+4. Results Storage
+   → results/factors/{name}.json (Code + Description + Metrics)
+   → results/db/backtest_results.db (SQLite)
+   → results/logs/ (Running logs)
+
+⚡ CONTINUE UNTIL 5000+ VALID FACTORS REACHED
+```
+
+### Phase 2: ML Model Training (Closed Source - Local Only)
+
+```
+5. Load Top 50 Factors (by IC ≥ 0.01)
+   → From results/factors/ with valid IC
+   → Extract factor values from workspaces
+
+6. Build Feature Matrix
+   → X = factor values (samples × factors)
+   → y = forward returns (96-bar shift)
+
+7. Train LightGBM Model
+   → Split: 80% train, 20% validate
+   → Early stopping (50 rounds)
+   → Feature importance analysis
+
+8. Model Validation
+   → IC (train vs valid)
+   → Sharpe-like metric
+   → Overfitting detection
+
+9. Save Model
+   → results/models/{name}/model.txt
+   → results/models/{name}/metadata.json
+```
+
+### Phase 3: Portfolio Optimization (Closed Source - Local Only)
+
+```
+10. Load Top 30 Factors
+    → Compute correlation matrix
+    → Select uncorrelated factors (max corr = 0.3)
+
+11. Optimize Weights
+    → Weight by absolute IC
+    → Normalize to sum = 1.0
+
+12. Backtest Portfolio
+    → Combined factor score = Σ(weight_i × factor_i)
+    → Calculate IC, Sharpe, Max DD, Win Rate
+
+13. Save Portfolio
+    → results/portfolios/{name}.json
+```
+
+### Phase 4: Strategy Generation (Closed Source - Local Only)
+
+```
+14. Generate Trading Rules
+    → Entry signals (factor thresholds)
+    → Exit signals (take profit, stop loss)
+    → Position sizing (Kelly criterion)
+
+15. Add Risk Management
+    → Max drawdown protection
+    → Cooldown periods after losses
+    → Stoploss cluster detection
+
+16. Save Strategy
+    → results/strategies/{name}.json
+```
+
+### Phase 5: Iterative Improvement (Closed Source - Local Only)
+
+```
+17. ML Feedback Loop
+    → Use model performance to guide factor generation
+    → Identify feature importance patterns
+    → Generate factors targeting weak areas
+
+18. Portfolio Feedback
+    → Use portfolio performance to refine weights
+    → Add new uncorrelated factors
+    → Remove degraded factors
+
+19. Loop Back to Phase 1
+    → Generate NEW factors with ML insights
+    → Retrain model with expanded factor set
+    → Continuous improvement cycle
+```
+
+---
+
+## 📊 CURRENT RESULTS (as of April 2026)
+
+### Factor Evaluation (1009 factors, FULL DATA 2020-2026)
+
+| Metric | Value |
+|--------|-------|
+| Total evaluated | 1,009 |
+| Successful | 337 (33%) |
+| Failed | 672 (67%) |
+| Best IC | **0.255** (daily_close_open_mom) |
+| Avg IC (valid) | 0.011 |
+| Best Sharpe | 1.71 (DCP) |
+
+### Top 10 Factors by IC
+
+| # | Factor | IC | Sharpe |
+|---|--------|-----|--------|
+| 1 | daily_close_open_mom | **0.255** | 0.007 |
+| 2 | daily_ret_log_1d | 0.255 | 0.003 |
+| 3 | daily_ret_close_1d | 0.255 | 0.005 |
+| 4 | daily_close_to_close_return | 0.255 | 0.005 |
+| 5 | daily_ret_vol_adj_1d | 0.235 | -0.007 |
+| 6 | daily_ols_slope_96 | 0.227 | 0.002 |
+| 7 | DCP | 0.199 | **1.71** |
+| 8 | DailyTrendStrength_Raw | 0.143 | -0.016 |
+| 9 | daily_c2c_return | 0.129 | 0.001 |
+| 10 | daily_momentum | 0.129 | -0.001 |
+
+### Failure Analysis (672 failed)
+
+| Error Type | Count | % | Cause |
+|------------|-------|-----|-------|
+| Code crashed | 540 | 80.4% | MultiIndex errors (FIXED in v3 prompt) |
+| All NaN values | 97 | 14.4% | Volume=0, rolling window too large |
+| Other errors | 28 | 4.2% | Various |
+| Timeout (120s) | 5 | 0.7% | Computationally expensive |
+| Too little overlap | 2 | 0.3% | Data mismatch |
+
+---
+
+## 💡 OPTIMIZATION POTENTIAL (HIGH-END UPGRADES)
+
+### 1. Code Quality Improvements
+- **Current**: 33% success rate
+- **Target**: 70%+ with v3 prompt (MultiIndex examples)
+- **Expected**: ~700 valid factors from 1009 generated
+
+### 2. ML Pipeline Enhancements
+- **Feature Selection**: Use SHAP values for importance
+- **Ensemble Models**: Combine LightGBM + XGBoost + Neural Net
+- **Cross-Validation**: Time-series split to prevent overfitting
+- **Hyperparameter Optimization**: Optuna for automatic tuning
+
+### 3. Portfolio Optimization
+- **Risk Parity**: Equal risk contribution instead of IC-weighted
+- **Black-Litterman**: Incorporate LLM views as priors
+- **Regime Detection**: Switch portfolios based on market state
+- **Dynamic Rebalancing**: Adjust weights based on rolling IC
+
+### 4. Strategy Generation
+- **Regime-Specific Rules**: Different signals for trending vs mean-reverting
+- **Multi-Timeframe**: Combine 1min, 5min, 15min signals
+- **Adaptive Thresholds**: Dynamic entry/exit based on volatility
+- **News Integration**: Avoid trading during high-impact news
+
+### 5. Execution Optimization
+- **Parallel Factor Generation**: 8+ workers instead of 4
+- **Smart Retry Logic**: Learn from failures, adjust prompts
+- **Early Stopping**: Skip factors that show promise in first 1000 bars
+- **Incremental Evaluation**: Evaluate factors as they're generated
+
+### 6. Risk Management
+- **VaR/ES**: Value at Risk and Expected Shortfall calculations
+- **Correlation Monitoring**: Track factor correlation drift
+- **Performance Attribution**: Understand which factors drive returns
+- **Stress Testing**: Test strategies on historical crises
+
+### 7. Infrastructure
+- **GPU Acceleration**: Use RTX 5060 Ti for LightGBM training
+- **Database Optimization**: Index queries for faster factor selection
+- **Caching Layer**: Cache expensive computations
+- **Monitoring Dashboard**: Real-time performance tracking
+
+---
