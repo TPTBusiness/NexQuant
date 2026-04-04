@@ -513,6 +513,14 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             db_path.mkdir(parents=True, exist_ok=True)
             db_file = db_path / "backtest_results.db"
 
+            # Parallel run isolation: use run-specific subdirectory if PARALLEL_RUN_ID is set
+            run_id = os.getenv("PARALLEL_RUN_ID", "0")
+            if run_id != "0":
+                # For parallel runs, save to isolated results directory
+                isolated_db_path = project_root / "results" / "runs" / f"run{run_id}" / "db"
+                isolated_db_path.mkdir(parents=True, exist_ok=True)
+                db_file = isolated_db_path / "backtest_results.db"
+
             # Save to database
             db = ResultsDatabase(db_path=str(db_file))
             run_id = db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
@@ -547,13 +555,20 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             Database run ID
         """
         import json
+        import os as _os
         from datetime import datetime
         from pathlib import Path
 
         try:
             # Ensure factors directory exists (5 levels up to project root)
             project_root = Path(__file__).parent.parent.parent.parent.parent
-            factors_dir = project_root / "results" / "factors"
+
+            # Parallel run isolation: use run-specific directory if PARALLEL_RUN_ID is set
+            parallel_run_id = _os.getenv("PARALLEL_RUN_ID", "0")
+            if parallel_run_id != "0":
+                factors_dir = project_root / "results" / "runs" / f"run{parallel_run_id}" / "factors"
+            else:
+                factors_dir = project_root / "results" / "factors"
             factors_dir.mkdir(parents=True, exist_ok=True)
 
             # Sanitize factor name for filename
@@ -777,7 +792,13 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         # Write to results/logs/
         try:
             project_root = Path(__file__).parent.parent.parent.parent.parent
-            log_dir = project_root / "results" / "logs"
+
+            # Parallel run isolation: use run-specific log directory if PARALLEL_RUN_ID is set
+            parallel_run_id = os.getenv("PARALLEL_RUN_ID", "0")
+            if parallel_run_id != "0":
+                log_dir = project_root / "results" / "runs" / f"run{parallel_run_id}" / "logs"
+            else:
+                log_dir = project_root / "results" / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
 
             # One file per day
@@ -798,5 +819,15 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         """Ensure all results directories exist."""
         from pathlib import Path
         project_root = Path(__file__).parent.parent.parent.parent.parent
-        for subdir in ["results/runs", "results/factors", "results/logs", "results/backtests", "results/db"]:
-            (project_root / subdir).mkdir(parents=True, exist_ok=True)
+
+        # Parallel run isolation: create run-specific directories if PARALLEL_RUN_ID is set
+        parallel_run_id = os.getenv("PARALLEL_RUN_ID", "0")
+        if parallel_run_id != "0":
+            # Isolated run directories
+            run_base = project_root / "results" / "runs" / f"run{parallel_run_id}"
+            for subdir in ["factors", "logs", "db"]:
+                (run_base / subdir).mkdir(parents=True, exist_ok=True)
+        else:
+            # Standard shared directories
+            for subdir in ["results/runs", "results/factors", "results/logs", "results/backtests", "results/db"]:
+                (project_root / subdir).mkdir(parents=True, exist_ok=True)

@@ -12,8 +12,8 @@ class CoSTEERSettings(ExtendedBaseSettings):
     coder_use_cache: bool = False
     """Indicates whether to use cache for the coder"""
 
-    max_loop: int = 10
-    """Maximum number of task implementation loops"""
+    max_loop: int = 3
+    """Maximum number of task implementation loops (reduced from 10 for faster iterations)"""
 
     fail_task_trial_limit: int = 20
 
