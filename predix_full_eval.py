@@ -335,6 +335,10 @@ def run_evaluation(
 
                 n_success = sum(1 for r in results if r.status == "success")
                 n_fail = sum(1 for r in results if r.status == "failed")
+
+                # Save immediately after each factor
+                save_single_result(result)
+
                 progress.update(
                     task,
                     advance=1,
@@ -349,6 +353,15 @@ def run_evaluation(
 # ---------------------------------------------------------------------------
 FACTORS_DIR = RESULTS_DIR / "factors"
 FACTORS_DIR.mkdir(parents=True, exist_ok=True)
+
+def save_single_result(r: EvalResult) -> None:
+    """Save a single factor result to results/factors/."""
+    if r.status != "success":
+        return
+    safe_name = r.factor_name.replace("/", "_").replace("\\", "_").replace(" ", "_")[:100]
+    json_path = FACTORS_DIR / f"{safe_name}.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(r.to_dict(), f, indent=2, default=str)
 
 def save_results(results: List[EvalResult]) -> None:
     """Save evaluation results to JSON and SQLite."""
