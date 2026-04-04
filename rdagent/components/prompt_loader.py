@@ -39,8 +39,8 @@ def get_local_prompt_path(name: str) -> Optional[Path]:
     if not LOCAL_PROMPTS_DIR.exists():
         return None
     
-    # Try versioned files first (v2, v1, etc.)
-    for version in ["v2", "v1"]:
+    # Try versioned files first (v3, v2, v1, etc.)
+    for version in ["v3", "v2", "v1"]:
         for ext in ["yaml", "yml"]:
             path = LOCAL_PROMPTS_DIR / f"{name}_{version}.{ext}"
             if path.exists():
