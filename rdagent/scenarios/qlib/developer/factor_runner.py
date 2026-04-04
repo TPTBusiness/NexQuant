@@ -530,8 +530,16 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 f"(IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}, run_id={run_id})"
             )
 
+            # Extract factor code and description from experiment
+            factor_code, factor_description = self._extract_factor_info(exp)
+
             # Also write a JSON summary to results/factors/ for file-based access
-            self._save_factor_json(factor_name, metrics, run_id)
+            self._save_factor_json(
+                factor_name, metrics, run_id,
+                factor_code=factor_code,
+                factor_description=factor_description,
+                exp=exp
+            )
 
             db.close()
 
@@ -542,7 +550,9 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 f"Traceback: {traceback.format_exc()}"
             )
 
-    def _save_factor_json(self, factor_name: str, metrics: dict, run_id: int) -> None:
+    def _save_factor_json(self, factor_name: str, metrics: dict, run_id: int,
+                          factor_code: str = "", factor_description: str = "",
+                          exp=None) -> None:
         """
         Save factor metrics as a JSON file for easy file-based access.
 
@@ -554,6 +564,12 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             Extracted metrics dictionary
         run_id : int
             Database run ID
+        factor_code : str, optional
+            Full factor implementation code
+        factor_description : str, optional
+            Factor description from docstring or comments
+        exp : Experiment, optional
+            The experiment object for extracting additional metadata
         """
         import json
         import os as _os
@@ -580,9 +596,11 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
             json_path = factors_dir / f"{safe_name}.json"
 
-            # Build summary document
+            # Build summary document with code and description
             factor_summary = {
                 "factor_name": factor_name,
+                "factor_code": factor_code,
+                "factor_description": factor_description,
                 "run_id": run_id,
                 "saved_at": datetime.now().isoformat(),
                 "metrics": {
@@ -605,6 +623,51 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
         except Exception as e:
             logger.warning(f"Failed to save factor JSON for '{factor_name}': {e}")
+
+    def _extract_factor_info(self, exp) -> tuple:
+        """
+        Extract factor code and description from experiment.
+
+        Parameters
+        ----------
+        exp : QlibFactorExperiment
+            The experiment with generated factor code
+
+        Returns
+        -------
+        tuple
+            (factor_code, factor_description)
+        """
+        import re
+
+        factor_code = ""
+        factor_description = "No description available"
+
+        # Try to extract from sub_workspace_list
+        if hasattr(exp, "sub_workspace_list") and exp.sub_workspace_list:
+            for ws in exp.sub_workspace_list:
+                if hasattr(ws, "file_dict") and "factor.py" in ws.file_dict:
+                    factor_code = ws.file_dict["factor.py"]
+                    break
+
+        # Extract description from code
+        if factor_code:
+            # Try docstring
+            match = re.search(r'"""(.*?)"""', factor_code, re.DOTALL)
+            if match:
+                factor_description = match.group(1).strip()[:500]
+            else:
+                # Try comments
+                lines = factor_code.split('\n')
+                desc_lines = []
+                for line in lines[:20]:
+                    stripped = line.strip()
+                    if stripped.startswith('#') and not stripped.startswith('#!'):
+                        desc_lines.append(stripped[1:].strip())
+                if desc_lines:
+                    factor_description = ' '.join(desc_lines)[:500]
+
+        return factor_code, factor_description
 
     def _log_result_warnings(self, factor_name: str, result, metrics: dict) -> None:
         """
