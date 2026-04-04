@@ -10,7 +10,7 @@ NOTE: **key is always "data" for all hdf5 files **.
 
 | Filename       | Description                                                      |
 | -------------- | -----------------------------------------------------------------|
-| "daily_pv.h5"  | EURUSD 1-minute price and volume data (2020-2026).               |
+| "intraday_pv.h5"  | EURUSD 1-minute OHLCV intraday data (2020-2026).               |
 
 
 # For different data, We have some basic knowledge for them

@@ -1,11 +1,19 @@
 from pathlib import Path
+"""
+Qlib Factor Runner - Executes factor backtests in Docker.
+
+NOTE: The @cache_with_pickle decorator was REMOVED from develop() because:
+- Backtests should ALWAYS run fresh — caching causes stale results
+- Each hypothesis may have different code even with same task info
+- Docker-level caching (QlibDockerConf.enable_cache=False) is sufficient
+- The pickle cache caused 240+ factor generations but ZERO Docker backtests
+"""
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 from pandarallel import pandarallel
 
-from rdagent.core.conf import RD_AGENT_SETTINGS
-from rdagent.core.utils import cache_with_pickle
 
 pandarallel.initialize(verbose=1)
 
@@ -61,12 +69,17 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         IC_max = IC_max.unstack().max(axis=0)
         return new_feature.iloc[:, IC_max[IC_max < 0.99].index]
 
-    @cache_with_pickle(CachedRunner.get_cache_key, CachedRunner.assign_cached_result)
     def develop(self, exp: QlibFactorExperiment) -> QlibFactorExperiment:
         """
         Generate the experiment by processing and combining factor data,
         then passing the combined data to Docker for backtest results.
+
+        NOTE: @cache_with_pickle decorator was REMOVED. Every experiment
+        triggers a fresh Docker backtest — no cached results are used.
         """
+        # Ensure all results directories exist
+        self._ensure_results_dirs()
+
         if exp.based_experiments and exp.based_experiments[-1].result is None:
             logger.info(f"Baseline experiment execution ...")
             exp.based_experiments[-1] = self.develop(exp.based_experiments[-1])
@@ -227,6 +240,9 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             self._save_result_to_database(exp, result)
         except Exception as e:
             logger.warning(f"Failed to save results to database: {e}")
+
+        # Always write a log entry for every run (success or failure)
+        self._write_run_log(exp, result)
 
         return exp
 
@@ -688,3 +704,99 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             # Mark factor as rejected by protection
             exp.rejected_by_protection = True
             exp.protection_reason = protection_result.reason
+
+    def _write_run_log(self, exp, result) -> None:
+        """
+        Write a log entry for EVERY run (success or failure) to results/logs/.
+
+        This ensures we have a record of every factor attempt, even if it failed
+        validation or had no valid metrics.
+
+        Parameters
+        ----------
+        exp : QlibFactorExperiment
+            The experiment object
+        result : pd.Series or dict or None
+            Backtest result (can be None if execution failed)
+        """
+        import json
+        from datetime import datetime
+        from pathlib import Path
+
+        factor_name = "unknown"
+        if hasattr(exp, 'hypothesis') and exp.hypothesis is not None:
+            factor_name = getattr(exp.hypothesis, 'hypothesis', 'unknown')
+
+        # Build log entry
+        log_entry = {
+            "factor_name": factor_name,
+            "timestamp": datetime.now().isoformat(),
+            "status": "unknown",
+            "ic": None,
+            "sharpe": None,
+            "annualized_return": None,
+            "max_drawdown": None,
+            "win_rate": None,
+            "rejected_by_protection": getattr(exp, 'rejected_by_protection', False),
+            "protection_reason": getattr(exp, 'protection_reason', None),
+        }
+
+        # Extract metrics if available
+        if result is not None:
+            if hasattr(result, 'get'):  # pd.Series or dict
+                ic_val = result.get('IC', result.get('ic', None))
+                log_entry['ic'] = self._safe_float(ic_val) if ic_val is not None else None
+
+                sharpe_val = result.get('1day.excess_return_with_cost.shar',
+                                        result.get('1day.excess_return_with_cost.sharpe',
+                                        result.get('sharpe', None)))
+                log_entry['sharpe'] = self._safe_float(sharpe_val) if sharpe_val is not None else None
+
+                ann_ret = result.get('1day.excess_return_with_cost.annualized_return',
+                                     result.get('annualized_return', None))
+                log_entry['annualized_return'] = self._safe_float(ann_ret) if ann_ret is not None else None
+
+                mdd = result.get('1day.excess_return_with_cost.max_drawdown',
+                                 result.get('max_drawdown', None))
+                log_entry['max_drawdown'] = self._safe_float(mdd) if mdd is not None else None
+
+                wr = result.get('win_rate', None)
+                log_entry['win_rate'] = self._safe_float(wr) if wr is not None else None
+
+            # Determine status
+            if log_entry['ic'] is not None or log_entry['sharpe'] is not None:
+                log_entry['status'] = "success"
+            elif getattr(exp, 'rejected_by_protection', False):
+                log_entry['status'] = "rejected_protection"
+            else:
+                log_entry['status'] = "no_valid_metrics"
+        else:
+            log_entry['status'] = "execution_failed"
+            log_entry['reason'] = "Result was None"
+
+        # Write to results/logs/
+        try:
+            project_root = Path(__file__).parent.parent.parent.parent.parent
+            log_dir = project_root / "results" / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+
+            # One file per day
+            today = datetime.now().strftime("%Y-%m-%d")
+            log_file = log_dir / f"factor_runs_{today}.jsonl"
+
+            with open(log_file, "a") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+            logger.info(
+                f"Run log written for '{factor_name[:50]}': "
+                f"status={log_entry['status']}, IC={log_entry['ic']}, Sharpe={log_entry['sharpe']}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to write run log: {e}")
+
+    def _ensure_results_dirs(self) -> None:
+        """Ensure all results directories exist."""
+        from pathlib import Path
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+        for subdir in ["results/runs", "results/factors", "results/logs", "results/backtests", "results/db"]:
+            (project_root / subdir).mkdir(parents=True, exist_ok=True)
