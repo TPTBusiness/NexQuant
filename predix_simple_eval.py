@@ -14,7 +14,8 @@ import json
 import os
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+import warnings
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -238,7 +239,7 @@ def run_evaluation(
     workspaces: List[FactorWorkspace],
     n_workers: int = 4,
 ) -> List[EvalResult]:
-    """Run factor evaluation in parallel."""
+    """Run factor evaluation in parallel using threads."""
     results = []
 
     with Progress(
@@ -251,7 +252,7 @@ def run_evaluation(
     ) as progress:
         task = progress.add_task(f"Evaluating {len(workspaces)} factors...", total=len(workspaces))
 
-        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        with ThreadPoolExecutor(max_workers=n_workers) as executor:
             futures = {executor.submit(evaluate_factor, ws): ws for ws in workspaces}
 
             for future in as_completed(futures):
