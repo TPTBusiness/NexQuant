@@ -102,3 +102,4 @@ test_credentials.py
 
 # Closed source local components
 rdagent/scenarios/qlib/local/
+docs/COMPLETE_WORKFLOW.md
