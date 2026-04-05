@@ -788,6 +788,274 @@ def portfolio_simple(
 
 
 @app.command()
+def build_strategies(
+    top: int = typer.Option(
+        50,
+        "--top", "-n",
+        help="Number of top factors to consider (default: 50)",
+    ),
+    max_combo: int = typer.Option(
+        2,
+        "--max-combo", "-c",
+        help="Maximum combination size: 2=pairs, 3=triplets (default: 2)",
+    ),
+    diversified: bool = typer.Option(
+        False,
+        "--diversified/-d",
+        help="Only generate cross-category combinations",
+    ),
+):
+    """
+    Build trading strategies by systematically combining factors.
+
+    This command:
+    1. Loads top evaluated factors
+    2. Generates systematic combinations (pairs, triplets)
+    3. Evaluates each combination using walk-forward validation
+    4. Ranks by Sharpe ratio and saves best strategies
+
+    Examples:
+        predix build-strategies                   # Build from top 50, pairs only
+        predix build-strategies -n 100 -c 3       # Top 100, up to triplets
+        predix build-strategies -d                # Diversified only
+    """
+    import pandas as pd
+    import numpy as np
+    from rich.table import Table
+    from rich.panel import Panel
+
+    from rdagent.scenarios.qlib.developer.strategy_builder import StrategyBuilder
+
+    console.print(Panel(
+        "[bold cyan]🏗️  Predix Strategy Builder[/bold cyan]\n"
+        "Systematically combining factors into trading strategies",
+        border_style="cyan",
+    ))
+
+    builder = StrategyBuilder()
+
+    try:
+        results = builder.build_strategies(
+            top_n=top,
+            max_combo_size=max_combo,
+            diversified_only=diversified,
+        )
+    except Exception as e:
+        console.print(f"[bold red]Strategy building failed: {e}[/bold red]")
+        import traceback
+        console.print(traceback.format_exc())
+        return
+
+    if not results:
+        console.print("[yellow]No strategies built. Check if factor values exist.[/yellow]")
+        return
+
+    # Display top strategies
+    successful = [r for r in results if r.get("status") == "success"]
+
+    if successful:
+        table = Table(
+            title=f"Top {min(20, len(successful))} Strategies by Sharpe",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("#", justify="center", width=4)
+        table.add_column("Factors", width=50)
+        table.add_column("Sharpe", justify="right", width=8)
+        table.add_column("Ann. Ret %", justify="right", width=10)
+        table.add_column("Max DD", justify="right", width=8)
+        table.add_column("Win Rate", justify="right", width=8)
+
+        for i, strat in enumerate(successful[:20], 1):
+            factors_str = " + ".join(strat["factors"][:3])
+            if len(strat["factors"]) > 3:
+                factors_str += f" +{len(strat['factors'])-3}"
+
+            table.add_row(
+                str(i),
+                factors_str,
+                f"{strat.get('sharpe', 0):.4f}",
+                f"{strat.get('annualized_return', 0):.4f}",
+                f"{strat.get('max_drawdown', 0):.4f}",
+                f"{strat.get('win_rate', 0):.2%}",
+            )
+
+        console.print(table)
+
+        # Summary
+        avg_sharpe = np.mean([s.get("sharpe", 0) for s in successful])
+        best_sharpe = max(s.get("sharpe", 0) for s in successful)
+        avg_dd = np.mean([s.get("max_drawdown", 0) for s in successful])
+
+        console.print(Panel(
+            f"[bold]Strategy Building Summary[/bold]\n"
+            f"Total combinations: {len(results)}\n"
+            f"Successful: {len(successful)}\n"
+            f"Failed: {len(results) - len(successful)}\n"
+            f"Avg Sharpe: {avg_sharpe:.4f}\n"
+            f"Best Sharpe: {best_sharpe:.4f}\n"
+            f"Avg Max DD: {avg_dd:.4f}\n"
+            f"Saved to: results/strategies/",
+            border_style="green",
+        ))
+    else:
+        console.print("[yellow]No successful strategies. Check factor values exist.[/yellow]")
+
+
+@app.command()
+def build_strategies_ai(
+    top: int = typer.Option(
+        50,
+        "--top", "-t",
+        help="Number of top factors to use (default: 50)",
+    ),
+    max_loops: int = typer.Option(
+        5,
+        "--max-loops", "-l",
+        help="Maximum improvement cycles (default: 5)",
+    ),
+    min_sharpe: float = typer.Option(
+        1.5,
+        "--min-sharpe",
+        help="Minimum Sharpe ratio for acceptance (default: 1.5)",
+    ),
+    max_drawdown: float = typer.Option(
+        -0.20,
+        "--max-dd",
+        help="Maximum acceptable drawdown (default: -0.20)",
+    ),
+):
+    """
+    Build trading strategies using AI (LLM-based StrategyCoSTEER).
+
+    Uses LLM to generate, test, and improve trading strategies from
+    existing factors. Follows the CoSTEER pattern:
+    1. Load top factors by IC
+    2. LLM generates strategy hypothesis and code
+    3. Execute backtest and evaluate
+    4. Feed results back to LLM for improvement
+    5. Repeat until convergence or max loops
+
+    Examples:
+        predix build-strategies-ai           # Default: top 50, 5 loops
+        predix build-strategies-ai -t 100    # Use top 100 factors
+        predix build-strategies-ai -l 10     # 10 improvement loops
+        predix build-strategies-ai --min-sharpe 2.0  # Stricter target
+    """
+    from rich.panel import Panel
+    from pathlib import Path
+
+    console.print(Panel(
+        "[bold cyan]🧠 StrategyCoSTEER - AI Strategy Builder[/bold cyan]\n"
+        "Generating trading strategies from existing factors\n"
+        "Uses LLM to combine factors, backtest, and improve",
+        border_style="cyan",
+    ))
+
+    # Check if local module exists
+    local_module = Path(__file__).parent / "rdagent" / "scenarios" / "qlib" / "local"
+    if not local_module.exists():
+        console.print("[bold red]❌ StrategyCoSTEER not available: local/ directory not found[/bold red]")
+        console.print("[yellow]This is a closed-source feature. Contact development team.[/yellow]")
+        return
+
+    costeer_file = local_module / "strategy_coster.py"
+    if not costeer_file.exists():
+        console.print("[bold red]❌ strategy_coster.py not found[/bold red]")
+        return
+
+    # Load top factors
+    factors_dir = Path(__file__).parent / "results" / "factors"
+    if not factors_dir.exists():
+        console.print("[bold red]❌ No factors directory found at results/factors/[/bold red]")
+        console.print("[yellow]Run 'predix quant' to generate factors first.[/yellow]")
+        return
+
+    # Load evaluated factors
+    import json
+    import glob as glob_module
+
+    factors = []
+    for f in glob_module.glob(str(factors_dir / "*.json")):
+        try:
+            with open(f) as fh:
+                data = json.load(fh)
+            if data.get("status") == "success" and data.get("ic") is not None:
+                factors.append(data)
+        except Exception:
+            continue
+
+    if len(factors) < 10:
+        console.print(f"[bold red]❌ Only {len(factors)} evaluated factors found. Need at least 10.[/bold red]")
+        console.print("[yellow]Run 'predix evaluate' or 'predix quant' to generate more factors.[/yellow]")
+        return
+
+    # Sort by IC and take top factors
+    factors.sort(key=lambda x: abs(x.get("ic", 0) or 0), reverse=True)
+    top_factors = factors[:top]
+
+    console.print(f"\n[bold green]✓ Loaded {len(top_factors)} top factors[/bold green]")
+    console.print(f"   Max loops: {max_loops}")
+    console.print(f"   Target Sharpe: ≥ {min_sharpe}")
+    console.print(f"   Max Drawdown: ≥ {max_drawdown:.2%}\n")
+
+    # Run StrategyCoSTEER
+    try:
+        from rdagent.scenarios.qlib.local.strategy_coster import StrategyCoSTEER
+
+        strategies_dir = Path(__file__).parent / "results" / "strategies"
+        strategies_dir.mkdir(parents=True, exist_ok=True)
+
+        costeer = StrategyCoSTEER(
+            factors_dir=str(factors_dir),
+            strategies_dir=str(strategies_dir),
+            max_loops=max_loops,
+            min_sharpe=min_sharpe,
+            max_drawdown=max_drawdown,
+        )
+
+        results = costeer.run(top_factors)
+
+        # Display results
+        if results:
+            console.print(f"\n[bold green]✓ Generated {len(results)} accepted strategies![/bold green]\n")
+
+            from rich.table import Table
+            table = Table(title="Accepted Strategies")
+            table.add_column("#", style="dim")
+            table.add_column("Strategy", style="cyan")
+            table.add_column("Factors", style="yellow")
+            table.add_column("Sharpe", justify="right", style="green")
+            table.add_column("Max DD", justify="right", style="red")
+            table.add_column("Win Rate", justify="right")
+            table.add_column("Loop", justify="center")
+
+            for i, r in enumerate(results, 1):
+                table.add_row(
+                    str(i),
+                    r.get("strategy_name", "unknown")[:30],
+                    str(len(r.get("factor_names", []))),
+                    f"{r.get('sharpe_ratio', 0):.3f}",
+                    f"{r.get('max_drawdown', 0):.2%}",
+                    f"{r.get('win_rate', 0):.2%}",
+                    str(r.get("loop", "?")),
+                )
+
+            console.print(table)
+            console.print(f"\n[dim]Strategies saved to: {strategies_dir}/[/dim]")
+        else:
+            console.print("[yellow]No strategies met acceptance criteria.[/yellow]")
+            console.print("[dim]Check factor values in results/factors/values/[/dim]")
+
+    except ImportError as e:
+        console.print(f"[bold red]❌ Import failed: {e}[/bold red]")
+    except Exception as e:
+        console.print(f"[bold red]❌ Strategy building failed: {e}[/bold red]")
+        import traceback
+        console.print(traceback.format_exc())
+
+
+@app.command()
 def health():
     """Check system health and configuration."""
     from rdagent.app.utils.health_check import health_check
