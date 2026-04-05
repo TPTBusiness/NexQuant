@@ -231,6 +231,8 @@ def evaluate(
         predix evaluate --force --top 50  # Re-evaluate 50 factors
         predix evaluate -p 8              # Use 8 parallel workers
     """
+    from rich.panel import Panel
+
     console.print(Panel(
         "[bold cyan]📊 Predix Factor Evaluator[/bold cyan]\n"
         "Evaluating factors with FULL 1min data (2020-2026)\n"
