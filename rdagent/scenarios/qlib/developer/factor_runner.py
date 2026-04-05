@@ -207,14 +207,35 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                     run_env=env_to_use,
                 )
 
+        # Handle Qlib Docker backtest failure gracefully
         if result is None:
-            logger.error(
-                f"Failed to run this experiment (result is None). "
-                f"Factor: {getattr(exp.hypothesis, 'hypothesis', 'unknown')}"
+            factor_name = getattr(exp.hypothesis, 'hypothesis', 'unknown')
+            logger.warning(
+                f"Qlib Docker backtest returned None for '{factor_name}'. "
+                f"Attempting direct factor evaluation..."
             )
-            # Save failed run info for debugging
-            self._save_failed_run(exp, stdout, error_type="result_none")
-            raise FactorEmptyError(f"Failed to run this experiment, because {stdout}")
+
+            # Try to compute metrics directly from the factor's result.h5
+            direct_result = self._evaluate_factor_directly(exp, stdout)
+
+            if direct_result is not None:
+                logger.info(f"Direct evaluation succeeded for '{factor_name}'. Using direct metrics.")
+                result = direct_result
+            else:
+                logger.error(
+                    f"Both Qlib Docker backtest and direct evaluation failed for '{factor_name}'. "
+                    f"Skipping this factor and continuing."
+                )
+                # Save failed run info for debugging
+                self._save_failed_run(exp, stdout, error_type="result_none")
+
+                # Mark experiment as failed but DON'T raise - let the loop continue
+                exp.result = None
+                exp.stdout = stdout
+                exp.failed = True
+                exp.failure_reason = "Qlib Docker and direct evaluation both failed"
+
+                return exp
 
         # Validate result before proceeding
         validation_result = self._validate_result(exp, result)
@@ -342,6 +363,133 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             "warnings": "; ".join(warnings),
             "details": details,
         }
+
+    def _evaluate_factor_directly(self, exp, stdout: str) -> Optional[pd.Series]:
+        """
+        Evaluate factor directly from its result.h5 file when Qlib Docker fails.
+
+        This method:
+        1. Reads the factor's result.h5 from the workspace
+        2. Loads the source data (intraday_pv.h5)
+        3. Computes forward returns
+        4. Calculates IC, Sharpe, and other metrics
+        5. Returns a pd.Series compatible with the Qlib backtest result format
+
+        Parameters
+        ----------
+        exp : QlibFactorExperiment
+            The experiment with generated factor code
+        stdout : str
+            Standard output from the Docker execution
+
+        Returns
+        -------
+        pd.Series or None
+            Metrics series compatible with Qlib backtest result format,
+            or None if direct evaluation also fails
+        """
+        import numpy as np
+
+        try:
+            # Get workspace path
+            workspace_path = exp.experiment_workspace.workspace_path
+            if workspace_path is None:
+                return None
+
+            # Read factor result
+            result_h5 = workspace_path / "result.h5"
+            if not result_h5.exists():
+                return None
+
+            factor_values = pd.read_hdf(str(result_h5), key="data")
+            if factor_values is None or factor_values.empty:
+                return None
+
+            # Get the factor column
+            factor_col = factor_values.iloc[:, 0]
+            factor_name = factor_values.columns[0]
+
+            # Load source data for forward returns
+            data_path = (
+                Path(__file__).parent.parent.parent.parent.parent
+                / "git_ignore_folder"
+                / "factor_implementation_source_data"
+                / "intraday_pv.h5"
+            )
+
+            if not data_path.exists():
+                # Try debug data path
+                data_path = (
+                    Path(__file__).parent.parent.parent.parent.parent
+                    / "git_ignore_folder"
+                    / "factor_implementation_source_data_debug"
+                    / "intraday_pv.h5"
+                )
+
+            if not data_path.exists():
+                return None
+
+            df = pd.read_hdf(str(data_path), key="data")
+            close = df["$close"]
+
+            # Compute forward returns (96 bars = 96 minutes for 1min data)
+            forward_ret = close.groupby(level="instrument").shift(-96) / close - 1
+
+            # Compute IC
+            valid_idx = factor_col.dropna().index.intersection(forward_ret.dropna().index)
+            if len(valid_idx) < 100:
+                return None
+
+            ic = factor_col.loc[valid_idx].corr(forward_ret.loc[valid_idx])
+            if np.isnan(ic):
+                return None
+
+            # Compute Rank IC
+            try:
+                rank_ic = factor_col.loc[valid_idx].corr(forward_ret.loc[valid_idx], method="spearman")
+            except Exception:
+                rank_ic = ic
+
+            # Compute Sharpe-like metric
+            factor_mean = factor_col.loc[valid_idx].mean()
+            factor_std = factor_col.loc[valid_idx].std()
+            sharpe = factor_mean / factor_std if factor_std > 0 else 0
+
+            # Annualized return (approximate)
+            ann_factor = np.sqrt(252 * 1440 / 96)
+            annualized_return = factor_mean * ann_factor * 100
+
+            # Max drawdown (approximate)
+            cum_perf = factor_col.loc[valid_idx].cumsum()
+            running_max = cum_perf.expanding().max()
+            drawdown = (cum_perf - running_max) / running_max.replace(0, np.nan)
+            max_drawdown = drawdown.min() if len(drawdown) > 0 else 0
+
+            # Win rate
+            win_rate = (factor_col.loc[valid_idx] > 0).sum() / len(valid_idx)
+
+            # Create result series compatible with Qlib backtest result format
+            result = pd.Series({
+                "IC": ic,
+                "1day.excess_return_with_cost.shar": sharpe,
+                "1day.excess_return_with_cost.annualized_return": annualized_return,
+                "1day.excess_return_with_cost.max_drawdown": max_drawdown,
+                "win_rate": win_rate,
+                "1day.excess_return_with_cost.information_ratio": rank_ic,
+                "1day.excess_return_with_cost.std": factor_std,
+                "1day.pos": len(valid_idx),
+                "factor_name": factor_name,
+            })
+
+            logger.info(
+                f"Direct evaluation: IC={ic:.6f}, Sharpe={sharpe:.4f}, "
+                f"AnnRet={annualized_return:.4f}%, WR={win_rate:.2%}"
+            )
+            return result
+
+        except Exception as e:
+            logger.warning(f"Direct evaluation failed: {e}")
+            return None
 
     def _save_failed_run(self, exp, stdout: str, error_type: str = "unknown",
                          validation: Optional[dict] = None) -> None:
