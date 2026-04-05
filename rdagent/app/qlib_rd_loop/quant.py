@@ -189,6 +189,18 @@ class QuantRDLoop(RDLoop):
             if exp is None:
                 logger.error(f"Factor extraction failed.")
                 raise FactorEmptyError("Factor extraction failed.")
+
+            # Handle failed experiments gracefully (don't break the loop)
+            if getattr(exp, "failed", False):
+                reason = getattr(exp, "failure_reason", "unknown")
+                factor_name = "unknown"
+                if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
+                    factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
+                logger.warning(
+                    f"Factor '{factor_name}' failed evaluation: {reason}. "
+                    f"Continuing with next factor."
+                )
+                # Return exp anyway - loop will continue
         elif prev_out["direct_exp_gen"]["propose"].action == "model":
             exp = self.model_runner.develop(prev_out["coding"])
         logger.log_object(exp, tag="runner result")
