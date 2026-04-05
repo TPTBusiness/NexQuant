@@ -169,6 +169,21 @@ def list_available_prompts() -> Dict[str, list]:
     return result
 
 
+def get_strategy_discovery_prompt() -> Dict[str, str]:
+    """Load strategy discovery prompts from local/strategy_discovery_v1.yaml."""
+    return load_prompt("strategy_discovery")
+
+
+def get_strategy_evaluation_prompt() -> Dict[str, str]:
+    """Load strategy evaluation prompts."""
+    return load_prompt("strategy_evaluation")
+
+
+def get_strategy_improvement_prompt() -> Dict[str, str]:
+    """Load strategy improvement prompts."""
+    return load_prompt("strategy_improvement")
+
+
 # Convenience functions for specific prompts
 def get_factor_discovery_prompt() -> Dict[str, str]:
     """Get factor discovery prompt (system + user)."""
@@ -187,7 +202,17 @@ def get_model_coder_prompt() -> Dict[str, str]:
 
 def get_trading_strategy_prompt() -> Dict[str, str]:
     """Get trading strategy prompt."""
-    return load_prompt("trading_strategy")
+    return load_prompt("strategy_discovery")
+
+
+def get_strategy_evaluation_prompt() -> Dict[str, str]:
+    """Get strategy evaluation prompt."""
+    return load_prompt("strategy_discovery", section="strategy_evaluation")
+
+
+def get_strategy_improvement_prompt() -> Dict[str, str]:
+    """Get strategy improvement prompt."""
+    return load_prompt("strategy_discovery", section="strategy_improvement")
 
 
 # Test function
