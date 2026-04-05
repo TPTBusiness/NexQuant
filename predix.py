@@ -365,6 +365,293 @@ def top(
 
 
 @app.command()
+def portfolio(
+    top: int = typer.Option(
+        50,
+        "--top", "-n",
+        help="Number of candidate factors to consider (default: 50)",
+    ),
+    target: int = typer.Option(
+        10,
+        "--target", "-t",
+        help="Number of factors to select (default: 10)",
+    ),
+    max_corr: float = typer.Option(
+        0.3,
+        "--max-corr", "-c",
+        help="Maximum allowed correlation between factors (default: 0.3)",
+    ),
+):
+    """
+    Select a diversified portfolio of uncorrelated factors.
+
+    Analyzes the top factors by IC and selects a subset that are
+    not highly correlated, reducing redundancy.
+
+    Examples:
+        predix portfolio                   # Select top 10 from top 50
+        predix portfolio -n 100 -t 20      # Select top 20 from top 100
+        predix portfolio -c 0.5            # Allow higher correlation
+    """
+    import json
+    import glob as glob_module
+    import subprocess
+    import tempfile
+    import shutil
+    import numpy as np
+    import pandas as pd
+    from rich.table import Table
+    from rich.panel import Panel
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
+
+    factors_dir = Path(__file__).parent / "results" / "factors"
+    if not factors_dir.exists():
+        console.print("[red]No results found in results/factors/[/red]")
+        return
+
+    # 1. Load top factors by IC
+    results = []
+    for f in glob_module.glob(str(factors_dir / "*.json")):
+        try:
+            with open(f) as fh:
+                data = json.load(fh)
+            if data.get("status") == "success" and data.get("ic") is not None:
+                results.append(data)
+        except Exception:
+            continue
+
+    if not results:
+        console.print("[red]No evaluated factors found with valid IC[/red]")
+        return
+
+    # Sort and select candidates
+    results.sort(key=lambda x: abs(x.get("ic", 0) or 0), reverse=True)
+    candidates = results[:top]
+
+    console.print(f"Loaded {len(results)} factors. Selecting top {top} candidates...")
+
+    # 2. Evaluate candidates to get time-series values for correlation
+    # We need to run the factor code to get the series of values.
+    # We do this sequentially to avoid OOM.
+    
+    # Locate data file
+    data_file = Path(__file__).parent / "git_ignore_folder" / "factor_implementation_source_data" / "intraday_pv.h5"
+    if not data_file.exists():
+        data_file = Path(__file__).parent / "git_ignore_folder" / "factor_implementation_source_data_debug" / "intraday_pv.h5"
+    
+    if not data_file.exists():
+        console.print("[red]Source data file (intraday_pv.h5) not found.[/red]")
+        return
+
+    factor_series = {} # name -> pd.Series
+    errors = []
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task(f"Computing values for {len(candidates)} factors...", total=len(candidates))
+        
+        for cand in candidates:
+            fname = cand.get("factor_name", "unknown")
+            fcode = cand.get("factor_code", "")
+            
+            if not fcode:
+                errors.append((fname, "No code in JSON"))
+                progress.advance(task)
+                continue
+
+            # Create temp workspace
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                # Symlink data
+                try:
+                    os.symlink(str(data_file), str(tmp_path / "intraday_pv.h5"))
+                except OSError:
+                    # If symlink fails, copy the file
+                    import shutil
+                    shutil.copy(str(data_file), str(tmp_path / "intraday_pv.h5"))
+                
+                # Write code
+                (tmp_path / "factor.py").write_text(fcode)
+                
+                try:
+                    # Run factor
+                    result = subprocess.run(
+                        [sys.executable, "factor.py"],
+                        cwd=tmp_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=120 # 2 min timeout per factor
+                    )
+                    
+                    # Read result
+                    res_file = tmp_path / "result.h5"
+                    if res_file.exists():
+                        df = pd.read_hdf(str(res_file), key="data")
+                        # Get the series (first column)
+                        series = df.iloc[:, 0]
+                        
+                        # Count non-NaN values
+                        non_nan = series.count()
+                        if non_nan < 1000:
+                            errors.append((fname, f"Only {non_nan} valid values"))
+                            progress.update(task, description=f"{fname}: {non_nan} values ⚠️")
+                        else:
+                            factor_series[fname] = series
+                            progress.update(task, description=f"Computed {fname} ✅ ({non_nan} values)")
+                    else:
+                        # Check stderr for errors
+                        stderr = result.stderr[:200] if result.stderr else "Unknown"
+                        errors.append((fname, f"No result.h5. Error: {stderr}"))
+                        progress.update(task, description=f"{fname} ❌ (No result)")
+                except subprocess.TimeoutExpired:
+                    errors.append((fname, "Timeout (2 min)"))
+                    progress.update(task, description=f"{fname} ⏱️ (Timeout)")
+                except Exception as e:
+                    errors.append((fname, str(e)[:100]))
+                    progress.update(task, description=f"{fname} ❌ (Error)")
+            
+            progress.advance(task)
+
+    # Show summary of errors
+    if errors:
+        console.print(f"\n[yellow]Skipped {len(errors)} factors:[/yellow]")
+        for fname, reason in errors[:5]:
+            console.print(f"  • {fname}: {reason}")
+        if len(errors) > 5:
+            console.print(f"  ... and {len(errors)-5} more")
+
+    if len(factor_series) < 3:
+        console.print("[red]Not enough valid factor series to build portfolio (need at least 3).[/red]")
+        console.print("[yellow]Tip: Factors might be producing mostly NaN values or failing execution.[/yellow]")
+        
+        # Fallback: Show top factors by IC without diversification
+        console.print("\n[dim]Showing top factors by IC instead:[/dim]")
+        table = Table(
+            title=f"Top {min(20, len(candidates))} Factors by IC (No Diversification)",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("#", justify="center", width=4)
+        table.add_column("Factor", width=40)
+        table.add_column("IC", justify="right", width=10)
+        table.add_column("Sharpe", justify="right", width=10)
+
+        for i, cand in enumerate(candidates[:20], 1):
+            table.add_row(
+                str(i),
+                cand.get("factor_name", "unknown")[:38],
+                f"{cand.get('ic', 0):.6f}",
+                f"{cand.get('sharpe', 0):.4f}" if cand.get('sharpe') else "N/A",
+            )
+        
+        console.print(table)
+        return
+
+    # 3. Build Correlation Matrix
+    console.print(f"\n[dim]Building correlation matrix from {len(factor_series)} factors...[/dim]")
+    
+    # Align indices and drop NaN
+    combined = pd.DataFrame(factor_series).dropna()
+    
+    if combined.empty or len(combined) < 100:
+        console.print("[red]Not enough valid overlapping data to compute correlation.[/red]")
+        console.print("[dim]This means the factors produce values at different times or have too many NaN values.[/dim]")
+        return
+
+    corr_matrix = combined.corr().fillna(0)
+    ic_map = {cand['factor_name']: cand.get('ic', 0) for cand in candidates}
+
+    # 4. Greedy Selection
+    selected = []
+    remaining = list(corr_matrix.columns)
+    
+    # Sort remaining by IC to prioritize high IC factors
+    remaining.sort(key=lambda x: abs(ic_map.get(x, 0)), reverse=True)
+
+    for factor in remaining:
+        if len(selected) >= target:
+            break
+        
+        # If it's the first one, just take it
+        if not selected:
+            selected.append(factor)
+            continue
+        
+        # Check correlation with already selected
+        # We want max(|corr|) < max_corr
+        max_c = 0
+        for sel in selected:
+            c = abs(corr_matrix.loc[factor, sel])
+            if c > max_c:
+                max_c = c
+        
+        if max_c < max_corr:
+            selected.append(factor)
+
+    # 5. Display Results
+    table = Table(
+        title=f"Selected Diversified Portfolio (Top {len(selected)})",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("#", justify="center", width=4)
+    table.add_column("Factor", width=40)
+    table.add_column("IC", justify="right", width=10)
+    table.add_column("Sharpe", justify="right", width=10)
+    table.add_column("Max Corr", justify="right", width=10)
+
+    for i, fname in enumerate(selected, 1):
+        # Find original data for display
+        data = next((c for c in candidates if c['factor_name'] == fname), {})
+        ic = data.get('ic')
+        sharpe = data.get('sharpe')
+        
+        # Calculate max corr with other selected factors
+        max_c_val = 0
+        for s in selected:
+            if s != fname:
+                val = abs(corr_matrix.loc[fname, s])
+                if val > max_c_val: max_c_val = val
+
+        table.add_row(
+            str(i),
+            fname[:38],
+            f"{ic:.6f}" if ic is not None else "N/A",
+            f"{sharpe:.4f}" if sharpe is not None else "N/A",
+            f"{max_c_val:.4f}" if max_c_val > 0 else "-"
+        )
+
+    console.print(table)
+
+    # 6. Save Result
+    portfolio_data = {
+        "selected_factors": selected,
+        "max_correlation": max_corr,
+        "pool_size": top,
+        "timestamp": pd.Timestamp.now().isoformat()
+    }
+    
+    out_dir = Path(__file__).parent / "results" / "portfolio"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_file = out_dir / "selected_factors.json"
+    
+    with open(out_file, "w") as f:
+        json.dump(portfolio_data, f, indent=2)
+    
+    console.print(Panel(
+        f"[bold]Portfolio saved to results/portfolio/selected_factors.json[/bold]\n"
+        f"Selected {len(selected)} unique factors from {top} candidates.",
+        border_style="green"
+    ))
+
+
+@app.command()
 def health():
     """Check system health and configuration."""
     from rdagent.app.utils.health_check import health_check
