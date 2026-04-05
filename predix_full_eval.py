@@ -115,10 +115,41 @@ def _extract_factor_description(code: str) -> str:
 # ---------------------------------------------------------------------------
 # Factor scanner
 # ---------------------------------------------------------------------------
-def scan_factors(workspace_dir: Path) -> List[FactorInfo]:
-    """Scan workspace directories for unique factor codes."""
+def scan_factors(workspace_dir: Path, skip_evaluated: bool = True) -> List[FactorInfo]:
+    """Scan workspace directories for unique factor codes.
+
+    Parameters
+    ----------
+    workspace_dir : Path
+        Path to workspace directory
+    skip_evaluated : bool
+        If True, skip factors that already have valid results in results/factors/
+
+    Returns
+    -------
+    List[FactorInfo]
+        List of factor information
+    """
     factors = []
     seen_names = set()
+
+    # Load already evaluated factors (if skip_evaluated is True)
+    evaluated_factors = set()
+    if skip_evaluated:
+        project_root = Path(__file__).parent
+        factors_dir = project_root / "results" / "factors"
+        if factors_dir.exists():
+            import json
+            import glob
+            for f in glob.glob(str(factors_dir / "*.json")):
+                try:
+                    with open(f) as fh:
+                        data = json.load(fh)
+                    if data.get("status") == "success" and data.get("ic") is not None:
+                        evaluated_factors.add(data.get("factor_name"))
+                except Exception:
+                    pass
+            print(f"  Found {len(evaluated_factors)} already evaluated factors - skipping")
 
     for ws in workspace_dir.iterdir():
         if not ws.is_dir():
@@ -151,6 +182,11 @@ def scan_factors(workspace_dir: Path) -> List[FactorInfo]:
         # Skip duplicates
         if factor_name in seen_names:
             continue
+
+        # Skip already evaluated factors
+        if skip_evaluated and factor_name in evaluated_factors:
+            continue
+
         seen_names.add(factor_name)
 
         factors.append(FactorInfo(
@@ -525,6 +561,7 @@ def main(
     top: int = 100,
     all_factors: bool = False,
     parallel: int = 4,
+    force: bool = False,
 ) -> None:
     """Main entry point."""
     console.print(Panel(
@@ -542,10 +579,14 @@ def main(
     full_data = pd.read_hdf(str(FULL_DATA_FILE), key="data")
     console.print(f"[bold green]✓ Loaded {len(full_data):,} rows ({full_data.index.get_level_values('datetime').min()} to {full_data.index.get_level_values('datetime').max()})[/bold green]")
 
-    # Scan factors
+    # Scan factors (skip already evaluated by default)
     console.print(f"\n[dim]Scanning workspaces...[/dim]")
-    factors = scan_factors(WORKSPACE_DIR)
+    factors = scan_factors(WORKSPACE_DIR, skip_evaluated=not force)
     console.print(f"[bold]Total unique factors found: {len(factors)}[/bold]")
+    if force:
+        console.print("[yellow]⚠️  Force mode: Re-evaluating ALL factors[/yellow]")
+    else:
+        console.print("[dim]Skipping already evaluated factors[/dim]")
 
     if not factors:
         console.print("[red]No factors found![/red]")
@@ -594,6 +635,11 @@ if __name__ == "__main__":
         default=4,
         help="Number of parallel workers (default: 4)",
     )
+    parser.add_argument(
+        "--force", "-f",
+        action="store_true",
+        help="Force re-evaluation of ALL factors (even already evaluated)",
+    )
 
     args = parser.parse_args()
 
@@ -601,4 +647,5 @@ if __name__ == "__main__":
         top=args.top,
         all_factors=args.all,
         parallel=args.parallel,
+        force=args.force,
     )
