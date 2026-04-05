@@ -257,6 +257,112 @@ def evaluate(
 
 
 @app.command()
+def top(
+    n: int = typer.Option(
+        20,
+        "--num", "-n",
+        help="Number of top factors to show (default: 20)",
+    ),
+    metric: str = typer.Option(
+        "ic",
+        "--metric", "-m",
+        help="Sort by metric: 'ic' or 'sharpe'",
+    ),
+):
+    """
+    Show top-performing factors by IC or Sharpe.
+
+    Examples:
+        predix top                      # Top 20 by IC
+        predix top -n 50                # Top 50 by IC
+        predix top -m sharpe            # Top 20 by Sharpe
+    """
+    import json
+    import glob as glob_module
+    import numpy as np
+    from rich.table import Table
+    from rich.panel import Panel
+
+    factors_dir = Path(__file__).parent / "results" / "factors"
+    if not factors_dir.exists():
+        console.print("[red]No results found in results/factors/[/red]")
+        return
+
+    # Load all factor JSON files
+    results = []
+    for f in glob_module.glob(str(factors_dir / "*.json")):
+        try:
+            with open(f) as fh:
+                data = json.load(fh)
+            # Only include factors with valid IC
+            if data.get("status") == "success" and data.get("ic") is not None:
+                results.append(data)
+        except Exception:
+            continue
+
+    if not results:
+        console.print("[yellow]No evaluated factors found with valid IC[/yellow]")
+        return
+
+    # Sort by metric
+    if metric == "sharpe":
+        results.sort(key=lambda x: abs(x.get("sharpe", 0) or 0), reverse=True)
+        sort_label = "Sharpe"
+    else:
+        results.sort(key=lambda x: abs(x.get("ic", 0) or 0), reverse=True)
+        sort_label = "IC"
+
+    # Display as table
+    table = Table(
+        title=f"Top {min(n, len(results))} Factors by {sort_label}",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("#", justify="center", width=4)
+    table.add_column("Factor", width=40)
+    table.add_column("IC", justify="right", width=10)
+    table.add_column("Sharpe", justify="right", width=10)
+    table.add_column("Ann. Return %", justify="right", width=12)
+    table.add_column("Max DD", justify="right", width=10)
+    table.add_column("Win Rate", justify="right", width=10)
+
+    for i, r in enumerate(results[:n], 1):
+        ic = r.get("ic")
+        sharpe = r.get("sharpe")
+        ann_ret = r.get("annualized_return")
+        max_dd = r.get("max_drawdown")
+        win_rate = r.get("win_rate")
+
+        table.add_row(
+            str(i),
+            r["factor_name"][:38],
+            f"{ic:.6f}" if ic is not None else "N/A",
+            f"{sharpe:.4f}" if sharpe is not None else "N/A",
+            f"{ann_ret:.4f}" if ann_ret is not None else "N/A",
+            f"{max_dd:.4f}" if max_dd is not None else "N/A",
+            f"{win_rate:.2%}" if win_rate is not None else "N/A",
+        )
+
+    console.print(table)
+
+    # Summary
+    valid_ic = [r.get("ic") for r in results if r.get("ic") is not None]
+    valid_sharpe = [r.get("sharpe") for r in results if r.get("sharpe") is not None]
+    # Filter extreme outliers for average
+    valid_sharpe_filtered = [s for s in valid_sharpe if abs(s or 0) < 1e6]
+
+    console.print(Panel(
+        f"[bold]Summary[/bold]\n"
+        f"Total evaluated: {len(results)}\n"
+        f"Avg IC: {np.mean(valid_ic):.6f} (n={len(valid_ic)})\n"
+        f"Best IC: {max(valid_ic, key=abs, default=0):.6f}\n"
+        f"Avg Sharpe: {np.mean(valid_sharpe_filtered):.4f} (n={len(valid_sharpe_filtered)})\n"
+        f"Best Sharpe: {max(valid_sharpe, key=abs, default=0):.4f}",
+        border_style="green",
+    ))
+
+
+@app.command()
 def health():
     """Check system health and configuration."""
     from rdagent.app.utils.health_check import health_check
