@@ -652,6 +652,142 @@ def portfolio(
 
 
 @app.command()
+def portfolio_simple(
+    top: int = typer.Option(
+        100,
+        "--top", "-n",
+        help="Number of candidate factors to consider (default: 100)",
+    ),
+):
+    """
+    Select a diversified portfolio based on factor categories (Simple Method).
+
+    Instead of calculating correlations (which requires valid time-series data),
+    this method groups factors by their names/types (e.g., momentum, volatility,
+    mean_reversion, session) and selects the best from each group.
+
+    Examples:
+        predix portfolio-simple              # Top factors from different categories
+        predix portfolio-simple -n 200       # Consider top 200 factors
+    """
+    import json
+    import glob as glob_module
+    import re
+    import numpy as np
+    import pandas as pd
+    from rich.table import Table
+    from rich.panel import Panel
+
+    factors_dir = Path(__file__).parent / "results" / "factors"
+    if not factors_dir.exists():
+        console.print("[red]No results found in results/factors/[/red]")
+        return
+
+    # 1. Load top factors by IC
+    results = []
+    for f in glob_module.glob(str(factors_dir / "*.json")):
+        try:
+            with open(f) as fh:
+                data = json.load(fh)
+            if data.get("status") == "success" and data.get("ic") is not None:
+                results.append(data)
+        except Exception:
+            continue
+
+    if not results:
+        console.print("[red]No evaluated factors found with valid IC[/red]")
+        return
+
+    # Sort by absolute IC
+    results.sort(key=lambda x: abs(x.get("ic", 0) or 0), reverse=True)
+    candidates = results[:top]
+
+    # 2. Define categories based on keywords in factor names
+    categories = {
+        "momentum": ["mom", "return", "ret", "trend", "directional", "drift", "slope", "roc"],
+        "volatility": ["vol", "std", "range", "dev", "risk", "variance"],
+        "mean_reversion": ["ridge", "mean", "reversion", "revert", "resid", "resi", "norm"],
+        "session": ["session", "london", "ny", "overlap", "asian", "intraday"],
+        "volume": ["vol_", "volume", "flow", "pressure", "toxicity", "imbalance"],
+        "pattern": ["pattern", "shape", "structure", "fractal"],
+    }
+
+    # 3. Assign each factor to a category
+    categorized = {cat: [] for cat in categories}
+    categorized["other"] = []
+
+    for cand in candidates:
+        fname = cand.get("factor_name", "").lower()
+        assigned = False
+        
+        # Check each category's keywords
+        for cat, keywords in categories.items():
+            if any(kw in fname for kw in keywords):
+                categorized[cat].append(cand)
+                assigned = True
+                break
+        
+        if not assigned:
+            categorized["other"].append(cand)
+
+    # 4. Select best factor from each category
+    selected = []
+    for cat in list(categories.keys()) + ["other"]:
+        if categorized[cat]:
+            best = categorized[cat][0]  # Already sorted by IC
+            selected.append({
+                "factor": best,
+                "category": cat.capitalize() if cat != "other" else "Other"
+            })
+
+    # 5. Display Results
+    table = Table(
+        title=f"Simple Diversified Portfolio (Selected {len(selected)} factors)",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("#", justify="center", width=4)
+    table.add_column("Factor", width=40)
+    table.add_column("Category", width=15)
+    table.add_column("IC", justify="right", width=10)
+    table.add_column("Sharpe", justify="right", width=10)
+
+    for i, item in enumerate(selected, 1):
+        cand = item["factor"]
+        cat = item["category"]
+        table.add_row(
+            str(i),
+            cand.get("factor_name", "unknown")[:38],
+            cat,
+            f"{cand.get('ic', 0):.6f}",
+            f"{cand.get('sharpe', 0):.4f}" if cand.get('sharpe') else "N/A",
+        )
+
+    console.print(table)
+
+    # 6. Save Result
+    portfolio_data = {
+        "selected_factors": [item["factor"]["factor_name"] for item in selected],
+        "categories": {item["category"]: item["factor"]["factor_name"] for item in selected},
+        "method": "simple_keyword_categorization",
+        "timestamp": str(pd.Timestamp.now().isoformat())
+    }
+
+    out_dir = Path(__file__).parent / "results" / "portfolio"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_file = out_dir / "portfolio_simple.json"
+
+    with open(out_file, "w") as f:
+        json.dump(portfolio_data, f, indent=2)
+
+    console.print(Panel(
+        f"[bold]Simple Portfolio saved to results/portfolio/portfolio_simple.json[/bold]\n"
+        f"Selected {len(selected)} factors across {len([c for c in categorized if categorized[c]])} categories.",
+        border_style="green"
+    ))
+
+
+@app.command()
 def health():
     """Check system health and configuration."""
     from rdagent.app.utils.health_check import health_check
