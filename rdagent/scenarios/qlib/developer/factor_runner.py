@@ -689,6 +689,9 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 exp=exp
             )
 
+            # Save factor values as parquet for strategy building
+            self._save_factor_values(factor_name, exp)
+
             db.close()
 
         except Exception as e:
@@ -816,6 +819,64 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                     factor_description = ' '.join(desc_lines)[:500]
 
         return factor_code, factor_description
+
+    def _save_factor_values(self, factor_name: str, exp) -> None:
+        """
+        Save factor time-series values as parquet for strategy building.
+
+        This is essential for walk-forward validation and strategy combination.
+
+        Parameters
+        ----------
+        factor_name : str
+            Name of the factor
+        exp : QlibFactorExperiment
+            The experiment with factor values
+        """
+        import os as _os
+
+        try:
+            # Get workspace path
+            workspace_path = exp.experiment_workspace.workspace_path
+            if workspace_path is None:
+                return
+
+            result_h5 = workspace_path / "result.h5"
+            if not result_h5.exists():
+                return
+
+            # Read factor values
+            import pandas as pd
+            df = pd.read_hdf(str(result_h5), key="data")
+            if df is None or df.empty:
+                return
+
+            # Get the factor series (first column)
+            series = df.iloc[:, 0]
+            series.name = factor_name
+
+            # Save to results/factors/values/
+            project_root = Path(__file__).parent.parent.parent.parent.parent
+
+            # Parallel run isolation
+            parallel_run_id = _os.getenv("PARALLEL_RUN_ID", "0")
+            if parallel_run_id != "0":
+                values_dir = project_root / "results" / "runs" / f"run{parallel_run_id}" / "factors" / "values"
+            else:
+                values_dir = project_root / "results" / "factors" / "values"
+
+            values_dir.mkdir(parents=True, exist_ok=True)
+
+            # Safe filename
+            safe_name = factor_name.replace("/", "_").replace("\\", "_").replace(" ", "_")[:100]
+            parquet_path = values_dir / f"{safe_name}.parquet"
+
+            # Save as parquet (with datetime index)
+            series.to_parquet(str(parquet_path))
+
+        except Exception as e:
+            # Don't let factor value saving break the main workflow
+            pass
 
     def _log_result_warnings(self, factor_name: str, result, metrics: dict) -> None:
         """
