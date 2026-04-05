@@ -92,6 +92,12 @@ Predix/
 **🔒 CLOSED SOURCE (Local Only - NOT on GitHub):**
 - `models/local/` - Your improved models (Transformer, TCN, PatchTST, CNN+LSTM)
 - `prompts/local/` - Your improved prompts (v2.0 optimized)
+- `rdagent/scenarios/qlib/local/` - Advanced components:
+  - `strategy_coster.py` - StrategyCoSTEER (LLM strategy generation)
+  - `strategy_evaluator.py` - Comprehensive strategy metrics
+  - `strategy_runner.py` - Strategy execution & backtesting
+  - `strategy_discovery_v1.yaml` - LLM prompts for strategy generation
+  - Plus: ml_trainer, portfolio_optimizer, quant_loop_advanced, etc.
 - `.env` - API keys
 - `results/` - Backtest results
 - `git_ignore_folder/` - Trading data
