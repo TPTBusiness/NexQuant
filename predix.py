@@ -196,6 +196,67 @@ def quant(
 
 
 @app.command()
+def evaluate(
+    top: int = typer.Option(
+        100,
+        "--top", "-n",
+        help="Number of factors to evaluate (default: 100)",
+    ),
+    all_factors: bool = typer.Option(
+        False,
+        "--all", "-a",
+        help="Evaluate all undiscovered factors",
+    ),
+    parallel: int = typer.Option(
+        4,
+        "--parallel", "-p",
+        help="Number of parallel workers (default: 4)",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force", "-f",
+        help="Force re-evaluation of ALL factors (even already evaluated)",
+    ),
+):
+    """
+    Evaluate existing factors with full 1min data (2020-2026).
+
+    Computes IC, Sharpe, Max DD, Win Rate for each factor.
+    Automatically skips already evaluated factors (use --force to re-evaluate).
+
+    Examples:
+        predix evaluate                   # Evaluate 100 NEW factors
+        predix evaluate --top 500         # Evaluate 500 NEW factors
+        predix evaluate --all             # Evaluate all NEW factors
+        predix evaluate --force --top 50  # Re-evaluate 50 factors
+        predix evaluate -p 8              # Use 8 parallel workers
+    """
+    console.print(Panel(
+        "[bold cyan]📊 Predix Factor Evaluator[/bold cyan]\n"
+        "Evaluating factors with FULL 1min data (2020-2026)\n"
+        "Skips already evaluated factors automatically",
+        border_style="cyan",
+    ))
+
+    # Import and run the evaluator
+    from predix_full_eval import main as eval_main
+
+    try:
+        eval_main(
+            top=top,
+            all_factors=all_factors,
+            parallel=parallel,
+            force=force,
+        )
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Evaluation interrupted by user[/yellow]")
+    except Exception as e:
+        console.print(f"\n[bold red]Evaluation failed: {e}[/bold red]")
+        import traceback
+        console.print(traceback.format_exc())
+
+
+@app.command()
 def health():
     """Check system health and configuration."""
     from rdagent.app.utils.health_check import health_check
