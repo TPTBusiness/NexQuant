@@ -383,27 +383,34 @@ def run_evaluation(
 
             for future in as_completed(futures):
                 factor = futures[future]
+                result = None
                 try:
                     result = future.result(timeout=300)
                     results.append(result)
                 except Exception as e:
+                    # Handle timeout and other exceptions
+                    fname = str(getattr(factor, 'factor_name', 'unknown'))[:40]
                     results.append(EvalResult(
-                        factor_name=factor.factor_name,
-                        workspace_hash=factor.workspace_hash,
+                        factor_name=fname,
+                        workspace_hash=getattr(factor, 'workspace_hash', 'unknown'),
                         status="failed",
                         error_message=f"Exception: {str(e)[:300]}",
                     ))
+                    result = results[-1]
 
                 n_success = sum(1 for r in results if r.status == "success")
                 n_fail = sum(1 for r in results if r.status == "failed")
 
                 # Save immediately after each factor
-                save_single_result(result)
+                if result is not None:
+                    save_single_result(result)
 
+                # Update progress with safe string handling
+                fname = str(getattr(factor, 'factor_name', 'unknown'))[:40]
                 progress.update(
                     task,
                     advance=1,
-                    description=f"Evaluating: {n_success}✅ {n_fail}❌ | {factor.factor_name[:40]}",
+                    description=f"Evaluating: {n_success}✅ {n_fail}❌ | {fname}",
                 )
 
     return results
