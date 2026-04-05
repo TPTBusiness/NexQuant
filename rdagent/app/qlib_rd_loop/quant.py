@@ -3,6 +3,8 @@ Quant (Factor & Model) workflow with session control
 """
 
 import asyncio
+import json
+from pathlib import Path
 from typing import Any
 
 import fire
@@ -224,7 +226,7 @@ class QuantRDLoop(RDLoop):
                 factor_name = "unknown"
                 if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
                     factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
-                
+
                 logger.warning(f"Skipping feedback for failed factor '{factor_name}'. Reason: {reason}")
                 feedback = HypothesisFeedback(
                     observations=f"Factor '{factor_name}' failed execution.",
@@ -242,9 +244,91 @@ class QuantRDLoop(RDLoop):
             # NOTE: DB save is handled by factor_runner.py _save_result_to_database()
             # which runs immediately after Docker execution. No duplicate save needed here.
 
+        # Periodically build strategies using AI when enough factors are available
+        factor_count = self.trace.get_factor_count()
+        if factor_count > 0 and factor_count % 50 == 0:
+            self._build_strategies_with_ai()
+
         feedback = self._interact_feedback(feedback)
         logger.log_object(feedback, tag="feedback")
         return feedback
+
+    def _build_strategies_with_ai(self) -> None:
+        """
+        Build trading strategies using StrategyCoSTEER (LLM-based).
+
+        This method is called periodically during the factor generation loop
+        to convert accumulated factors into trading strategies.
+
+        Gracefully skips if local/ directory doesn't exist or LLM is unavailable.
+        """
+        try:
+            # Check if StrategyCoSTEER module exists (graceful skip)
+            local_module = Path(__file__).parent.parent.parent / "scenarios" / "qlib" / "local"
+            if not local_module.exists():
+                logger.debug("StrategyCoSTEER: local/ directory not found. Skipping strategy building.")
+                return
+
+            costeer_file = local_module / "strategy_coster.py"
+            if not costeer_file.exists():
+                logger.debug("StrategyCoSTEER: strategy_coster.py not found. Skipping strategy building.")
+                return
+
+            from rdagent.scenarios.qlib.local.strategy_coster import StrategyCoSTEER
+
+            # Load top factors from results
+            project_root = Path(__file__).parent.parent.parent.parent
+            results_dir = project_root / "results"
+            factors_dir = results_dir / "factors"
+
+            if not factors_dir.exists():
+                logger.debug("StrategyCoSTEER: No factors directory found. Skipping.")
+                return
+
+            # Load evaluated factors
+            factors = []
+            for f in factors_dir.glob("*.json"):
+                try:
+                    with open(f) as fh:
+                        data = json.load(fh)
+                    if data.get("status") == "success" and data.get("ic") is not None:
+                        factors.append(data)
+                except Exception:
+                    continue
+
+            if len(factors) < 10:
+                logger.debug(f"StrategyCoSTEER: Only {len(factors)} factors available. Need at least 10. Skipping.")
+                return
+
+            # Sort by IC and take top factors
+            factors.sort(key=lambda x: abs(x.get("ic", 0) or 0), reverse=True)
+            top_factors = factors[:50]  # Use top 50 factors
+
+            logger.info(f"StrategyCoSTEER: Building strategies from {len(top_factors)} top factors...")
+
+            # Initialize and run StrategyCoSTEER
+            strategies_dir = results_dir / "strategies"
+            costeer = StrategyCoSTEER(
+                factors_dir=str(factors_dir),
+                strategies_dir=str(strategies_dir),
+                max_loops=3,  # Limited loops for periodic building
+                min_sharpe=1.5,
+                max_drawdown=-0.20,
+            )
+
+            # Run CoSTEER loop
+            results = costeer.run(top_factors)
+
+            if results:
+                logger.info(f"StrategyCoSTEER: Generated {len(results)} accepted strategies.")
+            else:
+                logger.info("StrategyCoSTEER: No strategies met acceptance criteria this cycle.")
+
+        except ImportError as e:
+            logger.warning(f"StrategyCoSTEER: Import failed ({e}). Skipping strategy building.")
+        except Exception as e:
+            # Don't break the main loop for strategy building failures
+            logger.warning(f"StrategyCoSTEER: Unexpected error: {e}. Skipping strategy building.")
 
 
 def main(
