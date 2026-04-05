@@ -217,10 +217,27 @@ class QuantRDLoop(RDLoop):
                 decision=False,
             )
         else:
-            if prev_out["direct_exp_gen"]["propose"].action == "factor":
-                feedback = self.factor_summarizer.generate_feedback(prev_out["running"], self.trace)
-            elif prev_out["direct_exp_gen"]["propose"].action == "model":
-                feedback = self.model_summarizer.generate_feedback(prev_out["running"], self.trace)
+            # Handle cases where the experiment failed during execution (e.g., Docker error)
+            exp = prev_out.get("running")
+            if exp is not None and getattr(exp, "failed", False):
+                reason = getattr(exp, "failure_reason", "Unknown failure reason")
+                factor_name = "unknown"
+                if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
+                    factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
+                
+                logger.warning(f"Skipping feedback for failed factor '{factor_name}'. Reason: {reason}")
+                feedback = HypothesisFeedback(
+                    observations=f"Factor '{factor_name}' failed execution.",
+                    hypothesis_evaluation="Failed",
+                    new_hypothesis="Try a different approach.",
+                    reason=reason,
+                    decision=False,
+                )
+            else:
+                if prev_out["direct_exp_gen"]["propose"].action == "factor":
+                    feedback = self.factor_summarizer.generate_feedback(prev_out["running"], self.trace)
+                elif prev_out["direct_exp_gen"]["propose"].action == "model":
+                    feedback = self.model_summarizer.generate_feedback(prev_out["running"], self.trace)
 
             # NOTE: DB save is handled by factor_runner.py _save_result_to_database()
             # which runs immediately after Docker execution. No duplicate save needed here.
