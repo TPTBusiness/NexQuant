@@ -924,6 +924,11 @@ def build_strategies_ai(
         "--max-dd",
         help="Maximum acceptable drawdown (default: -0.20)",
     ),
+    count: int = typer.Option(
+        1,
+        "--count", "-c",
+        help="Number of strategies to generate (default: 1, use 0 for unlimited)",
+    ),
 ):
     """
     Build trading strategies using AI (LLM-based StrategyCoSTEER).
@@ -966,6 +971,31 @@ def build_strategies_ai(
 
     # Load top factors
     factors_dir = Path(__file__).parent / "results" / "factors"
+
+    # Setup LLM environment (same as quant command)
+    api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+    api_key_2 = os.getenv("OPENROUTER_API_KEY_2", "")
+    
+    if api_key and not api_key.startswith("sk-or-"):
+        # OPENROUTER_API_KEY not set, try to use what we have
+        api_key = os.getenv("OPENROUTER_API_KEY", api_key)
+
+    if "openrouter" in os.getenv("CHAT_MODEL", "").lower() or "openrouter" in os.getenv("OPENAI_API_BASE", "").lower():
+        # Already configured for OpenRouter
+        console.print(f"\n[bold blue]🌐 Using OpenRouter: {os.getenv('CHAT_MODEL', 'unknown')}[/bold blue]")
+    elif api_key:
+        # Configure OpenRouter
+        if api_key_2:
+            os.environ["OPENAI_API_KEY"] = f"{api_key},{api_key_2}"
+        else:
+            os.environ["OPENAI_API_KEY"] = api_key
+        os.environ["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
+        os.environ["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/qwen/qwen3.6-plus:free")
+        console.print(f"\n[bold blue]🌐 Using OpenRouter: {os.environ['CHAT_MODEL']}[/bold blue]")
+    else:
+        console.print("[bold red]❌ No API key found. Set OPENROUTER_API_KEY in .env[/bold red]")
+        return
+
     if not factors_dir.exists():
         console.print("[bold red]❌ No factors directory found at results/factors/[/bold red]")
         console.print("[yellow]Run 'predix quant' to generate factors first.[/yellow]")
@@ -1014,7 +1044,29 @@ def build_strategies_ai(
             max_drawdown=max_drawdown,
         )
 
-        results = costeer.run(top_factors)
+        # Generate strategies until we have enough
+        all_results = []
+        batch_idx = 0
+        max_batches = count if count > 0 else 999  # Unlimited if count=0
+
+        while len(all_results) < count or count == 0:
+            if count == 0 and batch_idx >= max_batches:
+                break  # Safety limit for unlimited mode
+            if count > 0 and batch_idx >= count:
+                break  # Already tried enough times
+
+            batch_idx += 1
+            console.print(f"\n[dim]━━━ Strategy Batch {batch_idx}/{count if count > 0 else '∞'} ━━━[/dim]")
+
+            results = costeer.run(top_factors)
+            all_results.extend(results)
+
+            if count == 0:
+                console.print(f"\n[dim]Generated {len(all_results)} strategies so far. Press Ctrl+C to stop.[/dim]")
+            elif len(all_results) < count:
+                console.print(f"\n[dim]Need {count - len(all_results)} more strategies...[/dim]")
+
+        results = all_results[:count] if count > 0 else all_results  # Trim to exact count
 
         # Display results
         if results:
@@ -1024,20 +1076,35 @@ def build_strategies_ai(
             table = Table(title="Accepted Strategies")
             table.add_column("#", style="dim")
             table.add_column("Strategy", style="cyan")
-            table.add_column("Factors", style="yellow")
-            table.add_column("Sharpe", justify="right", style="green")
+            table.add_column("Monthly %", justify="right", style="green")
+            table.add_column("Trades", justify="right")
+            table.add_column("Sharpe", justify="right")
             table.add_column("Max DD", justify="right", style="red")
             table.add_column("Win Rate", justify="right")
+            table.add_column("Real IC", justify="right", style="magenta")
             table.add_column("Loop", justify="center")
 
             for i, r in enumerate(results, 1):
+                # Monthly return: use real backtest if available, else estimate
+                rb = r.get('real_backtest', {})
+                if isinstance(rb, dict) and rb.get('status') == 'success':
+                    monthly_pct = rb.get('monthly_return_pct', r.get('monthly_return_pct', 0))
+                    n_trades = rb.get('n_trades', '-')
+                    real_ic = rb.get('ic', 0)
+                else:
+                    monthly_pct = r.get('monthly_return_pct', r.get('real_monthly_return', 0))
+                    n_trades = '-'
+                    real_ic = rb.get('ic', 0) if isinstance(rb, dict) else 0
+
                 table.add_row(
                     str(i),
                     r.get("strategy_name", "unknown")[:30],
-                    str(len(r.get("factor_names", []))),
-                    f"{r.get('sharpe_ratio', 0):.3f}",
-                    f"{r.get('max_drawdown', 0):.2%}",
-                    f"{r.get('win_rate', 0):.2%}",
+                    f"{monthly_pct:.2f}%",
+                    str(n_trades),
+                    f"{r.get('sharpe', r.get('sharpe_ratio', 0)):.3f}",
+                    f"{r.get('max_drawdown', r.get('est_max_drawdown', 0)):.2%}",
+                    f"{r.get('win_rate', r.get('est_win_rate', 0)):.2%}",
+                    f"{real_ic:.4f}" if real_ic else "-",
                     str(r.get("loop", "?")),
                 )
 
