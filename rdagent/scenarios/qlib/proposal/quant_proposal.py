@@ -16,6 +16,15 @@ from rdagent.utils.agent.tpl import T
 class QuantTrace(Trace):
     def __init__(self, scen: Scenario) -> None:
         super().__init__(scen)
+        self._factor_count = 0
+
+    def get_factor_count(self) -> int:
+        """Return the number of factors generated so far."""
+        return self._factor_count
+
+    def increment_factor_count(self) -> None:
+        """Increment the factor count."""
+        self._factor_count += 1
         # Initialize the controller with default weights
         self.controller = EnvController()
 

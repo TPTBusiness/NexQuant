@@ -192,6 +192,10 @@ class QuantRDLoop(RDLoop):
                 logger.error(f"Factor extraction failed.")
                 raise FactorEmptyError("Factor extraction failed.")
 
+            # Increment factor count for tracking
+            if hasattr(self, 'trace') and hasattr(self.trace, 'increment_factor_count'):
+                self.trace.increment_factor_count()
+
             # Handle failed experiments gracefully (don't break the loop)
             if getattr(exp, "failed", False):
                 reason = getattr(exp, "failure_reason", "unknown")
