@@ -7,6 +7,7 @@
 ### Core Purpose
 - Generate trading factors (signals) autonomously using LLMs
 - Backtest and validate factors on 1-minute EUR/USD data
+- Generate AI strategies with LLM + REAL OHLCV backtest (96-bar forward returns)
 - Optimize portfolios using modern portfolio theory
 - Target: 1-3% monthly returns with Sharpe > 2.0
 
@@ -14,10 +15,11 @@
 - **Python 3.10/3.11** - Primary language
 - **PyTorch** - Deep learning models
 - **Qlib** - Backtesting engine
-- **LLM (Qwen3.5-35B)** - Factor generation via local llama.cpp
+- **LLM (Qwen3.5-35B via OpenRouter)** - Factor/strategy generation
 - **Flask** - Web dashboard API
 - **SQLite** - Results database
 - **Rich/Typer** - CLI interface
+- **Matplotlib/Seaborn** - Performance report charts
 
 ### Architecture
 
@@ -30,25 +32,86 @@ Predix/
 │   │   ├── backtesting/        # Backtest engine, metrics, database
 │   │   ├── coder/
 │   │   │   ├── factor_coder/   # Factor generation & EURUSD-specific modules
-│   │   │   └── rl/             # RL Trading Agent (NEW)
-│   │   │       ├── env.py      # Gym-compatible trading environment
-│   │   │       ├── agent.py    # Stable Baselines3 wrapper (PPO/A2C/SAC)
-│   │   │       ├── costeer.py  # RL trading controller + LLM code generation
-│   │   │       └── indicators.py # Technical indicators (RSI, MACD, BB, CCI, ATR)
+│   │   │   └── rl/             # RL Trading Agent
 │   │   ├── loader.py           # Prompt loader (auto-loads local prompts)
 │   │   └── model_loader.py     # Model loader (auto-loads local models)
 │   └── scenarios/
 │       └── qlib/               # Qlib integration for FX trading
+├── predix.py                   # Main CLI wrapper (predix.py commands)
+├── predix_parallel.py          # Parallel factor evolution
+├── predix_gen_strategies_real_bt.py  # AI Strategy Gen + REAL OHLCV Backtest
+├── predix_strategy_report.py   # Performance report generator (charts + PDF)
+├── debug_backtest.py           # Debug backtest alignment & IC
 ├── prompts/                    # LLM Prompts
 │   ├── standard_prompts.yaml   # Standard prompts (in Git)
 │   └── local/                  # Your improved prompts (NOT in Git!)
-│       ├── factor_discovery_v2.yaml
-│       ├── factor_evolution_v2.yaml
-│       └── model_coder_v2.yaml
 ├── models/                     # ML Models
 │   ├── standard/               # Standard models (in Git)
-│   │   ├── xgboost_factor.py
-│   │   └── lightgbm_factor.py
+│   └── local/                  # Your improved models (NOT in Git!)
+├── results/                    # Backtest results (NOT in git)
+│   ├── factors/                # ~872 evaluated factors
+│   │   └── values/             # Factor time-series parquet files (862)
+│   ├── strategies_new/         # AI-generated strategies with real backtests
+│   └── strategy_reports/       # Performance reports with charts
+├── git_ignore_folder/          # OHLCV data (intraday_pv.h5)
+└── .env                        # Environment config (API keys)
+```
+
+### CLI Commands Reference
+
+#### Trading Loop
+```bash
+rdagent fin_quant                        # Start factor evolution
+rdagent fin_quant --loop-n 5             # 5 evolution loops
+rdagent fin_quant --with-dashboard       # With web dashboard
+rdagent fin_quant --cli-dashboard        # With CLI Rich dashboard
+```
+
+#### Parallel Execution
+```bash
+python predix_parallel.py --runs 5 --api-keys 1 -m openrouter   # 5 parallel runs
+python predix_parallel.py --runs 20 --api-keys 2 -m openrouter  # 20 runs, 2 keys
+```
+
+#### AI Strategy Generation (REAL OHLCV Backtest)
+```bash
+python predix_gen_strategies_real_bt.py          # Generate 10 strategies
+python predix_gen_strategies_real_bt.py 20       # Generate 20 strategies
+python predix_gen_strategies_real_bt.py 5        # Generate 5 (faster test)
+```
+Each accepted strategy gets:
+- JSON file in `results/strategies_new/`
+- Performance report with charts in `results/strategy_reports/`
+- Dashboard PNG (equity curve, drawdown, signals, monthly returns)
+- Text report with full metrics
+
+#### Strategy Reports
+```bash
+python predix_strategy_report.py                 # Reports for ALL strategies
+python predix_strategy_report.py <path.json>     # Report for single strategy
+```
+
+#### Factor Evaluation
+```bash
+python predix.py evaluate --all                  # Evaluate all factors
+python predix.py top -n 20                       # Top 20 factors by IC
+python predix.py portfolio-simple                # Portfolio optimization
+```
+
+#### Debug
+```bash
+python debug_backtest.py                         # Debug alignment & IC
+```
+
+### Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `OPENROUTER_API_KEY` | OpenRouter API key | `sk-or-v1-b4b...` |
+| `OPENAI_API_KEY` | Alternative: OpenAI/llama key | `local` or `sk-...` |
+| `CHAT_MODEL` | LLM model | `openrouter/qwen/qwen3.6-plus:free` |
+| `OPENROUTER_MODEL` | Specific model | Same as CHAT_MODEL |
+| `NO_COLOR` | Disable ANSI colors | `1` |
 │   └── local/                  # Your improved models (NOT in Git!)
 │       ├── transformer_factor.py
 │       ├── tcn_factor.py
