@@ -137,6 +137,68 @@ done
 
 ---
 
+## CLI Commands
+
+### Trading Loop
+
+| Command | Description |
+|---------|-------------|
+| `rdagent fin_quant` | Start factor evolution loop |
+| `rdagent fin_quant --loop-n 5` | Run 5 evolution loops |
+| `rdagent fin_quant --with-dashboard` | Start with web dashboard |
+| `rdagent fin_quant --cli-dashboard` | Start with CLI Rich dashboard |
+
+### Parallel Execution
+
+| Command | Description |
+|---------|-------------|
+| `python predix_parallel.py --runs 5 --api-keys 1 -m openrouter` | Run 5 parallel factor evolutions |
+| `python predix_parallel.py --runs 20 --api-keys 2 -m openrouter` | Run 20 runs with 2 API keys |
+
+### AI Strategy Generation (with REAL OHLCV Backtest)
+
+| Command | Description |
+|---------|-------------|
+| `python predix_gen_strategies_real_bt.py` | Generate 10 strategies with LLM + real backtest |
+| `python predix_gen_strategies_real_bt.py 20` | Generate 20 strategies |
+| `python predix_gen_strategies_real_bt.py 5` | Generate 5 strategies (faster) |
+
+### Strategy Reports
+
+| Command | Description |
+|---------|-------------|
+| `python predix_strategy_report.py` | Generate reports for ALL strategies |
+| `python predix_strategy_report.py results/strategies_new/123_MyStrategy.json` | Report for single strategy |
+
+### Factor Evaluation
+
+| Command | Description |
+|---------|-------------|
+| `python predix.py evaluate --all` | Evaluate all generated factors |
+| `python predix.py top -n 20` | Show top 20 factors by IC |
+| `python predix.py portfolio-simple` | Simple portfolio optimization |
+
+### Other Utilities
+
+| Command | Description |
+|---------|-------------|
+| `python predix_batch_backtest.py` | Batch backtest multiple factors |
+| `python predix_parallel.py` | Parallel factor evolution |
+| `python predix_rebacktest_strategies.py` | Re-backtest existing strategies |
+| `python debug_backtest.py` | Debug backtest alignment & IC |
+
+### Environment Options
+
+| Env Variable | Description | Example |
+|--------------|-------------|---------|
+| `OPENROUTER_API_KEY` | OpenRouter API key | `sk-or-v1-...` |
+| `OPENAI_API_KEY` | Alternative: OpenAI key | `sk-...` |
+| `CHAT_MODEL` | LLM model | `openrouter/qwen/qwen3.6-plus:free` |
+| `OPENROUTER_MODEL` | Specific OpenRouter model | `openrouter/qwen/qwen3.6-plus:free` |
+| `NO_COLOR` | Disable ANSI colors | `1` |
+
+---
+
 ## Configuration
 
 ```bash
