@@ -30,10 +30,22 @@ FACTORS_DIR = Path('/home/nico/Predix/results/factors')
 STRATEGIES_DIR = Path('/home/nico/Predix/results/strategies_new')
 STRATEGIES_DIR.mkdir(parents=True, exist_ok=True)
 
-# Acceptance thresholds
-MIN_IC = 0.02
-MIN_SHARPE = 0.5
-MIN_TRADES = 10
+# Trading style: 'swing' (96 bars) or 'daytrading' (12-24 bars)
+TRADING_STYLE = os.getenv('TRADING_STYLE', 'swing')  # 'swing' or 'daytrading'
+
+if TRADING_STYLE == 'daytrading':
+    FORWARD_BARS = int(os.getenv('FORWARD_BARS', '12'))  # 12 minutes
+    MIN_IC = 0.02
+    MIN_SHARPE = 0.5
+    MIN_TRADES = 50  # More trades for daytrading
+    MAX_DRAWDOWN = -0.10  # FTMO compliant (10% max)
+    print("[dim]🎯 Daytrading mode: 12-bar forward returns, FTMO risk limits[/dim]")
+else:
+    FORWARD_BARS = int(os.getenv('FORWARD_BARS', '96'))  # 96 minutes (default)
+    MIN_IC = 0.02
+    MIN_SHARPE = 0.5
+    MIN_TRADES = 10
+    MAX_DRAWDOWN = -1.0  # No limit for swing
 
 # ============================================================================
 # OHLCV Data Loading (cached)
@@ -229,7 +241,8 @@ close = close.loc[common_idx]
 signal = signal.loc[common_idx]
 
 # Calculate returns - using 96-bar forward return (matching factor IC horizon)
-returns_96 = close.pct_change(96).shift(-96)
+FORWARD_BARS = {FORWARD_BARS}
+returns_96 = close.pct_change(FORWARD_BARS).shift(-FORWARD_BARS)
 signal_aligned = signal.loc[returns_96.dropna().index]
 fwd_returns = returns_96.loc[signal_aligned.index]
 
@@ -384,7 +397,7 @@ def main(count=10, max_attempts=50):
                 trades = bt.get('n_trades', 0)
                 
                 # Acceptance criteria
-                if abs(ic) > MIN_IC and sharpe > MIN_SHARPE and trades > MIN_TRADES:
+                if abs(ic) > MIN_IC and sharpe > MIN_SHARPE and trades > MIN_TRADES and bt.get("max_drawdown", 0) > MAX_DRAWDOWN:
                     # SUCCESS
                     strat['real_backtest'] = bt
                     strat['metrics'] = bt
