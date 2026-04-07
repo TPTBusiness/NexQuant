@@ -404,7 +404,16 @@ def main(count=10, max_attempts=50):
                     fname = f"{int(time.time())}_{strat['strategy_name']}.json"
                     with open(STRATEGIES_DIR / fname, 'w') as f:
                         json.dump(strat, f, indent=2, ensure_ascii=False)
-                    
+
+                    # Generate performance report automatically
+                    try:
+                        from predix_strategy_report import StrategyPerformanceReporter
+                        reporter = StrategyPerformanceReporter(strat)
+                        report_path = reporter.generate_report()
+                        console.print(f"  [dim]📊 Report: {report_path.name}[/dim]")
+                    except Exception as e:
+                        console.print(f"  [dim]⚠️ Report gen failed: {e}[/dim]")
+
                     results.append(strat)
                     console.print(f"[green]✓ Strategy #{len(results)}:[/green] {strat['strategy_name']} "
                                 f"IC={ic:.4f}, Sharpe={sharpe:.3f}, Monthly={bt.get('monthly_return_pct', 0):.2f}%, "
