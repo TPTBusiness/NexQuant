@@ -160,13 +160,15 @@ class StrategyPerformanceReporter:
 
     def _plot_drawdown(self, ax):
         """Plot drawdown visualization."""
-        max_dd = abs(self.summary.get('max_drawdown', 0))
+        max_dd = self.summary.get('max_drawdown', 0)
+        # Handle negative or invalid values
+        max_dd_abs = abs(max_dd) if max_dd != 0 else 0.01
         n_months = max(self.summary.get('n_months', 12), 12)
 
         # Simulated drawdown pattern
         months = pd.date_range(start='2024-01-01', periods=int(n_months), freq='ME')
-        dd = np.linspace(0, -max_dd, len(months)//2)
-        dd_recovery = np.linspace(-max_dd, 0, len(months) - len(months)//2)
+        dd = np.linspace(0, -max_dd_abs, len(months)//2)
+        dd_recovery = np.linspace(-max_dd_abs, 0, len(months) - len(months)//2)
         dd_full = np.concatenate([dd, dd_recovery[:len(months)-len(dd)]])
 
         ax.fill_between(months[:len(dd_full)], dd_full, alpha=0.5, color=ACCENT_RED)
@@ -207,9 +209,10 @@ class StrategyPerformanceReporter:
         n_months = max(int(self.summary.get('n_months', 12)), 12)
 
         months = [f'M{i+1}' for i in range(n_months)]
-        # Add some realistic variation
+        # Add some realistic variation - use absolute value for scale
         np.random.seed(42)
-        variation = np.random.normal(0, monthly_ret * 0.3, n_months)
+        scale = abs(monthly_ret) * 0.3 if monthly_ret != 0 else 1.0
+        variation = np.random.normal(0, scale, n_months)
         returns = monthly_ret + variation
 
         colors_plot = [ACCENT_GREEN if r > 0 else ACCENT_RED for r in returns]
