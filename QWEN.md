@@ -103,15 +103,242 @@ python predix.py portfolio-simple                # Portfolio optimization
 python debug_backtest.py                         # Debug alignment & IC
 ```
 
-### Environment Variables
+---
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `OPENROUTER_API_KEY` | OpenRouter API key | `sk-or-v1-b4b...` |
-| `OPENAI_API_KEY` | Alternative: OpenAI/llama key | `local` or `sk-...` |
-| `CHAT_MODEL` | LLM model | `openrouter/qwen/qwen3.6-plus:free` |
-| `OPENROUTER_MODEL` | Specific model | Same as CHAT_MODEL |
-| `NO_COLOR` | Disable ANSI colors | `1` |
+## 🚀 Live Trading System (cTrader + FTMO)
+
+### Overview
+
+Predix includes a **complete live trading system** that executes strategies on cTrader via Open API with FTMO broker.
+
+**All live trading code is CLOSED SOURCE** and stored in `git_ignore_folder/` (never committed to Git).
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    PREDIX LIVE TRADING                       │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Strategy JSON  →  Factor Calculator  →  Signal Generator   │
+│       ↓                    ↓                       ↓        │
+│  results/strategies   Live OHLCV Data        LONG/SHORT     │
+│  _new/*.json          (cTrader API)         /NEUTRAL        │
+│                                                    ↓        │
+│                                              Risk Manager   │
+│                                                    ↓        │
+│                                        cTrader Orders API   │
+│                                                    ↓        │
+│                                        FTMO Account (Live)  │
+│                                                              │
+│  Logging: results/live_trading/                              │
+│    - trades_*.json  (trade log)                              │
+│    - trading_*.log  (detailed log)                           │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Files (Closed Source)
+
+```
+git_ignore_folder/
+├── predix_live_trader.py          ← Main live trading script
+└── LIVE_TRADING_SETUP.md          ← Setup guide
+
+results/live_trading/
+├── trades_*.json                  ← Trade log
+└── trading_*.log                  ← Detailed log
+```
+
+### Prerequisites
+
+1. **cTrader Account** with FTMO broker
+2. **cTrader Open API** credentials: https://developers.ctrader.com/
+   - Client ID
+   - Client Secret  
+   - Broker ID
+   - Access Token
+3. **Python 3.10+** with `requests`, `pandas`, `numpy`, `python-dotenv`
+
+### Setup cTrader API
+
+1. **Register Application:**
+   - Go to https://developers.ctrader.com/
+   - Login with your cTrader credentials
+   - Create new application
+   - Note down: Client ID, Client Secret, Broker ID
+
+2. **Generate Access Token:**
+   - OAuth2 flow or generate in dashboard
+   - Token expires - refresh as needed
+
+3. **Configure .env:**
+```bash
+# Add to .env file:
+CTRADE_API_BASE=https://api.ctrader.com
+CTRADE_CLIENT_ID=your_client_id
+CTRADE_CLIENT_SECRET=your_client_secret
+CTRADE_ACCESS_TOKEN=your_access_token
+CTRADE_BROKER_ID=your_broker_id
+
+# Trading parameters
+TRADING_SYMBOL=EURUSD
+TRADING_TIMEFRAME=M1
+DEFAULT_LOT_SIZE=0.01
+MAX_DAILY_LOSS_PCT=2.0
+MAX_POSITIONS=1
+```
+
+### How It Works
+
+#### 1. **Strategy Loading**
+```python
+# Loads strategy from JSON
+strategy = json.load(open('results/strategies_new/123_MomentumDivergenceZScore.json'))
+code = strategy['code']          # Strategy Python code
+factors = strategy['factor_names']  # Factor names list
+```
+
+#### 2. **Factor Calculation**
+```python
+# Computes factors from live OHLCV
+ohlcv = client.get_ohlcv('EURUSD', 'M1', count=1000)
+factors_df = compute_factors(ohlcv)
+# Calculates: daily_close_return_96, daily_session_momentum_divergence_1d, etc.
+```
+
+#### 3. **Signal Generation**
+```python
+# Executes strategy code
+exec(strategy_code, {'factors': factors_df}, local_vars)
+signal = local_vars['signal']  # 1=LONG, -1=SHORT, 0=NEUTRAL
+```
+
+#### 4. **Order Execution**
+```python
+if signal != last_signal and signal != 0:
+    # Close opposite positions
+    if signal == 1: close_all_shorts()
+    if signal == -1: close_all_longs()
+    
+    # Place new order
+    client.place_order(
+        symbol='EURUSD',
+        side='LONG' if signal == 1 else 'SHORT',
+        lot_size=calculate_position_size(),
+        stop_loss=0.0050,    # 50 pips
+        take_profit=0.0100,  # 100 pips
+        comment='Predix-{strategy_name}'
+    )
+```
+
+#### 5. **Risk Management**
+- **Daily Loss Limit:** Stops trading if daily loss > 2%
+- **Max Positions:** Only 1 position at a time
+- **Position Sizing:** Dynamic based on balance and ATR
+- **Stop Loss:** 50 pips automatic
+- **Take Profit:** 100 pips automatic
+
+### Usage
+
+#### Paper Trading (TEST FIRST!)
+```bash
+python git_ignore_folder/predix_live_trader.py \
+  --strategy results/strategies_new/1775543215_MomentumDivergenceZScore.json \
+  --paper
+```
+
+#### Live Trading (REAL MONEY)
+```bash
+python git_ignore_folder/predix_live_trader.py \
+  --strategy results/strategies_new/1775543215_MomentumDivergenceZScore.json \
+  --lot-size 0.01
+```
+
+#### Custom Parameters
+```bash
+python git_ignore_folder/predix_live_trader.py \
+  --strategy results/strategies_new/123_MyStrategy.json \
+  --lot-size 0.02 \
+  --symbol EURUSD \
+  --timeframe M5
+```
+
+### CLI Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--strategy` | `-s` | Path to strategy JSON | Required |
+| `--paper` | `-p` | Paper trading mode | False |
+| `--lot-size` | `-l` | Fixed lot size | 0.01 |
+| `--symbol` | | Trading symbol | EURUSD |
+| `--timeframe` | | Timeframe | M1 |
+
+### Monitoring
+
+#### Log Files
+```bash
+# View trade log
+cat results/live_trading/trades_*.json | jq .
+
+# View detailed log
+tail -f results/live_trading/trading_*.log
+```
+
+#### Trade Log Format
+```json
+[
+  {
+    "timestamp": "2026-04-07T12:05:30",
+    "signal": 1,
+    "side": "LONG",
+    "lot_size": 0.01,
+    "result": { "orderId": "12345", "price": 1.08500 }
+  }
+]
+```
+
+### ⚠️ Critical Warnings
+
+1. **ALWAYS test in paper mode first** - Never go live without testing
+2. **Start small** - Use 0.01 lots initially
+3. **Monitor daily** - Check logs every day
+4. **FTMO rules** - Respect max drawdown limits (usually 10%)
+5. **Token expiry** - Refresh API tokens before they expire
+6. **Internet required** - System stops if connection drops
+7. **No guarantees** - Past performance ≠ future results
+
+### Troubleshooting
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Connection failed" | Wrong API credentials | Check .env values |
+| "No OHLCV data" | cTrader not running | Start cTrader platform |
+| "Signal error" | Missing factors | Strategy needs factors not in live data |
+| "Order failed" | Insufficient margin | Check FTMO account balance |
+| "Daily loss limit" | Hit 2% daily loss | System stopped - wait for next day |
+
+### cTrader API Endpoints
+
+The system uses these cTrader Open API endpoints:
+
+```
+GET  /api/accounts          # Get account info
+GET  /api/positions         # Get open positions
+GET  /api/cbars             # Get OHLCV data
+POST /api/orders            # Place order
+DELETE /api/positions/{id}  # Close position
+```
+
+### Future Enhancements
+
+- [ ] Multi-strategy portfolio trading
+- [ ] Dynamic stop loss/take profit
+- [ ] Trailing stop loss
+- [ ] Webhook alerts for trades
+- [ ] Telegram notifications
+- [ ] Auto-restart on disconnect
+- [ ] Backtest with live data sync
+
 │   └── local/                  # Your improved models (NOT in Git!)
 │       ├── transformer_factor.py
 │       ├── tcn_factor.py
