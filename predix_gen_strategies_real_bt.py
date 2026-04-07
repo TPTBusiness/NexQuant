@@ -192,18 +192,20 @@ Create an innovative strategy that combines momentum and mean-reversion signals.
 # ============================================================================
 def run_real_backtest(close, df_factors, strategy_code):
     """
-    Run real backtest using vectorbt library with actual OHLCV data.
+    Run real backtest using actual OHLCV data.
+
+    FIXED: Uses 96-bar forward returns (matching factor IC evaluation),
+    not 1-bar returns which are too noisy for 1-min data.
     """
     if close is None or df_factors is None or len(df_factors.columns) < 2:
         return None
-    
-    # Build test script with vectorbt
+
+    # Build test script
     script = f"""
 import pandas as pd
 import numpy as np
 import json
 
-# Close prices and factors are passed as pickle files
 close = pd.read_pickle('close.pkl')
 factors = pd.read_pickle('factors.pkl')
 
@@ -226,9 +228,20 @@ common_idx = close.index.intersection(signal.index)
 close = close.loc[common_idx]
 signal = signal.loc[common_idx]
 
-# Calculate returns
-returns = close.pct_change().fillna(0)
-strategy_returns = signal.shift(1) * returns  # Signal applies to NEXT bar's return
+# Calculate returns - using 96-bar forward return (matching factor IC horizon)
+returns_96 = close.pct_change(96).shift(-96)
+signal_aligned = signal.loc[returns_96.dropna().index]
+fwd_returns = returns_96.loc[signal_aligned.index]
+
+if len(signal_aligned) < 100 or len(fwd_returns) < 100:
+    print("ERROR: Not enough data after alignment")
+    exit(1)
+
+# Calculate IC: correlation(signal, forward_return)
+ic = signal_aligned.corr(fwd_returns)
+
+# Strategy returns
+strategy_returns = signal_aligned * fwd_returns
 
 # Basic metrics
 total_return = (1 + strategy_returns).prod() - 1
@@ -242,7 +255,7 @@ else:
     monthly_return = total_return
     annual_return = total_return * 12
 
-# Sharpe ratio (annualized)
+# Sharpe ratio (annualized for 96-bar horizon)
 if strategy_returns.std() > 0:
     sharpe = strategy_returns.mean() / strategy_returns.std() * np.sqrt(252 * 1440 / 96)
 else:
@@ -258,17 +271,8 @@ max_dd = drawdown.min() if len(drawdown) > 0 else 0
 win_rate = (strategy_returns > 0).sum() / len(strategy_returns) if len(strategy_returns) > 0 else 0
 
 # Trade count (signal changes)
-n_trades = int((signal != signal.shift(1)).sum())
+n_trades = int((signal_aligned != signal_aligned.shift(1)).sum())
 
-# Calculate IC: correlation between signal and forward returns
-fwd_returns = returns.shift(-1)
-common = signal.index.intersection(fwd_returns.dropna().index)
-if len(common) > 100:
-    ic = signal.loc[common].corr(fwd_returns.loc[common])
-else:
-    ic = 0
-
-# Output results
 result = {{
     "status": "success",
     "sharpe": float(sharpe),
@@ -281,9 +285,9 @@ result = {{
     "annual_return_pct": float(annual_return * 100),
     "n_bars": int(n_bars),
     "n_months": float(n_months),
-    "signal_long": int((signal == 1).sum()),
-    "signal_short": int((signal == -1).sum()),
-    "signal_neutral": int((signal == 0).sum()),
+    "signal_long": int((signal_aligned == 1).sum()),
+    "signal_short": int((signal_aligned == -1).sum()),
+    "signal_neutral": int((signal_aligned == 0).sum()),
 }}
 
 print(json.dumps(result))
