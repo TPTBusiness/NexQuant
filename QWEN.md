@@ -1721,3 +1721,74 @@ File: test/integration/test_full_pipeline.py (27 tests)
 - **Monitoring Dashboard**: Real-time performance tracking
 
 ---
+
+---
+
+## ⚠️ CRITICAL: NEVER COMMIT TRADING STRATEGIES OR JSON FILES
+
+### 🚫 NEVER COMMIT THESE:
+
+```
+❌ *.json (strategy files in root directory)
+❌ results/strategies_new/*.json
+❌ strategies/*.json
+❌ Any file containing trading strategy output
+❌ Backtest results JSON files
+❌ Generated strategy code files
+```
+
+### ✅ WHY?
+
+1. **Git Repository is for CODE ONLY** - Not for generated data
+2. **Strategy files are auto-generated** - They belong in `results/` (gitignored)
+3. **JSON files pollute the repository** - 204+ files were accidentally committed
+4. **History cleanup was painful** - Required BFG Repo-Cleaner to fix
+
+### ✅ WHAT TO COMMIT INSTEAD:
+
+```
+✅ Source code (*.py, *.yaml, *.sh)
+✅ Configuration files (.env.example, data_config.yaml)
+✅ Documentation (QWEN.md, README.md)
+✅ Tests (test/*.py)
+✅ Prompts (prompts/*.yaml)
+✅ Models (models/standard/*.py)
+```
+
+### ✅ WHERE DO STRATEGIES BELONG?
+
+```
+results/strategies_new/    ← Auto-generated strategies (gitignored)
+results/strategies/        ← StrategyCoSTEER output (gitignored)
+results/factors/           ← Factor data (gitignored)
+results/backtests/         ← Backtest results (gitignored)
+```
+
+### ✅ HOW TO PREVENT ACCIDENTAL COMMITS:
+
+```bash
+# 1. .gitignore is configured:
+*.json                    # Excludes ALL JSON files
+!package.json             # Except package files
+!package-lock.json
+
+# 2. Always check before commit:
+git status                # Verify no JSON files staged
+git diff --staged         # Review what will be committed
+
+# 3. If JSON files appear:
+git restore --staged *.json  # Unstage them
+git checkout -- *.json       # Discard changes
+```
+
+### 📜 LESSON LEARNED:
+
+On April 9, 2026:
+- 204+ JSON strategy files were accidentally committed to root
+- Required BFG Repo-Cleaner to remove from history
+- 13,221 git objects had to be cleaned
+- History rewrite required force push
+
+**NEVER let this happen again.**
+
+---
