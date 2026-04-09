@@ -89,6 +89,9 @@ duckduckgo-search
 pytest
 pytest-cov
 
+# News & Data (Polymarket, ForexFactory, CryptoPanic)
+beautifulsoup4>=4.12.0
+
 # RL Trading (optional - system works without these)
 # Install for full RL training: pip install stable-baselines3[extra] gymnasium
 # Without these, RL trading uses simple momentum fallback
