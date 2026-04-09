@@ -119,3 +119,37 @@ CLAUDE.md
 !package.json
 !package-lock.json
 !pyproject.json
+..bfg-report/
+
+# Log files (should be in results/logs/)
+*.log
+fin_quant*.log
+selector.log
+
+# Coverage files
+.coverage
+.coverage.*
+htmlcov/
+
+# BFG report
+..bfg-report/
+
+# Env backups
+.env.backup
+.env.local
+
+# Raw data
+data_raw/
+
+# HDF5 data files
+*.h5
+intraday_pv*.h5
+
+# Cache and build artifacts
+pickle_cache/
+predix.egg-info/
+__pycache__/
+*.pyc
+
+# Log folder
+log/
