@@ -1023,3 +1023,222 @@ def _generate_single_strategy_report(strategy_file: Path, output_dir: Path) -> D
 
 if __name__ == "__main__":
     app()
+
+
+@app.command(name="start_llama")
+def start_llama_cli(
+    model: str = typer.Option(
+        None, "--model", "-m", help="Path to model file"
+    ),
+    port: int = typer.Option(8081, "--port", "-p", help="Server port"),
+    gpu_layers: int = typer.Option(30, "--gpu-layers", "-g", help="GPU layers"),
+    ctx_size: int = typer.Option(80000, "--ctx-size", "-c", help="Context size"),
+    reasoning: bool = typer.Option(False, "--reasoning", help="Enable reasoning mode"),
+):
+    """
+    Start llama.cpp server for local LLM inference.
+
+    Options:
+      --model/-m: Path to model file (default: from .env or ~/models/qwen3.5/)
+      --port/-p: Server port (default: 8081)
+      --gpu-layers/-g: GPU layers (default: 30)
+      --ctx-size/-c: Context size (default: 80000)
+      --reasoning: Enable reasoning mode (default: off)
+
+    Examples:
+      rdagent start_llama
+      rdagent start_llama --gpu-layers 40 --ctx-size 4096
+      rdagent start_llama --reasoning
+    """
+    import subprocess
+    import sys
+    import os
+
+    model_path = model or os.getenv(
+        "LLAMA_MODEL_PATH",
+        str(Path.home() / "models" / "qwen3.5" / "Qwen3.5-35B-A3B-Q3_K_M.gguf"),
+    )
+
+    llama_server = str(Path.home() / "llama.cpp" / "build" / "bin" / "llama-server")
+
+    if not Path(llama_server).exists():
+        print(f"❌ llama.cpp server not found: {llama_server}")
+        print("\nBuild it first:")
+        print("  cd ~/llama.cpp && mkdir -p build && cd build && cmake .. && make")
+        sys.exit(1)
+
+    if not Path(model_path).exists():
+        print(f"❌ Model not found: {model_path}")
+        sys.exit(1)
+
+    cmd = [
+        llama_server,
+        "--model", model_path,
+        "--n-gpu-layers", str(gpu_layers),
+        "--ctx-size", str(ctx_size),
+        "--port", str(port),
+        "--threads", "8",
+        "--threads-batch", "8",
+        "--parallel", "1",
+        "--flash-attn",
+        "--jinja",
+        "--host", "0.0.0.0",
+    ]
+
+    if not reasoning:
+        cmd.extend(["--reasoning", "off"])
+
+    print(f"🚀 Starting llama.cpp server...")
+    print(f"   Model: {Path(model_path).name}")
+    print(f"   Port: {port}")
+    print(f"   GPU Layers: {gpu_layers}")
+    print(f"   Context: {ctx_size}")
+    print(f"   Reasoning: {'on' if reasoning else 'off'}")
+    print()
+
+    try:
+        os.execvp(cmd[0], cmd)
+    except Exception as e:
+        print(f"❌ Failed to start llama.cpp server: {e}")
+        sys.exit(1)
+
+
+@app.command(name="start_loop")
+def start_loop_cli(
+    target_count: int = typer.Option(3, "--target", "-t", help="Strategies per run"),
+    max_wait: int = typer.Option(1800, "--max-wait", "-w", help="Max wait per run (seconds)"),
+):
+    """
+    Start PREDIX strategy generator loop.
+
+    Runs continuously, generating strategies with automatic restart on crash.
+
+    Options:
+      --target/-t: Strategies to generate per run (default: 3)
+      --max-wait/-w: Max wait time per run in seconds (default: 1800 = 30min)
+
+    Examples:
+      rdagent start_loop
+      rdagent start_loop --target 5 --max-wait 3600
+    """
+    import subprocess
+    import signal
+    import sys
+    import os
+    from datetime import datetime
+    import time
+
+    script_dir = str(Path(__file__).parent.parent.parent.parent)
+    generator = f"python {script_dir}/scripts/predix_smart_strategy_gen.py"
+    logfile = f"{script_dir}/results/logs/generator_loop.log"
+    pidfile = "/tmp/predix_loop.pid"
+
+    os.makedirs(f"{script_dir}/results/logs", exist_ok=True)
+
+    def log(msg: str):
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        line = f"{ts} - {msg}"
+        print(line)
+        with open(logfile, "a") as f:
+            f.write(line + "\n")
+
+    def cleanup(signum=None, frame=None):
+        log("Received termination signal. Cleaning up...")
+        try:
+            subprocess.run(["pkill", "-f", "predix_smart_strategy_gen.py"], capture_output=True)
+        except Exception:
+            pass
+        try:
+            os.remove(pidfile)
+        except FileNotFoundError:
+            pass
+        log("Cleanup complete. Exiting.")
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, cleanup)
+    signal.signal(signal.SIGINT, cleanup)
+
+    with open(pidfile, "w") as f:
+        f.write(str(os.getpid()))
+
+    log("=========================================")
+    log("🚀 PREDIX Generator Loop Starting")
+    log("=========================================")
+    log(f"Target: {target_count} strategies per run")
+    log(f"Max wait: {max_wait}s per run")
+    log(f"Log: {logfile}")
+
+    attempt = 0
+
+    while True:
+        attempt += 1
+        log("")
+        log(f"=== Attempt #{attempt} ===================================")
+
+        # Check disk space
+        try:
+            usage = subprocess.run(["df", "-h", script_dir], capture_output=True, text=True)
+            disk_line = usage.stdout.strip().split("\n")[-1]
+            pct = int(disk_line.split()[4].replace("%", ""))
+            if pct > 90:
+                log(f"⚠️  Disk usage at {pct}%. Pausing...")
+                time.sleep(300)
+                continue
+        except Exception:
+            pass
+
+        # Count existing strategies
+        from pathlib import Path as P
+        strat_dir = P(f"{script_dir}/results/strategies_new")
+        strat_count = len(list(strat_dir.glob("*.json"))) if strat_dir.exists() else 0
+        log(f"📁 Existing strategies: {strat_count}")
+
+        # Kill stale processes
+        try:
+            subprocess.run(["pkill", "-9", "-f", "predix_smart_strategy_gen.py"], capture_output=True)
+        except Exception:
+            pass
+        time.sleep(2)
+
+        # Start generator
+        log("🤖 Starting generator...")
+        proc = subprocess.Popen(
+            generator.split(),
+            cwd=script_dir,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        log(f"   PID: {proc.pid}")
+
+        # Monitor progress
+        elapsed = 0
+        while proc.poll() is None:
+            time.sleep(30)
+            elapsed += 30
+
+            if elapsed % 120 == 0:
+                log(f"   ⏱️  {elapsed}s elapsed")
+
+            if elapsed >= max_wait:
+                log(f"   ⏰ Timeout after {elapsed}s. Killing...")
+                proc.kill()
+                break
+
+        # Check results
+        exit_code = proc.wait()
+        if exit_code == 0:
+            log("✅ Generator completed successfully")
+        elif exit_code == -9:
+            log("❌ Generator killed (OOM? Exit 137)")
+        else:
+            log(f"⚠️  Generator exited with code {exit_code}")
+
+        # Count new strategies
+        new_strats = sorted(strat_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)[:3]
+        if new_strats:
+            log("📊 Latest strategies:")
+            for s in new_strats:
+                log(f"   - {s.name}")
+
+        log("⏳ Waiting 60s before next attempt...")
+        time.sleep(60)
