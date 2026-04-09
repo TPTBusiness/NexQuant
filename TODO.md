@@ -58,16 +58,16 @@
 - [x] Tests: `test/integration/test_cli_commands.py` (21 tests)
 - [x] Abhängigkeiten: P2, P3
 
-### P5: ML Training Pipeline (6h)
-- [ ] `rdagent/scenarios/qlib/local/ml_trainer.py` erstellen
-  - [ ] Feature Matrix Builder (alle Top-N Faktoren)
-  - [ ] Time-Series Train/Val Split
-  - [ ] LightGBM Training (early stopping)
-  - [ ] Feature Importance Analysis
-  - [ ] Model Save/Load
-- [ ] CLI Command: `rdagent train_models`
-- [ ] Tests: `test/local/test_ml_trainer.py`
-- [ ] Abhängigkeiten: P0, `pip install lightgbm`
+### P5: ML Training Pipeline (6h) ✅ ABGESCHLOSSEN
+- [x] `rdagent/scenarios/qlib/local/ml_trainer.py` erstellt
+  - [x] Feature Matrix Builder (alle Top-N Faktoren)
+  - [x] Time-Series Train/Val Split
+  - [x] LightGBM Training (early stopping)
+  - [x] Feature Importance Analysis
+  - [x] Model Save/Load
+- [x] CLI Command: `rdagent train_models`
+- [x] Tests: `test/local/test_ml_trainer.py` (46 passed)
+- [x] Abhängigkeiten: P0, `pip install lightgbm`
 
 ### P6: Feedback an fin_quant Loop (3h)
 - [ ] Hook in `QuantRDLoop.feedback()` einbauen
