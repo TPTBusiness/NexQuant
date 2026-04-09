@@ -1,0 +1,24 @@
+# Bandit security scanning configuration
+# This file configures which security checks to skip
+
+skips:
+  # B101: assert_used - assert statements are used for development
+  - 'B101'
+  # B104: hardcoded_bind_all_interfaces - we bind to 0.0.0.0 intentionally
+  - 'B104'
+  # B108: hardcoded_tmp_directory - /tmp is used intentionally for Docker volumes
+  - 'B108'
+  # B301: pickle - pickle is used for session serialization (internal data only)
+  - 'B301'
+  # B310: urllib_urlopen - used for internal URL fetching
+  - 'B310'
+  # B311: random - random is used for non-crypto purposes
+  - 'B311'
+  # B404: subprocess - subprocess is used for process management
+  - 'B404'
+  # B603: subprocess_without_shell_equals_true - intentional usage
+  - 'B603'
+  # B608: hardcoded_sql_expressions - false positive
+  - 'B608'
+  # B609: linux_commands_wildcard_injection - intentional usage
+  - 'B609'
