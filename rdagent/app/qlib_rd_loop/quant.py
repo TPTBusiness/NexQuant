@@ -250,8 +250,23 @@ class QuantRDLoop(RDLoop):
 
         # Periodically build strategies using AI when enough factors are available
         factor_count = self.trace.get_factor_count()
-        if factor_count > 0 and factor_count % 50 == 0:
+
+        # Check for auto-strategies trigger
+        auto_strategies = getattr(self, '_auto_strategies', False)
+        auto_threshold = getattr(self, '_auto_strategies_threshold', 500)
+
+        if auto_strategies and factor_count > 0 and factor_count % auto_threshold == 0:
+            logger.info(
+                f"Auto-strategy trigger: {factor_count} factors evaluated. "
+                f"Suggesting strategy generation now..."
+            )
             self._build_strategies_with_ai()
+        elif factor_count > 0 and factor_count % 50 == 0 and not auto_strategies:
+            # Standard periodic suggestion (every 50 factors)
+            logger.info(
+                f"Periodic check: {factor_count} factors evaluated. "
+                f"Consider running 'rdagent generate_strategies' for AI strategy generation."
+            )
 
         feedback = self._interact_feedback(feedback)
         logger.log_object(feedback, tag="feedback")
@@ -342,6 +357,8 @@ def main(
     all_duration: str | None = None,
     checkout: bool = True,
     base_features_path: str | None = None,
+    auto_strategies: bool = False,
+    auto_strategies_threshold: int = 500,
     **kwargs,
 ):
     """
@@ -349,6 +366,13 @@ def main(
     You can continue running session by
     .. code-block:: python
         dotenv run -- python rdagent/app/qlib_rd_loop/quant.py $LOG_PATH/__session__/1/0_propose  --step_n 1   # `step_n` is a optional paramter
+
+    Parameters
+    ----------
+    auto_strategies : bool
+        Automatically generate strategies after factor threshold
+    auto_strategies_threshold : int
+        Number of factors before triggering strategy generation
     """
     if path is None:
         quant_loop = QuantRDLoop(QUANT_PROP_SETTING)
@@ -358,6 +382,17 @@ def main(
     if "user_interaction_queues" in kwargs and kwargs["user_interaction_queues"] is not None:
         quant_loop._set_interactor(*kwargs["user_interaction_queues"])
         quant_loop._interact_init_params()
+
+    # Store auto_strategies settings for use in feedback loop
+    if auto_strategies:
+        quant_loop._auto_strategies = True
+        quant_loop._auto_strategies_threshold = auto_strategies_threshold
+        logger.info(
+            f"Auto-strategies enabled. Will trigger after {auto_strategies_threshold} factors."
+        )
+    else:
+        quant_loop._auto_strategies = False
+        quant_loop._auto_strategies_threshold = auto_strategies_threshold
 
     asyncio.run(quant_loop.run(step_n=step_n, loop_n=loop_n, all_duration=all_duration))
 
