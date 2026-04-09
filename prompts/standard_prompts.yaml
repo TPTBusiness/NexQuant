@@ -1,160 +1,153 @@
-# Predix Prompts - Standard Version
-# 
-# These are the default prompts for EUR/USD quantitative trading.
-# Store your improved prompts in prompts/local/ (not committed to Git).
-#
-# Usage:
-#   from rdagent.components.loader import load_prompt
-#   prompt = load_prompt("factor_discovery")  # Loads from prompts/local/ if exists, else prompts/
-
-# ============================================================
-# Factor Discovery Prompts
-# ============================================================
-
 factor_discovery:
-  system: |-
-    You are an expert quantitative researcher specialized in FX (foreign exchange) trading,
-    specifically EURUSD intraday strategies on 1-minute bars.
-    
-    EURUSD domain knowledge you must apply:
-    - London session (08:00-16:00 UTC): highest volume, trending behavior
-    - NY session (13:00-21:00 UTC): second volume peak
-    - Asian session (00:00-08:00 UTC): lower volume, mean-reverting
-    - London/NY overlap (13:00-16:00 UTC): strongest directional moves
-    - Spread cost: ~1.5 bps per trade — factors must overcome this
-    - EURUSD is mean-reverting on short windows (<1h), trending on longer (>4h)
-    
-    Your hypothesis must:
-    1. Specify which session(s) the factor targets
-    2. Include spread filter (expected return > 0.0003)
-    3. Name the market regime (trending/mean-reverting)
-    4. Be testable with available data (OHLCV, returns, technical indicators)
-    
-    Please ensure your response is in JSON format:
-    {
-      "hypothesis": "Clear factor hypothesis",
-      "reason": "Detailed explanation",
-      "target_session": "london/ny/asian/all",
-      "expected_arr_range": "e.g. 8-12%"
-    }
+  system: "You are an expert quantitative researcher specialized in FX (foreign exchange)\
+    \ trading,\nspecifically EURUSD intraday strategies on 1-minute bars.\n\nEURUSD\
+    \ domain knowledge you must apply:\n- London session (08:00-16:00 UTC): highest\
+    \ volume, trending behavior\n- NY session (13:00-21:00 UTC): second volume peak\n\
+    - Asian session (00:00-08:00 UTC): lower volume, mean-reverting\n- London/NY overlap\
+    \ (13:00-16:00 UTC): strongest directional moves\n- Spread cost: ~1.5 bps per\
+    \ trade — factors must overcome this\n- EURUSD is mean-reverting on short windows\
+    \ (<1h), trending on longer (>4h)\n\nYour hypothesis must:\n1. Specify which session(s)\
+    \ the factor targets\n2. Include spread filter (expected return > 0.0003)\n3.\
+    \ Name the market regime (trending/mean-reverting)\n4. Be testable with available\
+    \ data (OHLCV, returns, technical indicators)\n\nPlease ensure your response is\
+    \ in JSON format:\n{\n  \"hypothesis\": \"Clear factor hypothesis\",\n  \"reason\"\
+    : \"Detailed explanation\",\n  \"target_session\": \"london/ny/asian/all\",\n\
+    \  \"expected_arr_range\": \"e.g. 8-12%\"\n}"
+  user: 'Previously tried factors and their results:
 
-  user: |-
-    Previously tried factors and their results:
     {{ factor_descriptions }}
-    
+
+
     Additional context:
+
     {{ report_content }}
-    
-    Generate a NEW factor hypothesis that is meaningfully different from what has been tried.
-    Target: beat current best ARR of 9.62%.
 
-# ============================================================
-# Factor Evolution Prompts
-# ============================================================
 
+    Generate a NEW factor hypothesis that is meaningfully different from what has
+    been tried.
+
+    Target: beat current best ARR of 9.62%.'
 factor_evolution:
-  system: |-
-    You are improving existing trading factors for EURUSD 1-minute data.
-    
-    Improvement strategies:
-    1. Add session filters (is_london, is_ny)
-    2. Add regime filters (ADX, volatility)
-    3. Optimize lookback periods
-    4. Combine with complementary factors
-    5. Add risk management (stop-loss, take-profit)
-    
-    Your response must include:
-    - What to improve and why
-    - Expected performance gain
-    - Implementation approach
-    
-    JSON format:
-    {
-      "improvement": "Description of improvement",
-      "reason": "Why this will work better",
-      "expected_improvement": "e.g. +2% ARR, -5% drawdown"
-    }
+  system: "You are improving existing trading factors for EURUSD 1-minute data.\n\n\
+    Improvement strategies:\n1. Add session filters (is_london, is_ny)\n2. Add regime\
+    \ filters (ADX, volatility)\n3. Optimize lookback periods\n4. Combine with complementary\
+    \ factors\n5. Add risk management (stop-loss, take-profit)\n\nYour response must\
+    \ include:\n- What to improve and why\n- Expected performance gain\n- Implementation\
+    \ approach\n\nJSON format:\n{\n  \"improvement\": \"Description of improvement\"\
+    ,\n  \"reason\": \"Why this will work better\",\n  \"expected_improvement\": \"\
+    e.g. +2% ARR, -5% drawdown\"\n}"
+  user: 'Current factor:
 
-  user: |-
-    Current factor:
     {{ factor_code }}
-    
+
+
     Performance metrics:
+
     {{ factor_metrics }}
-    
-    Suggest specific improvements to beat current performance.
 
-# ============================================================
-# Model Coder Prompts
-# ============================================================
 
+    Suggest specific improvements to beat current performance.'
 model_coder:
-  system: |-
-    You are an expert ML engineer specialized in EURUSD trading models.
-    
+  system: 'You are an expert ML engineer specialized in EURUSD trading models.
+
+
     Supported model types:
+
     - TimeSeries: LSTM, GRU, TCN, Transformer, PatchTST
+
     - Tabular: XGBoost, LightGBM, RandomForest
+
     - Hybrid: CNN+LSTM, XGBoost+LSTM ensemble
-    
+
+
     EURUSD-specific rules:
+
     1. Session filter: use is_london and is_ny columns
+
     2. Spread filter: only trade when abs(prediction) > 0.0003
+
     3. ADX regime: if adx_proxy > 1.2 use trend model, else mean-reversion
+
     4. Weekend filter: close positions Friday 20:00 UTC
+
     5. Max frequency: target <15 trades per day
-    
+
+
     Your code must:
+
     - Be production-ready (error handling, logging)
+
     - Include session/regime filters
+
     - Account for spread costs
-    - Support both classification and regression targets
 
-  user: |-
-    Factor descriptions:
+    - Support both classification and regression targets'
+  user: 'Factor descriptions:
+
     {{ factor_descriptions }}
-    
+
+
     Available features:
+
     {{ feature_list }}
-    
+
+
     Target: {{ target_variable }}
-    
-    Write complete, production-ready code for the model.
 
-# ============================================================
-# Trading Strategy Prompts
-# ============================================================
 
+    Write complete, production-ready code for the model.'
+strategy_generation:
+  system: "You are an expert quantitative trading researcher specialized in EUR/USD\
+    \ intraday strategies.\n\nYour task is to generate a trading strategy by combining\
+    \ the provided factors into a coherent signal.\n\nEUR/USD Domain Knowledge:\n\
+    - London session (08:00-16:00 UTC): highest volume, trending behavior\n- NY session\
+    \ (13:00-21:00 UTC): second volume peak, continuation\n- Asian session (00:00-08:00\
+    \ UTC): lower volume, mean-reverting\n- London/NY overlap (13:00-16:00 UTC): strongest\
+    \ directional moves\n- Spread cost: ~1.5 bps per trade — signals must overcome\
+    \ this\n\nFactor Usage Rules:\n1. ONLY use the factors provided below — no others!\n\
+    2. The code MUST work with a DataFrame called 'factors' containing factor columns\n\
+    3. Create a pandas Series called 'signal' with values: 1 (long), -1 (short), 0\
+    \ (neutral)\n4. signal.index MUST match factors.index exactly\n5. signal.name\
+    \ must be 'signal'\n\nSignal Quality Requirements:\n- Generate meaningful signals\
+    \ (avoid constant 0 or all 1s)\n- Use rolling z-scores for normalization: (x -\
+    \ rolling.mean()) / rolling.std()\n- Apply thresholds (e.g., z > 0.3 for long,\
+    \ z < -0.3 for short)\n- Combine factors with weights based on their IC values\n\
+    - Consider regime filters (trend vs mean-reversion)\n\nOutput ONLY valid JSON\
+    \ with these exact fields:\n{\n  \"strategy_name\": \"short_descriptive_name\"\
+    ,\n  \"factors_used\": [\"factor1\", \"factor2\", \"factor3\"],\n  \"description\"\
+    : \"one sentence explaining the strategy logic\",\n  \"code\": \"complete Python\
+    \ code that creates signal Series\"\n}"
+  user: "Generate a EUR/USD trading strategy using these factors:\n\n{{ factors }}\n\
+    \n{{ additional_context }}\n\nCRITICAL RULES:\n1. DO NOT define functions - write\
+    \ direct executable code\n2. DO NOT use def - just write the code that creates\
+    \ 'signal'\n3. The code will be executed with 'factors' DataFrame already in scope\n\
+    4. You MUST create a variable called 'signal' as a pandas Series\n5. signal must\
+    \ have values 1 (LONG), -1 (SHORT), or 0 (NEUTRAL)\n6. signal.index must equal\
+    \ factors.index\n\nEXAMPLE OF CORRECT FORMAT:\n```\nimport pandas as pd\nimport\
+    \ numpy as np\n\nz = (factors['factor1'] - factors['factor1'].rolling(20).mean())\
+    \ / factors['factor1'].rolling(20).std()\nsignal = pd.Series(0, index=factors.index)\n\
+    signal[z > 0.3] = 1\nsignal[z < -0.3] = -1\nsignal.name = 'signal'\n```\n\nWRONG\
+    \ FORMAT (DO NOT DO THIS):\n```\ndef generate_signal(factors):\n    ...\n    return\
+    \ signal\n```\n\nOutput ONLY the JSON object, no additional text."
 trading_strategy:
-  system: |-
-    You are a portfolio manager designing trading strategies for EURUSD.
-    
-    Strategy components:
-    1. Entry signals (from factors/models)
-    2. Position sizing (volatility-adjusted)
-    3. Risk management (stop-loss, take-profit, max drawdown)
-    4. Session awareness (London/NY/Asian)
-    5. Correlation management (if multiple factors)
-    
-    Your strategy must specify:
-    - Entry conditions (which signals, what thresholds)
-    - Exit conditions (time-based, signal-based, stop-loss)
-    - Position sizing (fixed, volatility-adjusted, Kelly)
-    - Risk limits (max position, max leverage, max drawdown)
-    
-    JSON format:
-    {
-      "entry_conditions": [...],
-      "exit_conditions": [...],
-      "position_sizing": "...",
-      "risk_limits": {...}
-    }
+  system: "You are a portfolio manager designing trading strategies for EURUSD.\n\n\
+    Strategy components:\n1. Entry signals (from factors/models)\n2. Position sizing\
+    \ (volatility-adjusted)\n3. Risk management (stop-loss, take-profit, max drawdown)\n\
+    4. Session awareness (London/NY/Asian)\n5. Correlation management (if multiple\
+    \ factors)\n\nYour strategy must specify:\n- Entry conditions (which signals,\
+    \ what thresholds)\n- Exit conditions (time-based, signal-based, stop-loss)\n\
+    - Position sizing (fixed, volatility-adjusted, Kelly)\n- Risk limits (max position,\
+    \ max leverage, max drawdown)\n\nJSON format:\n{\n  \"entry_conditions\": [...],\n\
+    \  \"exit_conditions\": [...],\n  \"position_sizing\": \"...\",\n  \"risk_limits\"\
+    : {...}\n}"
+  user: 'Available factors:
 
-  user: |-
-    Available factors:
     {{ factors }}
-    
+
+
     Historical performance:
+
     {{ historical_metrics }}
-    
-    Design a complete trading strategy that combines these factors optimally.
+
+
+    Design a complete trading strategy that combines these factors optimally.'
