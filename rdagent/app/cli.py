@@ -40,7 +40,46 @@ from rdagent.app.utils.health_check import health_check
 from rdagent.app.utils.info import collect_info
 from rdagent.log.mle_summary import grade_summary as grade_summary
 
-app = typer.Typer()
+app = typer.Typer(
+    help="""
+🤖 PREDIX - AI-Powered Quantitative Trading Agent for EUR/USD
+
+Usage:
+  rdagent COMMAND [OPTIONS]
+
+Available Commands:
+  Trading Loop:
+    fin_quant                  Start factor evolution loop
+    fin_quant --auto-strategies  Auto-generate strategies after threshold
+    fin_quant -d               With web dashboard
+
+  Strategy Generation:
+    generate_strategies        Generate trading strategies with LLM
+    generate_strategies --count 5 --optuna  Generate 5 with Optuna
+    optimize_portfolio         Optimize portfolio (mean-variance, risk parity)
+    strategies_report          Generate performance reports
+
+  Server & Loops:
+    start_llama                Start llama.cpp server for local LLM
+    start_llama --gpu-layers 40  Custom GPU layers
+    start_loop                 Start strategy generator loop
+    start_loop --target 5      Generate 5 strategies per run
+
+  RL Trading:
+    rl_trading --mode train    Train RL agent (PPO/A2C/SAC)
+    rl_trading --mode backtest  Backtest with trained model
+
+  Utilities:
+    health_check               Validate environment setup
+    server_ui                  Start web UI dashboard
+
+Examples:
+  rdagent fin_quant --auto-strategies --with-dashboard
+  rdagent generate_strategies --count 5 --optuna --optuna-trials 30
+  rdagent start_llama
+  rdagent start_loop --target 5
+""",
+)
 
 CheckoutOption = Annotated[bool, typer.Option("--checkout/--no-checkout", "-c/-C")]
 CheckEnvOption = Annotated[bool, typer.Option("--check-env/--no-check-env", "-e/-E")]
