@@ -618,21 +618,22 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             close = self.load_ohlcv_close()
             
             if close is not None:
-                # Align signal with close prices
-                common_idx = signal.index.intersection(close.index)
-                signal_aligned = signal.loc[common_idx].shift(1).fillna(0)
-                close_aligned = close.loc[common_idx]
+                # Use factor timestamps as the base (signal is generated on factor data)
+                # Resample OHLCV close to factor timestamps
+                signal_index = signal.index
+                close_aligned = close.reindex(signal_index).ffill()
                 
                 # Calculate real price returns
                 price_returns = close_aligned.pct_change().fillna(0)
                 
-                # Apply signal positions to real returns
-                returns = price_returns * signal_aligned
+                # Apply signal positions to real returns (lagged signal)
+                signal_positions = signal.shift(1).fillna(0)
+                returns = price_returns * signal_positions
                 
                 # Include spread costs (1.5 bps per trade = 0.00015)
                 combined_factor = df_factors.mean(axis=1)
                 SPREAD_COST = 0.00015
-                signal_changes = signal_aligned.diff().abs().fillna(0)
+                signal_changes = signal_positions.diff().abs().fillna(0)
                 spread_costs = signal_changes * SPREAD_COST
                 returns = returns - spread_costs
             else:
