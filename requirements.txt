@@ -89,8 +89,15 @@ duckduckgo-search
 pytest
 pytest-cov
 
+# Parameter Optimization
+optuna>=3.5.0
+
 # News & Data (Polymarket, ForexFactory, CryptoPanic)
 beautifulsoup4>=4.12.0
+
+# ML Training Pipeline
+lightgbm>=3.3.0
+scipy>=1.9.0
 
 # RL Trading (optional - system works without these)
 # Install for full RL training: pip install stable-baselines3[extra] gymnasium
