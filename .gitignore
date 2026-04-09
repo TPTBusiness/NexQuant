@@ -113,3 +113,9 @@ docs/SMART_STRATEGY_GEN.md
 # OpenACP local workspace (contains secrets)
 .openacp
 CLAUDE.md
+
+# Generated strategy JSON files (root directory only)
+*.json
+!package.json
+!package-lock.json
+!pyproject.json
