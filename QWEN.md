@@ -40,8 +40,15 @@ Predix/
 │   └── scenarios/
 │       └── qlib/               # Qlib integration for FX trading
 │           └── local/          # Closed source components (NOT in Git!)
-│               ├── data_loader.py          # OHLCV & factor data loader
-│               └── strategy_worker.py      # LLM strategy generation + backtest
+│               ├── data_loader.py              # OHLCV & factor data loader
+│               ├── strategy_worker.py          # LLM strategy generation + backtest
+│               ├── strategy_coster.py          # StrategyCoSTEER (LLM strategy gen)
+│               ├── strategy_evaluator.py       # Comprehensive strategy metrics
+│               ├── strategy_runner.py          # Strategy execution & backtesting
+│               ├── ml_trainer.py               # ML model training on factors
+│               ├── feedback_integrator.py      # P6: ML feedback into factor loop
+│               ├── portfolio_optimizer.py      # P7: Mean-variance & risk parity
+│               └── strategy_discovery_v1.yaml  # LLM prompts for strategy gen
 ├── predix.py                   # Main CLI wrapper (predix.py commands)
 ├── predix_parallel.py          # Parallel factor evolution
 ├── predix_gen_strategies_real_bt.py  # AI Strategy Gen + REAL OHLCV Backtest
@@ -769,9 +776,12 @@ report = risk_manager.generate_risk_report(returns, weights)
 - ✅ Auto-Strategies Hook (fin_quant --auto-strategies integration)
 - ✅ Strategy Worker (LLM strategy generation + FTMO-compliant backtesting)
 - ✅ Data Loader (OHLCV + factor data loading with caching)
+- ✅ ML Feedback Integrator (P6 - Auto-triggers for ML/strategy/portfolio at factor milestones)
+- ✅ Portfolio Optimizer (P7 - Mean-Variance, Risk Parity, IC-Weighted, Correlation Analysis)
+- ✅ Integration Tests P6-P8 (27 new tests, full pipeline end-to-end)
 - ✅ Dashboards (Web + CLI)
 - ✅ CLI Commands (`fin_quant`, `rl_trading`, `generate_strategies`, `optimize_portfolio`, etc.)
-- ✅ Integration Tests (220+ tests, run before EVERY commit)
+- ✅ Integration Tests (247+ tests, run before EVERY commit)
 - ✅ Security Scanning (Bandit pre-commit hook)
 - ⏳ Live Trading (Paper trading - in development)
 
@@ -784,8 +794,12 @@ report = risk_manager.generate_risk_report(returns, weights)
 5. ✅ P2: Strategy Orchestrator (DONE)
 6. ✅ P3: Optuna Optimizer (DONE)
 7. ✅ P4: CLI Commands (DONE)
-8. Backtest all 110 factors
-9. Select top 20 by IC/Sharpe
+8. ✅ P6: Feedback Loop (DONE - MLFeedbackMixin hooks into QuantRDLoop.feedback)
+9. ✅ P7: Portfolio Optimizer (DONE - Mean-Variance + Risk Parity + IC-Weighted)
+10. ✅ P8: Integration Tests (DONE - 27 tests for P6-P8 + full pipeline)
+11. ✅ P9: Documentation (DONE - QWEN.md updated)
+12. Backtest all 110 factors
+13. Select top 20 by IC/Sharpe
 10. Portfolio optimization
 8. 4 weeks paper trading
 9. Live trading with small capital
@@ -1521,6 +1535,104 @@ git status
     → Generate NEW factors with ML insights
     → Retrain model with expanded factor set
     → Continuous improvement cycle
+```
+
+### Phase 6: ML Feedback Integrator (P6 - Closed Source)
+
+```
+20. Hook into QuantRDLoop.feedback()
+    → Check factor count every feedback call
+    → Trigger ML training every 500 factors
+    → Trigger strategy generation every 1000 factors
+    → Trigger portfolio optimization every 2000 factors
+
+21. Feature Importance → Prompt Feedback
+    → Read results/models/feature_importance.json
+    → Generate prompt suggestions for next factor generation
+    → Save to prompts/local/ml_feedback.yaml
+
+22. MLFeedbackMixin Implementation
+    → Mixin class for QuantRDLoop
+    → Patches via multiple inheritance
+    → Graceful degradation if modules missing
+    → All errors caught - never breaks main loop
+
+File: rdagent/scenarios/qlib/local/feedback_integrator.py
+Tests: test/local/test_feedback_integrator.py (18 tests)
+```
+
+### Phase 7: Portfolio Optimizer (P7 - Closed Source)
+
+```
+23. Correlation Analysis
+    → Load top 30 strategies by Sharpe
+    → Calculate return correlation matrix
+    → Select uncorrelated subset (max corr 0.3)
+
+24. Mean-Variance Optimization (max Sharpe)
+    → Expected returns from strategy backtests
+    → Covariance matrix from strategy returns
+    → scipy.optimize.minimize (SLSQP)
+    → Long-only, weights sum to 1
+
+25. Risk Parity (equal risk contribution)
+    → Each strategy contributes equally to portfolio risk
+    → Alternative to mean-variance
+
+26. IC-Weighted Portfolio
+    → Weight proportional to |IC|
+    → Simple, robust fallback
+
+27. Portfolio Backtest
+    → Weighted combination of strategy signals
+    → Calculate portfolio IC, Sharpe, Max DD, Win Rate
+
+28. Results Persistence
+    → Save to results/portfolios/{timestamp}_portfolio_{method}.json
+    → Full metrics for each optimization
+
+File: rdagent/scenarios/qlib/local/portfolio_optimizer.py
+Tests: test/local/test_portfolio_optimizer.py (28 tests)
+```
+
+### Phase 8: Integration Tests (P8)
+
+```
+29. End-to-End Pipeline Tests
+    → Data Loading → Strategy Gen → Backtest → Accept
+    → Mock LLM calls for speed
+    → Verify all intermediate outputs
+
+30. Parallelization Tests
+    → 4 Workers, parallel factor evaluation
+    → No race conditions
+    → All results collected correctly
+
+31. FTMO Compliance Tests
+    → SL ≤ 2%, DD ≤ 10%, Daily Loss ≤ 5%
+    → All accepted strategies pass compliance
+
+32. Error Handling Tests
+    → Missing imports, empty data, edge cases
+    → Graceful degradation verified
+
+File: test/integration/test_full_pipeline.py (27 tests)
+```
+
+### Phase 9: Documentation (P9)
+
+```
+33. QWEN.md Updated
+    → Architecture section: new local modules listed
+    → Project Status: P6-P8 marked complete
+    → Next Steps: P6-P9 checkpoints added
+    → Module descriptions added
+
+34. Test Documentation
+    → 18 unit tests for feedback_integrator
+    → 28 unit tests for portfolio_optimizer
+    → 27 integration tests for full pipeline
+    → Total: 73 new tests, all passing
 ```
 
 ---
