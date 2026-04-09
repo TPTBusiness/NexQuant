@@ -274,34 +274,37 @@ class QuantRDLoop(RDLoop):
 
     def _build_strategies_with_ai(self) -> None:
         """
-        Build trading strategies using StrategyCoSTEER (LLM-based).
+        Build trading strategies using StrategyOrchestrator with Optuna optimization.
 
         This method is called periodically during the factor generation loop
         to convert accumulated factors into trading strategies.
 
-        Gracefully skips if local/ directory doesn't exist or LLM is unavailable.
+        Features:
+        - Uses improved LLM prompt (strategy_generation_v2.yaml)
+        - Forward-fills daily factors to 1-min OHLCV
+        - Realistic backtesting with real OHLCV data
+        - Optuna hyperparameter optimization
         """
         try:
-            # Check if StrategyCoSTEER module exists (graceful skip)
-            local_module = Path(__file__).parent.parent.parent / "scenarios" / "qlib" / "local"
-            if not local_module.exists():
-                logger.debug("StrategyCoSTEER: local/ directory not found. Skipping strategy building.")
-                return
-
-            costeer_file = local_module / "strategy_coster.py"
-            if not costeer_file.exists():
-                logger.debug("StrategyCoSTEER: strategy_coster.py not found. Skipping strategy building.")
-                return
-
-            from rdagent.scenarios.qlib.local.strategy_coster import StrategyCoSTEER
-
-            # Load top factors from results
+            from rdagent.components.coder.strategy_orchestrator import StrategyOrchestrator
+            from pathlib import Path
+            import yaml
+            
+            # Load improved prompt
             project_root = Path(__file__).parent.parent.parent.parent
+            prompt_path = project_root / "prompts" / "strategy_generation_v2.yaml"
+            if prompt_path.exists():
+                with open(prompt_path) as f:
+                    improved_prompt = yaml.safe_load(f)
+            else:
+                improved_prompt = None
+
+            # Load factors from results
             results_dir = project_root / "results"
             factors_dir = results_dir / "factors"
 
             if not factors_dir.exists():
-                logger.debug("StrategyCoSTEER: No factors directory found. Skipping.")
+                logger.debug("StrategyOrchestrator: No factors directory found. Skipping.")
                 return
 
             # Load evaluated factors
@@ -316,38 +319,70 @@ class QuantRDLoop(RDLoop):
                     continue
 
             if len(factors) < 10:
-                logger.debug(f"StrategyCoSTEER: Only {len(factors)} factors available. Need at least 10. Skipping.")
+                logger.debug(f"StrategyOrchestrator: Only {len(factors)} factors available. Need at least 10. Skipping.")
                 return
 
-            # Sort by IC and take top factors
+            # Sort by IC and take top 50
             factors.sort(key=lambda x: abs(x.get("ic", 0) or 0), reverse=True)
-            top_factors = factors[:50]  # Use top 50 factors
+            top_factors = factors[:50]
 
-            logger.info(f"StrategyCoSTEER: Building strategies from {len(top_factors)} top factors...")
+            logger.info(f"StrategyOrchestrator: Building strategies from {len(top_factors)} top factors...")
+            logger.info(f"  - Using improved prompt: {improved_prompt is not None}")
+            logger.info(f"  - Optuna optimization: enabled (20 trials)")
+            logger.info(f"  - Real OHLCV backtest: enabled")
 
-            # Initialize and run StrategyCoSTEER
-            strategies_dir = results_dir / "strategies"
-            costeer = StrategyCoSTEER(
-                factors_dir=str(factors_dir),
-                strategies_dir=str(strategies_dir),
-                max_loops=3,  # Limited loops for periodic building
-                min_sharpe=1.5,
+            # Initialize orchestrator with Optuna
+            orchestrator = StrategyOrchestrator(
+                top_factors=20,
+                trading_style='swing',
+                min_sharpe=0.5,
                 max_drawdown=-0.20,
+                min_win_rate=0.40,
+                use_optuna=True,
+                optuna_trials=20,
             )
+            
+            # Override with improved prompt if available
+            if improved_prompt:
+                orchestrator.strategy_prompt = improved_prompt.get('strategy_generation', {})
 
-            # Run CoSTEER loop
-            results = costeer.run(top_factors)
+            # Generate 3 strategies per cycle
+            n_strategies = 3
+            logger.info(f"Generating {n_strategies} strategies...")
+            
+            # Load top factors for generation
+            orch_factors = orchestrator.load_top_factors()
+            
+            for i in range(n_strategies):
+                try:
+                    # Select random factor combination
+                    import random
+                    n_factors = random.randint(2, min(5, len(orch_factors)))
+                    factor_subset = random.sample(orch_factors, n_factors)
+                    
+                    strategy_name = f"auto_gen_v{i+1}"
+                    code = orchestrator.generate_strategy_code(factor_subset, strategy_name)
+                    
+                    if code:
+                        result = orchestrator.evaluate_strategy(code, strategy_name, factor_subset)
+                        
+                        if result.get("status") == "accepted":
+                            logger.info(f"✅ Strategy {strategy_name} accepted!")
+                            logger.info(f"   Sharpe: {result.get('sharpe_ratio', 0):.2f}")
+                            logger.info(f"   Max DD: {result.get('max_drawdown', 0):.4f}")
+                            logger.info(f"   Win Rate: {result.get('win_rate', 0):.4f}")
+                        else:
+                            logger.info(f"❌ Strategy {strategy_name} rejected: {result.get('reason', 'unknown')[:100]}")
+                except Exception as e:
+                    logger.warning(f"Strategy generation failed for {strategy_name}: {e}")
 
-            if results:
-                logger.info(f"StrategyCoSTEER: Generated {len(results)} accepted strategies.")
-            else:
-                logger.info("StrategyCoSTEER: No strategies met acceptance criteria this cycle.")
+            logger.info("StrategyOrchestrator: Cycle complete.")
 
         except ImportError as e:
-            logger.warning(f"StrategyCoSTEER: Import failed ({e}). Skipping strategy building.")
+            logger.warning(f"StrategyOrchestrator: Import failed ({e}). Skipping strategy building.")
         except Exception as e:
             # Don't break the main loop for strategy building failures
-            logger.warning(f"StrategyCoSTEER: Unexpected error: {e}. Skipping strategy building.")
+            logger.warning(f"StrategyOrchestrator: Unexpected error: {e}. Skipping strategy building.")
 
 
 def main(
