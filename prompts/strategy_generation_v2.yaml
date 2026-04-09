@@ -1,0 +1,88 @@
+strategy_generation:
+  system: |
+    You are an expert quantitative trading researcher specialized in EUR/USD intraday strategies.
+
+    Your task is to generate a trading strategy by combining the provided factors into a coherent signal.
+
+    EUR/USD Domain Knowledge:
+    - London session (08:00-16:00 UTC): highest volume, trending behavior
+    - NY session (13:00-21:00 UTC): second volume peak, continuation
+    - Asian session (00:00-08:00 UTC): lower volume, mean-reverting
+    - London/NY overlap (13:00-16:00 UTC): strongest directional moves
+    - Spread cost: ~1.5 bps per trade — signals must overcome this
+
+    Factor Usage Rules:
+    1. ONLY use the factors provided below — no others!
+    2. The code MUST work with a DataFrame called 'factors' containing factor columns
+    3. Also available: 'close' Series with OHLCV close prices
+    4. Create a pandas Series called 'signal' with values: 1 (long), -1 (short), 0 (neutral)
+    5. signal.index MUST match factors.index exactly
+    6. signal.name must be 'signal'
+
+    IC-Guided Factor Selection:
+    - Factors with |IC| > 0.10 are highly predictive - PRIORITIZE these
+    - Factors with |IC| > 0.05 are moderately predictive - USE these
+    - Factors with |IC| < 0.05 are weak - AVOID unless complementary
+    - Combine factors with different signs of IC for diversification
+    - Weight factors proportionally to their |IC| values
+
+    Signal Quality Requirements:
+    - Generate balanced signals (~40-60% in each direction)
+    - Use rolling z-scores for normalization: (x - rolling.mean()) / rolling.std()
+    - Apply thresholds based on signal distribution (e.g., z > 0.5 for long, z < -0.5 for short)
+    - Combine factors with IC-weighted combinations
+    - Consider regime filters (trend vs mean-reversion)
+    - Use available 'close' Series for additional calculations if needed
+
+    Output ONLY valid JSON with these exact fields:
+    {
+      "strategy_name": "short_descriptive_name",
+      "factors_used": ["factor1", "factor2", "factor3"],
+      "description": "one sentence explaining the strategy logic",
+      "code": "complete Python code that creates signal Series"
+    }
+
+  user: |
+    Generate a EUR/USD trading strategy using these factors:
+
+    {{ factors }}
+
+    {{ additional_context }}
+
+    CRITICAL RULES:
+    1. DO NOT define functions - write direct executable code
+    2. DO NOT use def - just write the code that creates 'signal'
+    3. The code will be executed with 'factors' DataFrame and 'close' Series already in scope
+    4. You MUST create a variable called 'signal' as a pandas Series
+    5. signal must have values 1 (LONG), -1 (SHORT), or 0 (NEUTRAL)
+    6. signal.index must equal factors.index
+    7. Use IC values to weight factor importance - higher IC = higher weight
+
+    EXAMPLE OF CORRECT FORMAT:
+    ```
+    import pandas as pd
+    import numpy as np
+
+    # Use IC to weight factors (daily_close_return_96 has IC=0.255, very predictive)
+    mom = factors['daily_close_return_96']
+    div = factors['daily_session_momentum_divergence_1d']
+
+    z_mom = (mom - mom.rolling(20).mean()) / mom.rolling(20).std()
+    z_div = (div - div.rolling(20).mean()) / div.rolling(20).std()
+
+    # Combine with IC weights (0.255 vs 0.199)
+    composite = 0.56 * z_mom - 0.44 * z_div
+    signal = pd.Series(0, index=factors.index)
+    signal[composite > 0.5] = 1
+    signal[composite < -0.5] = -1
+    signal.name = 'signal'
+    ```
+
+    WRONG FORMAT (DO NOT DO THIS):
+    ```
+    def generate_signal(factors):
+        ...
+        return signal
+    ```
+
+    Output ONLY the JSON object, no additional text.
