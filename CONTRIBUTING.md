@@ -9,42 +9,158 @@ To get started, you can explore the issues list or search for `TODO:` comments i
 grep -r "TODO:"
 ```
 
-## How to Contribute
+## Development Workflow
 
-1. **Fork the Repository**: Create a fork of the repository on GitHub.
-2. **Clone the Repository**: Clone your forked repository to your local machine.
-   ```sh
-   git clone https://github.com/your-username/predix.git
-   ```
-3. **Create a Branch**: Create a new branch for your changes.
-   ```sh
-   git checkout -b feature/your-feature-name
-   ```
-4. **Make Changes**: Make your changes to the codebase.
-5. **Commit Changes**: Commit your changes with a descriptive commit message.
-   ```sh
-   git commit -m "Description of your changes"
-   ```
-6. **Push Changes**: Push your changes to your forked repository.
-   ```sh
-   git push origin feature/your-feature-name
-   ```
-7. **Ensure CI Passes**: Make sure your code passes the automatic CI checks on GitHub.
-8. **Create a Pull Request**: Create a pull request from your forked repository to the main repository.
+### 1. Fork and Clone
 
-## Code of Conduct
+```bash
+# Fork the repository on GitHub, then clone your fork
+git clone https://github.com/YOUR-USERNAME/Predix.git
+cd Predix
 
-Please adhere to the [Code of Conduct](CODE_OF_CONDUCT.md) in all your interactions with the project.
+# Add upstream remote
+git remote add upstream https://github.com/TPTBusiness/Predix.git
+```
 
-## Reporting Issues
+### 2. Create a Branch
 
-If you encounter any issues or have suggestions for improvements, please open an issue on GitHub.
+```bash
+# Use conventional commit prefixes in branch names
+git checkout -b feat/your-feature-name
+# or
+git checkout -b fix/bug-description
+git checkout -b docs/documentation-update
+git checkout -b refactor/code-cleanup
+```
 
-## Guidelines
+**Branch naming convention:**
+- `feat/` - New features
+- `fix/` - Bug fixes
+- `docs/` - Documentation changes
+- `refactor/` - Code refactoring
+- `test/` - Test additions/fixes
+- `chore/` - Maintenance tasks
 
-- Ensure your code follows the project's coding standards.
-- Write clear and concise commit messages.
-- Update documentation as needed.
-- Test your changes thoroughly before submitting a pull request.
+### 3. Make Your Changes
 
-Thank you for contributing to Predix!
+Follow the project conventions:
+
+- **Code style**: Use type hints, docstrings (Google style), and 120 char line limit
+- **Language**: All comments and documentation MUST be in English
+- **Structure**: Follow the existing module structure
+
+### 4. Write Tests
+
+**MANDATORY:** All new features MUST have tests with >80% coverage.
+
+```bash
+# Run tests
+pytest test/ -v
+
+# Run with coverage
+pytest --cov=rdagent --cov-report=html
+
+# Run integration tests
+pytest test/integration/ -v
+```
+
+### 5. Run Pre-commit Hooks
+
+Pre-commit hooks run automatically before EVERY commit:
+
+```bash
+# Install pre-commit
+pre-commit install
+
+# Run manually
+pre-commit run --all-files
+```
+
+### 6. Commit Your Changes
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```bash
+git commit -m "type: description"
+
+# Types:
+# feat:     New feature
+# fix:      Bug fix
+# docs:     Documentation
+# style:    Formatting
+# refactor: Code restructuring
+# test:     Tests
+# chore:    Maintenance
+```
+
+**Examples:**
+```bash
+git commit -m "feat: Add Optuna hyperparameter optimization"
+git commit -m "fix: Resolve database connection timeout"
+git commit -m "docs: Update README with new CLI commands"
+git commit -m "test: Add integration tests for portfolio optimizer"
+```
+
+### 7. Push and Create a Pull Request
+
+```bash
+git push origin your-branch-name
+```
+
+Then open a Pull Request on GitHub with:
+- Clear title (use conventional commit format)
+- Description of changes
+- Link to related issues
+- Screenshots (for UI changes)
+
+## Code Review Process
+
+All PRs are reviewed by maintainers. Expect:
+- Automated checks (tests, linting, security scan)
+- Code review by maintainers
+- Possible requested changes
+
+## Important Rules
+
+### 🚫 NEVER COMMIT
+
+- `.env` files or API keys
+- Generated data (`results/`, `*.db`, `*.log`)
+- Closed-source assets (`models/local/`, `prompts/local/`)
+- JSON strategy files in root directory
+- Private credentials or tokens
+
+### ✅ ALWAYS DO
+
+- Write tests for new features
+- Update documentation for user-visible changes
+- Run `pre-commit run --all-files` before pushing
+- Keep commit messages in English
+- Follow conventional commit format
+
+## Project Structure
+
+```
+Predix/
+├── rdagent/                 # Core framework (open source)
+│   ├── app/                 # CLI and scenario apps
+│   ├── components/          # Reusable agent components
+│   └── scenarios/           # Domain-specific scenarios
+├── test/                    # Test suite
+├── docs/                    # Documentation
+├── scripts/                 # Utility scripts
+├── prompts/                 # LLM prompts
+├── models/                  # ML models (standard only)
+├── constraints/             # Python version constraints
+└── requirements/            # Dependency files
+```
+
+## Need Help?
+
+- **Issues**: [GitHub Issues](https://github.com/TPTBusiness/Predix/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/TPTBusiness/Predix/discussions)
+- **Documentation**: See `docs/` folder
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the MIT License.

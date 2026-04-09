@@ -2,19 +2,20 @@
 
 ## Reporting a Vulnerability
 
-We take the security of Predix seriously. If you believe you have found a security vulnerability, please report it to us as described below.
+We take the security of Predix seriously. If you believe you have found a security vulnerability, please report it responsibly.
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please report them via email to:
-- **Email**: nico@predix.io
+### How to Report
 
-You should receive a response within 48 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
+1. **Open a private security advisory** on GitHub: https://github.com/TPTBusiness/Predix/security/advisories
+2. Provide a detailed description of the vulnerability
+3. Include steps to reproduce if possible
+4. We will respond within 48 hours
 
-## Preferred Languages
+### What to Expect
 
-We prefer all communications to be in English.
-
-## Security Updates
-
-Security updates will be released as patch versions. Please ensure you are using the latest version of Predix to benefit from security fixes.
+- We will acknowledge your report within 48 hours
+- We will investigate and provide updates regularly
+- Once resolved, we will credit you in the release notes (if desired)
+- Please allow reasonable time for us to address the issue before public disclosure
