@@ -106,29 +106,41 @@ strategy_generation:
     \ directional moves\n- Spread cost: ~1.5 bps per trade — signals must overcome\
     \ this\n\nFactor Usage Rules:\n1. ONLY use the factors provided below — no others!\n\
     2. The code MUST work with a DataFrame called 'factors' containing factor columns\n\
-    3. Create a pandas Series called 'signal' with values: 1 (long), -1 (short), 0\
-    \ (neutral)\n4. signal.index MUST match factors.index exactly\n5. signal.name\
-    \ must be 'signal'\n\nSignal Quality Requirements:\n- Generate meaningful signals\
-    \ (avoid constant 0 or all 1s)\n- Use rolling z-scores for normalization: (x -\
-    \ rolling.mean()) / rolling.std()\n- Apply thresholds (e.g., z > 0.3 for long,\
-    \ z < -0.3 for short)\n- Combine factors with weights based on their IC values\n\
-    - Consider regime filters (trend vs mean-reversion)\n\nOutput ONLY valid JSON\
+    3. Also available: 'close' Series with OHLCV close prices\n4. Create a pandas\
+    \ Series called 'signal' with values: 1 (long), -1 (short), 0 (neutral)\n5. signal.index\
+    \ MUST match factors.index exactly\n6. signal.name must be 'signal'\n\nIMPORTANT:\
+    \ Understanding IC Sign\n- Factors with POSITIVE IC (e.g., IC=+0.25): HIGH factor\
+    \ value → price goes UP → go LONG\n- Factors with NEGATIVE IC (e.g., IC=-0.20):\
+    \ HIGH factor value → price goes DOWN → go SHORT\n- Best strategies COMBINE both\
+    \ types: use positive IC for trend direction, negative IC for divergence/reversal\n\
+    \nSignal Quality Requirements:\n- Generate balanced signals (~40-60% in each direction)\n\
+    - Use rolling z-scores for normalization: (x - rolling.mean()) / rolling.std()\n\
+    - Combine factors respecting their IC SIGN (multiply negative IC factors by -1)\n\
+    - Apply thresholds based on signal distribution (e.g., z > 0.5 for long, z < -0.5\
+    \ for short)\n- Consider regime filters (trend vs mean-reversion)\n- Use available\
+    \ 'close' Series for additional calculations if needed\n\nOutput ONLY valid JSON\
     \ with these exact fields:\n{\n  \"strategy_name\": \"short_descriptive_name\"\
     ,\n  \"factors_used\": [\"factor1\", \"factor2\", \"factor3\"],\n  \"description\"\
     : \"one sentence explaining the strategy logic\",\n  \"code\": \"complete Python\
-    \ code that creates signal Series\"\n}"
+    \ code that creates signal Series\"\n}\n"
   user: "Generate a EUR/USD trading strategy using these factors:\n\n{{ factors }}\n\
     \n{{ additional_context }}\n\nCRITICAL RULES:\n1. DO NOT define functions - write\
     \ direct executable code\n2. DO NOT use def - just write the code that creates\
-    \ 'signal'\n3. The code will be executed with 'factors' DataFrame already in scope\n\
-    4. You MUST create a variable called 'signal' as a pandas Series\n5. signal must\
-    \ have values 1 (LONG), -1 (SHORT), or 0 (NEUTRAL)\n6. signal.index must equal\
-    \ factors.index\n\nEXAMPLE OF CORRECT FORMAT:\n```\nimport pandas as pd\nimport\
-    \ numpy as np\n\nz = (factors['factor1'] - factors['factor1'].rolling(20).mean())\
-    \ / factors['factor1'].rolling(20).std()\nsignal = pd.Series(0, index=factors.index)\n\
-    signal[z > 0.3] = 1\nsignal[z < -0.3] = -1\nsignal.name = 'signal'\n```\n\nWRONG\
+    \ 'signal'\n3. The code will be executed with 'factors' DataFrame and 'close'\
+    \ Series already in scope\n4. You MUST create a variable called 'signal' as a\
+    \ pandas Series\n5. signal must have values 1 (LONG), -1 (SHORT), or 0 (NEUTRAL)\n\
+    6. signal.index must equal factors.index\n7. RESPECT IC SIGN: Negative IC factors\
+    \ should be INVERTED (multiplied by -1) before combining\n\nEXAMPLE OF CORRECT\
+    \ FORMAT:\n```\nimport pandas as pd\nimport numpy as np\n\n# Positive IC factor:\
+    \ high value → go LONG\nmom = factors['daily_close_return_96']\nz_mom = (mom -\
+    \ mom.rolling(20).mean()) / mom.rolling(20).std()\n\n# Negative IC factor: high\
+    \ value → go SHORT (INVERT!)\ndiv = factors['daily_session_momentum_divergence_1d']\n\
+    z_div = -(div - div.rolling(20).mean()) / div.rolling(20).std()  # NOTE the minus\
+    \ sign!\n\n# Combine: momentum + inverted divergence\ncomposite = 0.5 * z_mom\
+    \ + 0.5 * z_div\nsignal = pd.Series(0, index=factors.index)\nsignal[composite\
+    \ > 0.5] = 1\nsignal[composite < -0.5] = -1\nsignal.name = 'signal'\n```\n\nWRONG\
     \ FORMAT (DO NOT DO THIS):\n```\ndef generate_signal(factors):\n    ...\n    return\
-    \ signal\n```\n\nOutput ONLY the JSON object, no additional text."
+    \ signal\n```\n\nOutput ONLY the JSON object, no additional text.\n"
 trading_strategy:
   system: "You are a portfolio manager designing trading strategies for EURUSD.\n\n\
     Strategy components:\n1. Entry signals (from factors/models)\n2. Position sizing\
