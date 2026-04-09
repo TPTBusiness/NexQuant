@@ -32,6 +32,12 @@ import numpy as np
 import pandas as pd
 
 from rdagent.components.prompt_loader import load_prompt
+
+# OHLCV data path
+OHLCV_PATH = Path(os.getenv(
+    'PREDIX_OHLCV_PATH',
+    '/home/nico/Predix/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5'
+))
 from rdagent.log import rdagent_logger as logger
 
 logger = logging.getLogger(__name__)
@@ -99,6 +105,35 @@ class StrategyOrchestrator:
             f"StrategyOrchestrator initialized: style={self.trading_style}, "
             f"top_factors={self.top_factors}, min_sharpe={self.min_sharpe}"
         )
+
+    def load_ohlcv_close(self) -> pd.Series:
+        """Load OHLCV close prices from HDF5 file."""
+        if not OHLCV_PATH.exists():
+            logger.warning(f"OHLCV data not found: {OHLCV_PATH}")
+            return None
+        
+        try:
+            ohlcv = pd.read_hdf(str(OHLCV_PATH), key='data')
+            if '$close' in ohlcv.columns:
+                close = ohlcv['$close'].dropna()
+            elif 'close' in ohlcv.columns:
+                close = ohlcv['close'].dropna()
+            else:
+                close = ohlcv.select_dtypes(include=[np.number]).iloc[:, 0].dropna()
+            
+            # Handle MultiIndex
+            if isinstance(close.index, pd.MultiIndex):
+                try:
+                    close = close.xs('EURUSD', level='instrument')
+                except KeyError:
+                    idx = close.index.get_level_values('instrument') == 'EURUSD'
+                    close = close[idx]
+                    close.index = close.index.droplevel('instrument')
+            
+            return close
+        except Exception as e:
+            logger.warning(f"Failed to load OHLCV data: {e}")
+            return None
 
     def load_top_factors(self) -> List[Dict[str, Any]]:
         """
@@ -579,17 +614,36 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             
             # Debug: check signal distribution
 
-            # Calculate returns based on signal changes
-            # Simple P&L simulation: when signal changes from 0 to 1, we go long
-            # Returns = signal position * small random return proxy
-            signal_positions = signal.shift(1).fillna(0)
-            # Use factor mean as return proxy (scaled to realistic returns)
-            combined_factor = df_factors.mean(axis=1)
-            # Scale to ~0.01% daily returns (realistic for FX)
-            return_proxy = combined_factor * 0.0001
-            returns = return_proxy * signal_positions
+            # Calculate REAL returns using OHLCV data
+            close = self.load_ohlcv_close()
             
-            # Debug returns}, returns std={returns.std()}").sum()}, Total: {len(returns)}")
+            if close is not None:
+                # Align signal with close prices
+                common_idx = signal.index.intersection(close.index)
+                signal_aligned = signal.loc[common_idx].shift(1).fillna(0)
+                close_aligned = close.loc[common_idx]
+                
+                # Calculate real price returns
+                price_returns = close_aligned.pct_change().fillna(0)
+                
+                # Apply signal positions to real returns
+                returns = price_returns * signal_aligned
+                
+                # Include spread costs (1.5 bps per trade = 0.00015)
+                combined_factor = df_factors.mean(axis=1)
+                SPREAD_COST = 0.00015
+                signal_changes = signal_aligned.diff().abs().fillna(0)
+                spread_costs = signal_changes * SPREAD_COST
+                returns = returns - spread_costs
+            else:
+                # Fallback: use factor proxy if OHLCV unavailable
+                logger.warning("OHLCV data unavailable, using factor proxy")
+                signal_positions = signal.shift(1).fillna(0)
+                combined_factor = df_factors.mean(axis=1)
+                return_proxy = combined_factor * 0.0001
+                returns = return_proxy * signal_positions
+            
+            # Returns calculated
 
             if returns.std() == 0:
                 return {
@@ -621,8 +675,11 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             trades = signal_changes[signal_changes != 0]
             win_rate = float((trades > 0).sum() / len(trades)) if len(trades) > 0 else 0.0
 
-            # Information ratio (signal vs combined factor)
-            benchmark_returns = combined_factor.pct_change().fillna(0)
+            # Information ratio (signal vs buy-and-hold)
+            if close is not None:
+                benchmark_returns = price_returns
+            else:
+                benchmark_returns = combined_factor.pct_change().fillna(0)
             excess_returns = returns - benchmark_returns
             if excess_returns.std() > 0:
                 ir = float(excess_returns.mean() / excess_returns.std() * ann_factor)
