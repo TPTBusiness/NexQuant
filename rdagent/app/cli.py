@@ -65,6 +65,16 @@ Available Commands:
     start_loop                 Start strategy generator loop
     start_loop --target 5      Generate 5 strategies per run
 
+  Parallel & Evaluation:
+    parallel                   Run parallel factor experiments
+    eval_all                   Evaluate factors with full data
+    simple_eval                Simple IC/Sharpe computation
+    batch_backtest             Batch backtest factors
+
+  Strategy Tools:
+    rebacktest                 Re-backtest existing strategies
+    report                     Generate PDF performance reports
+
   RL Trading:
     rl_trading --mode train    Train RL agent (PPO/A2C/SAC)
     rl_trading --mode backtest  Backtest with trained model
@@ -78,6 +88,9 @@ Examples:
   rdagent generate_strategies --count 5 --optuna --optuna-trials 30
   rdagent start_llama
   rdagent start_loop --target 5
+  rdagent parallel --runs 10
+  rdagent eval_all --top 500
+  rdagent batch_backtest --all
 """,
 )
 
@@ -1281,3 +1294,304 @@ def start_loop_cli(
 
         log("⏳ Waiting 60s before next attempt...")
         time.sleep(60)
+
+
+@app.command(name="parallel")
+def parallel_cli(
+    runs: int = typer.Option(5, "--runs", "-n", help="Number of parallel runs"),
+    api_keys: int = typer.Option(1, "--api-keys", "-k", help="Number of API keys to distribute"),
+):
+    """
+    Run multiple factor experiments in parallel.
+
+    Each run gets its own:
+    - Log file
+    - Result directory
+    - Workspace
+
+    Options:
+      --runs/-n: Number of parallel runs (default: 5)
+      --api-keys/-k: Number of API keys (default: 1)
+
+    Examples:
+      rdagent parallel --runs 5 --api-keys 1
+      rdagent parallel -n 10 -k 2
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).parent.parent.parent.parent
+    script = project_root / "scripts" / "predix_parallel.py"
+
+    if not script.exists():
+        typer.echo(f"❌ Script not found: {script}")
+        raise typer.Exit(code=1)
+
+    cmd = [sys.executable, str(script), "--runs", str(runs), "--api-keys", str(api_keys), "-m", "local"]
+
+    typer.echo(f"🚀 Starting {runs} parallel runs...")
+    typer.echo(f"   Script: {script}")
+    typer.echo(f"   API Keys: {api_keys}")
+    typer.echo(f"   Model: local (llama.cpp)")
+
+    try:
+        result = subprocess.run(cmd, cwd=str(project_root))
+        raise typer.Exit(code=result.returncode)
+    except KeyboardInterrupt:
+        typer.echo("\n⚠️  Interrupted by user")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="eval_all")
+def eval_all_cli(
+    top: int = typer.Option(100, "--top", "-n", help="Evaluate top N factors"),
+    parallel: int = typer.Option(4, "--parallel", "-p", help="Number of parallel workers"),
+    full_data: bool = typer.Option(True, "--full-data/--debug-data", help="Use full dataset"),
+):
+    """
+    Evaluate factors with full 1-minute data.
+
+    Computes IC, Sharpe, Max DD, Win Rate for existing factors
+    using the complete intraday_pv.h5 dataset.
+
+    Options:
+      --top/-n: Evaluate top N factors by IC (default: 100)
+      --parallel/-p: Number of parallel workers (default: 4)
+      --full-data: Use full dataset (default: True)
+
+    Examples:
+      rdagent eval_all --top 100
+      rdagent eval_all -n 500 -p 8
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).parent.parent.parent.parent
+    script = project_root / "scripts" / "predix_full_eval.py"
+
+    if not script.exists():
+        typer.echo(f"❌ Script not found: {script}")
+        raise typer.Exit(code=1)
+
+    cmd = [sys.executable, str(script)]
+    if top > 0:
+        cmd.extend(["--top", str(top)])
+    if parallel > 1:
+        cmd.extend(["--parallel", str(parallel)])
+
+    typer.echo(f"📊 Evaluating top {top} factors with full data...")
+    typer.echo(f"   Script: {script}")
+    typer.echo(f"   Workers: {parallel}")
+
+    try:
+        result = subprocess.run(cmd, cwd=str(project_root))
+        raise typer.Exit(code=result.returncode)
+    except KeyboardInterrupt:
+        typer.echo("\n⚠️  Interrupted by user")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="batch_backtest")
+def batch_backtest_cli(
+    factors: int = typer.Option(100, "--factors", "-n", help="Number of factors to backtest"),
+    parallel: int = typer.Option(4, "--parallel", "-p", help="Number of parallel workers"),
+    all_factors: bool = typer.Option(False, "--all", "-a", help="Backtest all factors"),
+):
+    """
+    Batch backtest existing factors.
+
+    Scans generated factor code from workspaces, runs Qlib backtests,
+    and saves results to JSON + SQLite.
+
+    Options:
+      --factors/-n: Number of factors to backtest (default: 100)
+      --parallel/-p: Number of parallel workers (default: 4)
+      --all/-a: Backtest all factors
+
+    Examples:
+      rdagent batch_backtest --factors 100
+      rdagent batch_backtest -n 500 -p 8
+      rdagent batch_backtest --all
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).parent.parent.parent.parent
+    script = project_root / "scripts" / "predix_batch_backtest.py"
+
+    if not script.exists():
+        typer.echo(f"❌ Script not found: {script}")
+        raise typer.Exit(code=1)
+
+    cmd = [sys.executable, str(script)]
+    if all_factors:
+        cmd.append("--all")
+    elif factors > 0:
+        cmd.extend(["--factors", str(factors)])
+    if parallel > 1:
+        cmd.extend(["--parallel", str(parallel)])
+
+    typer.echo(f"📈 Batch backtesting {factors} factors...")
+    typer.echo(f"   Script: {script}")
+    typer.echo(f"   Workers: {parallel}")
+
+    try:
+        result = subprocess.run(cmd, cwd=str(project_root))
+        raise typer.Exit(code=result.returncode)
+    except KeyboardInterrupt:
+        typer.echo("\n⚠️  Interrupted by user")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="simple_eval")
+def simple_eval_cli(
+    top: int = typer.Option(100, "--top", "-n", help="Evaluate top N factors"),
+    parallel: int = typer.Option(4, "--parallel", "-p", help="Number of parallel workers"),
+    all_factors: bool = typer.Option(False, "--all", "-a", help="Evaluate all factors"),
+):
+    """
+    Simple factor evaluation - Direct IC/Sharpe computation.
+
+    Computes IC and Sharpe directly from factor values and forward returns
+    without Qlib infrastructure (faster but less accurate).
+
+    Options:
+      --top/-n: Evaluate top N factors (default: 100)
+      --parallel/-p: Number of parallel workers (default: 4)
+      --all/-a: Evaluate all factors
+
+    Examples:
+      rdagent simple_eval --top 100
+      rdagent simple_eval -n 500 -p 8
+      rdagent simple_eval --all
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).parent.parent.parent.parent
+    script = project_root / "scripts" / "predix_simple_eval.py"
+
+    if not script.exists():
+        typer.echo(f"❌ Script not found: {script}")
+        raise typer.Exit(code=1)
+
+    cmd = [sys.executable, str(script)]
+    if all_factors:
+        cmd.append("--all")
+    elif top > 0:
+        cmd.extend(["--top", str(top)])
+    if parallel > 1:
+        cmd.extend(["--parallel", str(parallel)])
+
+    typer.echo(f"📊 Simple evaluating top {top} factors...")
+    typer.echo(f"   Script: {script}")
+    typer.echo(f"   Workers: {parallel}")
+
+    try:
+        result = subprocess.run(cmd, cwd=str(project_root))
+        raise typer.Exit(code=result.returncode)
+    except KeyboardInterrupt:
+        typer.echo("\n⚠️  Interrupted by user")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="rebacktest")
+def rebacktest_cli(
+    strategies_dir: str = typer.Option(
+        None, "--strategies-dir", "-d", help="Directory containing strategy JSON files"
+    ),
+):
+    """
+    Re-backtest existing strategies with current settings.
+
+    Options:
+      --strategies-dir/-d: Directory with strategy JSON files (default: results/strategies_new/)
+
+    Examples:
+      rdagent rebacktest
+      rdagent rebacktest -d results/strategies_new/
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).parent.parent.parent.parent
+    script = project_root / "scripts" / "predix_rebacktest_strategies.py"
+
+    if not script.exists():
+        typer.echo(f"❌ Script not found: {script}")
+        raise typer.Exit(code=1)
+
+    cmd = [sys.executable, str(script)]
+    if strategies_dir:
+        cmd.extend(["--strategies-dir", strategies_dir])
+
+    typer.echo("🔄 Re-backtesting existing strategies...")
+    typer.echo(f"   Script: {script}")
+
+    try:
+        result = subprocess.run(cmd, cwd=str(project_root))
+        raise typer.Exit(code=result.returncode)
+    except KeyboardInterrupt:
+        typer.echo("\n⚠️  Interrupted by user")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="report")
+def report_cli(
+    strategy_path: str = typer.Option(
+        None, "--strategy", "-s", help="Path to single strategy JSON (default: all strategies)"
+    ),
+    output: str = typer.Option(
+        None, "--output", "-o", help="Output directory (default: results/strategy_reports/)"
+    ),
+):
+    """
+    Generate performance reports for strategies.
+
+    Creates PDF reports with:
+    - Equity curve
+    - Drawdown chart
+    - Signal distribution
+    - Monthly returns heatmap
+    - Full metrics
+
+    Options:
+      --strategy/-s: Path to single strategy JSON (default: all)
+      --output/-o: Output directory (default: results/strategy_reports/)
+
+    Examples:
+      rdagent report                              # All strategies
+      rdagent report -s results/strategies_new/123_MyStrategy.json
+      rdagent report -o custom/reports/
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).parent.parent.parent.parent
+    script = project_root / "scripts" / "predix_strategy_report.py"
+
+    if not script.exists():
+        typer.echo(f"❌ Script not found: {script}")
+        raise typer.Exit(code=1)
+
+    cmd = [sys.executable, str(script)]
+    if strategy_path:
+        cmd.append(strategy_path)
+    if output:
+        cmd.extend(["-o", output])
+
+    typer.echo("📊 Generating strategy reports...")
+    typer.echo(f"   Script: {script}")
+
+    try:
+        result = subprocess.run(cmd, cwd=str(project_root))
+        raise typer.Exit(code=result.returncode)
+    except KeyboardInterrupt:
+        typer.echo("\n⚠️  Interrupted by user")
+        raise typer.Exit(code=1)
