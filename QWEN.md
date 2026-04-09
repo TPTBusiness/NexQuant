@@ -1792,3 +1792,130 @@ On April 9, 2026:
 **NEVER let this happen again.**
 
 ---
+
+---
+
+## 🔒 CRITICAL: NEVER COMMIT CLOSED-SOURCE / PRIVATE ASSETS
+
+### 🚫 NEVER COMMIT THESE (CLOSED SOURCE):
+
+```
+❌ git_ignore_folder/          ← Trading scripts, OHLCV data, credentials
+❌ rdagent/scenarios/qlib/local/  ← Advanced closed-source components
+❌ models/local/               ← Your improved models (Transformer, TCN, etc.)
+❌ prompts/local/              ← Your improved prompts (v2.0 optimized)
+❌ .env                        ← API keys, credentials
+❌ results/                    ← Backtest results, strategies, logs
+❌ *.db                        ← SQLite databases
+❇️ *.log                       ← Log files
+```
+
+### ✅ WHY?
+
+1. **Alpha Protection** - Your best models/prompts are your competitive edge
+2. **Security** - API keys and credentials must stay private
+3. **Repository Size** - OHLCV data and results are massive
+4. **Open Source Framework** - Users get the framework, not your alpha
+
+### 📂 WHAT IS OPEN SOURCE vs CLOSED SOURCE:
+
+#### 🟢 OPEN SOURCE (Public on GitHub - SAFE TO COMMIT):
+```
+rdagent/                       ← Core framework
+models/standard/               ← Base models (XGBoost, LightGBM)
+prompts/standard_prompts.yaml  ← Base prompts
+web/                           ← Dashboards
+test/                          ← ALL tests
+requirements.txt               ← Dependencies
+data_config.yaml               ← Configuration
+scripts/                       ← Utility scripts
+```
+
+#### 🔒 CLOSED SOURCE (Local Only - NEVER COMMIT):
+```
+git_ignore_folder/
+├── predix_live_trader.py      ← Live trading scripts
+├── LIVE_TRADING_SETUP.md      ← Setup guides
+└── factor_implementation_source_data/  ← OHLCV data
+
+rdagent/scenarios/qlib/local/
+├── strategy_coster.py         ← StrategyCoSTEER
+├── strategy_evaluator.py      ← Strategy metrics
+├── strategy_runner.py         ← Strategy execution
+├── ml_trainer.py              ← ML training
+├── feedback_integrator.py     ← ML feedback loop
+├── portfolio_optimizer.py     ← Portfolio optimization
+└── strategy_discovery_v1.yaml ← LLM prompts
+
+models/local/
+├── transformer_factor.py
+├── tcn_factor.py
+├── patchtst_factor.py
+└── cnn_lstm_hybrid.py
+
+prompts/local/
+└── factor_discovery_v2.yaml   ← Your improved prompts
+
+.env                           ← API keys
+results/                       ← All generated data
+```
+
+### ✅ HOW .gitignore PROTECTS YOU:
+
+```bash
+# Already in .gitignore:
+.gitignore contains:
+  git_ignore_folder/           ← Trading data
+  .env                         ← Credentials
+  results/                     ← Generated data
+  *.db                         ← Databases
+  *.log                        ← Log files
+  models/local/                ← Your improved models
+  prompts/local/               ← Your improved prompts
+  rdagent/scenarios/qlib/local/  ← Advanced components
+```
+
+### ✅ HOW TO VERIFY BEFORE COMMIT:
+
+```bash
+# ALWAYS run these before commit:
+git status                     # Should NOT show closed-source files
+git diff --staged              # Review EVERY file
+
+# If you see any of these, STOP:
+git_ignore_folder/
+.env
+results/
+models/local/
+prompts/local/
+rdagent/scenarios/qlib/local/
+```
+
+### ✅ BACKUP YOUR PRIVATE ASSETS SAFELY:
+
+```bash
+# Create a PRIVATE repo on GitHub:
+git clone git@github.com:YOUR-USERNAME/predix-private-assets.git
+
+# Copy closed-source assets:
+cp -r ~/Predix/models/local/* ~/predix-private-assets/models/
+cp -r ~/Predix/prompts/local/* ~/predix-private-assets/prompts/
+cp -r ~/Predix/git_ignore_folder/* ~/predix-private-assets/data/
+
+# Commit to PRIVATE repo:
+cd ~/predix-private-assets
+git add .
+git commit -m "Backup: models v2, prompts v2, trading scripts"
+git push
+```
+
+### 📜 LESSON LEARNED:
+
+Your **competitive edge** (alpha) is in:
+- `models/local/` - Your improved model architectures
+- `prompts/local/` - Your optimized prompt templates
+- `git_ignore_folder/` - Your trading scripts and data
+
+**These MUST stay private.** The open-source framework is the skeleton - your closed-source assets are the brain.
+
+---
