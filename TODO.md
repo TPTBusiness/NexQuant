@@ -69,7 +69,7 @@
 - [x] Tests: `test/local/test_ml_trainer.py` (46 passed)
 - [x] Abhängigkeiten: P0, `pip install lightgbm`
 
-### P6: Feedback an fin_quant Loop (3h)
+### P6: Feedback an fin_quant Loop (3h) ✅ ABGESCHLOSSEN
 - [ ] Hook in `QuantRDLoop.feedback()` einbauen
   - [ ] `_trigger_ml_training()` alle 500 Faktoren
   - [ ] `_trigger_strategy_generation()` alle 1000 Faktoren
@@ -78,7 +78,7 @@
 - [ ] Tests: `test/local/test_feedback_integration.py`
 - [ ] Abhängigkeiten: P5
 
-### P7: Portfolio Optimizer (6h)
+### P7: Portfolio Optimizer (6h) ✅ ABGESCHLOSSEN
 - [ ] `rdagent/scenarios/qlib/local/portfolio_optimizer.py` erstellen
   - [ ] Korrelationsmatrix (max 0.3)
   - [ ] Mean-Variance Optimization
@@ -89,7 +89,7 @@
 - [ ] Tests: `test/local/test_portfolio_optimizer.py`
 - [ ] Abhängigkeiten: P5
 
-### P8: Integrationstests (4h)
+### P8: Integrationstests (4h) ✅ ABGESCHLOSSEN
 - [ ] End-to-End Pipeline Test
   - [ ] Data Loading → Strategy Gen → Backtest → Accept
 - [ ] Parallelisierung Test
@@ -101,7 +101,7 @@
 - [ ] Tests: `test/integration/test_full_pipeline.py`
 - [ ] Abhängigkeiten: P0-P7
 
-### P9: Dokumentation (3h)
+### P9: Dokumentation (3h) ✅ ABGESCHLOSSEN
 - [ ] README.md aktualisieren
   - [ ] Neue Commands dokumentieren
   - [ ] Architektur-Diagramm
