@@ -37,6 +37,9 @@ Predix/
 │   │   └── model_loader.py     # Model loader (auto-loads local models)
 │   └── scenarios/
 │       └── qlib/               # Qlib integration for FX trading
+│           └── local/          # Closed source components (NOT in Git!)
+│               ├── data_loader.py          # OHLCV & factor data loader
+│               └── strategy_worker.py      # LLM strategy generation + backtest
 ├── predix.py                   # Main CLI wrapper (predix.py commands)
 ├── predix_parallel.py          # Parallel factor evolution
 ├── predix_gen_strategies_real_bt.py  # AI Strategy Gen + REAL OHLCV Backtest
@@ -733,6 +736,8 @@ report = risk_manager.generate_risk_report(returns, weights)
 - ✅ Risk Management (Correlation, Portfolio Optimization)
 - ✅ Trading Protection System (Drawdown, Cooldown, Stoploss Guard, Low Performance)
 - ✅ RL Trading Agent (PPO/A2C/SAC with Gymnasium environment + fallback)
+- ✅ Strategy Worker (LLM strategy generation + FTMO-compliant backtesting)
+- ✅ Data Loader (OHLCV + factor data loading with caching)
 - ✅ Dashboards (Web + CLI)
 - ✅ CLI Commands (`fin_quant`, `rl_trading`, `health_check`, etc.)
 - ✅ Integration Tests (200+ tests, run before EVERY commit)
