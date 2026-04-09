@@ -72,7 +72,7 @@ def setup_llm_env():
     if router_key:
         os.environ['OPENAI_API_KEY'] = router_key
         os.environ['OPENAI_API_BASE'] = 'https://openrouter.ai/api/v1'
-        os.environ['CHAT_MODEL'] = os.getenv('OPENROUTER_MODEL', 'openrouter/qwen/qwen3.6-plus:free')
+        os.environ['CHAT_MODEL'] = os.getenv('OPENROUTER_MODEL', 'openrouter/google/gemma-4-26b-a4b-it:free')
 
 # ============================================================================
 # Factor Loading (cached at module level for each process)

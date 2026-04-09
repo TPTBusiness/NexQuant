@@ -178,7 +178,7 @@ class ParallelRunner:
             api_key = self.api_keys[run_state.api_key_idx]
             env["OPENAI_API_KEY"] = api_key
             env["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
-            env["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/qwen/qwen3.6-plus:free")
+            env["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/google/gemma-4-26b-a4b-it:free")
 
             # If we configured multiple API keys AND have enough keys, use load balancing
             if self.num_api_keys >= 2 and len(self.api_keys) >= 2:

@@ -140,7 +140,7 @@ def quant(
 
         # Setup both API keys for load balancing
         os.environ["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
-        os.environ["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/qwen/qwen3.6-plus:free")
+        os.environ["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/google/gemma-4-26b-a4b-it:free")
 
         # If second key exists, configure LiteLLM for load balancing
         if api_key_2:
@@ -990,7 +990,7 @@ def build_strategies_ai(
         else:
             os.environ["OPENAI_API_KEY"] = api_key
         os.environ["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
-        os.environ["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/qwen/qwen3.6-plus:free")
+        os.environ["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/google/gemma-4-26b-a4b-it:free")
         console.print(f"\n[bold blue]🌐 Using OpenRouter: {os.environ['CHAT_MODEL']}[/bold blue]")
     else:
         console.print("[bold red]❌ No API key found. Set OPENROUTER_API_KEY in .env[/bold red]")
