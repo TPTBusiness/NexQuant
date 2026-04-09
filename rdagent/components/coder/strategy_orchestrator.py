@@ -32,6 +32,7 @@ import numpy as np
 import pandas as pd
 
 from rdagent.components.prompt_loader import load_prompt
+from rdagent.components.coder.optuna_optimizer import OptunaOptimizer
 
 # OHLCV data path
 OHLCV_PATH = Path(os.getenv(
@@ -59,6 +60,8 @@ class StrategyOrchestrator:
         max_drawdown: float = -0.20,
         min_win_rate: float = 0.50,
         results_dir: Optional[str] = None,
+        use_optuna: bool = True,
+        optuna_trials: int = 20,
     ):
         """
         Parameters
@@ -81,6 +84,8 @@ class StrategyOrchestrator:
         self.min_sharpe = min_sharpe
         self.max_drawdown = max_drawdown
         self.min_win_rate = min_win_rate
+        self.use_optuna = use_optuna
+        self.optuna_trials = optuna_trials
 
         if results_dir is None:
             project_root = Path(__file__).parent.parent.parent.parent
@@ -909,8 +914,41 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
         # Evaluate
         result = self.evaluate_strategy(code, strategy_name, factors)
         result["code"] = code
-
+        
+        # Optimize with Optuna if enabled and accepted
+        if result.get("status") == "accepted" and self.use_optuna:
+            logger.info(f"Running Optuna optimization for {strategy_name}...")
+            optimizer = OptunaOptimizer(n_trials=self.optuna_trials)
+            
+            # Prepare factor values for optimization
+            factor_values = self._prepare_factor_values(factors)
+            
+            if factor_values is not None:
+                optimized = optimizer.optimize_strategy(result, factor_values)
+                if optimized.get("best_value", float('-inf')) > result.get("sharpe_ratio", 0):
+                    logger.info(f"Optuna improved {strategy_name}: {optimized.get('best_value', 0):.2f}")
+                    result.update(optimized)
+        
         return result
+
+    def _prepare_factor_values(self, factors: List[Dict]) -> Optional[pd.DataFrame]:
+        """Prepare factor values DataFrame for Optuna optimization."""
+        factor_values = {}
+        for f in factors:
+            fname = f.get("factor_name", "")
+            if fname:
+                series = self.load_factor_values(fname)
+                if series is not None:
+                    factor_values[fname] = series
+        
+        if factor_values:
+            df = pd.DataFrame(factor_values)
+            # Forward-fill to OHLCV index
+            close = self.load_ohlcv_close()
+            if close is not None:
+                df = df.reindex(close.index).ffill()
+            return df.dropna()
+        return None
 
     def _save_strategy(self, result: Dict[str, Any]) -> None:
         """Save accepted strategy to JSON file."""
