@@ -580,21 +580,27 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             # Convert all factor columns to numeric
             for col in df_factors.columns:
                 df_factors[col] = pd.to_numeric(df_factors[col], errors='coerce')
+            
+            # Forward-fill daily factors to match OHLCV 1-min index
+            # Many factors are daily (1 value per day), need to ffill to 1-min
+            close = self.load_ohlcv_close()
+            if close is not None:
+                df_factors = df_factors.reindex(close.index).ffill()
+            
             df_factors = df_factors.dropna()
             
-            if len(df_factors) < 100:
+            if len(df_factors) < 1000:
                 return {
                     "strategy_name": strategy_name,
                     "status": "rejected",
-                    "reason": "Insufficient numeric data after conversion",
+                    "reason": f"Insufficient numeric data after conversion ({len(df_factors)} rows)",
                     "factors_used": factor_names,
                 }
             
-            # Load OHLCV close prices for strategies that need them
-            close = self.load_ohlcv_close()
+            # close is already loaded above for ffill, reuse it
+            # Reindex close to match factor index
             if close is not None:
-                # Reindex close to match factor index
-                close = close.reindex(df_factors.index).ffill()
+                close = close.reindex(df_factors.index)
             
             # Execute strategy code with factor data and close prices
             local_vars = {"factors": df_factors}
