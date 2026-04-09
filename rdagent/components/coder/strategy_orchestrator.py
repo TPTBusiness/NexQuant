@@ -12,8 +12,8 @@ Usage:
     orchestrator = StrategyOrchestrator(
         top_factors=20,
         trading_style='swing',
-        min_sharpe=1.5,
-        max_drawdown=-0.20,
+        min_sharpe=0.3,
+        max_drawdown=-0.30,
     )
     results = orchestrator.generate_strategies(count=10, workers=4)
 """
@@ -56,9 +56,9 @@ class StrategyOrchestrator:
         self,
         top_factors: int = 20,
         trading_style: str = "swing",
-        min_sharpe: float = 1.5,
-        max_drawdown: float = -0.20,
-        min_win_rate: float = 0.50,
+        min_sharpe: float = 0.3,
+        max_drawdown: float = -0.30,
+        min_win_rate: float = 0.40,
         results_dir: Optional[str] = None,
         use_optuna: bool = True,
         optuna_trials: int = 20,
@@ -179,7 +179,67 @@ class StrategyOrchestrator:
             else:
                 logger.debug(f"Skipping {fname} - no parquet file")
         
-        return factors_with_files[: self.top_factors]
+        # Select diverse factor TYPES, not just top IC
+        # This ensures we get momentum, volatility, session, volume, etc.
+        type_keywords = {
+            "momentum": [], "trend": [], "volatility": [], "volume": [],
+            "session": [], "london": [], "range": [], "vwap": [],
+            "return": [], "ofi": [], "spread": [], "close": [],
+            "divergence": [], "other": []
+        }
+        
+        for f in factors_with_files:
+            name = f.get("factor_name", "").lower()
+            matched = False
+            for kw in type_keywords:
+                if kw in name:
+                    type_keywords[kw].append(f)
+                    matched = True
+                    break
+            if not matched:
+                type_keywords["other"].append(f)
+        
+        # Select best from each type (ensures diversity)
+        selected = []
+        already_names = set()
+        
+        # Priority order: momentum, divergence, volatility, session, volume, etc.
+        priority_types = ["momentum", "divergence", "volatility", "session", 
+                         "london", "range", "vwap", "volume", "ofi", "spread", 
+                         "return", "trend", "close", "other"]
+        
+        per_type = max(2, self.top_factors // len(priority_types))
+        
+        for kw in priority_types:
+            for f in sorted(type_keywords[kw], key=lambda x: abs(x.get("ic", 0)), reverse=True):
+                if f["factor_name"] not in already_names:
+                    selected.append(f)
+                    already_names.add(f["factor_name"])
+                    if len([s for s in selected if s["factor_name"] in [x["factor_name"] for x in type_keywords[kw]]]) >= per_type:
+                        break
+        
+        # Fill remaining with highest IC not yet selected
+        if len(selected) < self.top_factors:
+            remaining = [f for f in factors_with_files if f["factor_name"] not in already_names]
+            remaining.sort(key=lambda x: abs(x.get("ic", 0)), reverse=True)
+            selected.extend(remaining[:self.top_factors - len(selected)])
+        
+        # Log diversity
+        type_counts = {}
+        for f in selected:
+            name = f.get("factor_name", "").lower()
+            matched = False
+            for kw in type_keywords:
+                if kw in name:
+                    type_counts[kw] = type_counts.get(kw, 0) + 1
+                    matched = True
+                    break
+            if not matched:
+                type_counts["other"] = type_counts.get("other", 0) + 1
+        
+        logger.info(f"Selected {len(selected)} diverse factors: {type_counts}")
+        
+        return selected[:self.top_factors]
 
     def load_factor_values(self, factor_name: str) -> Optional[pd.Series]:
         """
@@ -848,8 +908,12 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                             f"DD={result['max_drawdown']:.2%}"
                         )
                     else:
-                        logger.debug(
-                            f"Strategy rejected: {result['strategy_name']} - {result.get('reason', 'unknown')}"
+                        # Also save rejected strategies for debugging
+                        self._save_strategy(result)
+                        logger.warning(
+                            f"Strategy REJECTED: {result['strategy_name']} - {result.get('reason', 'unknown')} | "
+                            f"Sharpe={result.get('sharpe_ratio', 'N/A')} | "
+                            f"DD={result.get('max_drawdown', 'N/A')}"
                         )
 
                     if progress_callback:
