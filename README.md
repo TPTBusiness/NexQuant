@@ -1,5 +1,19 @@
 # Predix
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%20|%203.11-blue?style=for-the-badge&logo=python" alt="Python">
+  <img src="https://img.shields.io/badge/Platform-Linux-lightgrey?style=for-the-badge&logo=linux" alt="Platform">
+  <img src="https://img.shields.io/badge/PyTorch-2.0+-red?style=for-the-badge&logo=pytorch" alt="PyTorch">
+  <img src="https://img.shields.io/badge/Optuna-3.5+-009B77?style=for-the-badge&logo=optuna" alt="Optuna">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas" alt="Pandas">
+  <img src="https://img.shields.io/badge/LightGBM-00A1E0?style=for-the-badge" alt="LightGBM">
+  <img src="https://img.shields.io/badge/Qlib-FF6B6B?style=for-the-badge" alt="Qlib">
+  <img src="https://img.shields.io/badge/llama.cpp-7B68EE?style=for-the-badge" alt="llama.cpp">
+</p>
+
 <h4 align="center">
   <strong>AI-powered Quantitative Trading Agent for EUR/USD Forex</strong>
 </h4>
@@ -12,9 +26,30 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/TPTBusiness/Predix/blob/master/LICENSE"><img src="https://img.shields.io/github/license/TPTBusiness/Predix" alt="License"></a>
-  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
-  <a href="https://github.com/TPTBusiness/Predix/stargazers"><img src="https://img.shields.io/github/stars/TPTBusiness/Predix" alt="Stars"></a>
+  <a href="https://github.com/TPTBusiness/Predix/blob/master/LICENSE">
+    <img src="https://img.shields.io/github/license/TPTBusiness/Predix?style=flat-square" alt="License">
+  </a>
+  <a href="https://github.com/astral-sh/ruff">
+    <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=flat-square" alt="Ruff">
+  </a>
+  <a href="https://github.com/TPTBusiness/Predix/stargazers">
+    <img src="https://img.shields.io/github/stars/TPTBusiness/Predix?style=flat-square" alt="Stars">
+  </a>
+  <a href="https://github.com/TPTBusiness/Predix/forks">
+    <img src="https://img.shields.io/github/forks/TPTBusiness/Predix?style=flat-square" alt="Forks">
+  </a>
+  <a href="https://github.com/TPTBusiness/Predix/issues">
+    <img src="https://img.shields.io/github/issues/TPTBusiness/Predix?style=flat-square" alt="Issues">
+  </a>
+  <a href="https://github.com/TPTBusiness/Predix/pulls">
+    <img src="https://img.shields.io/github/issues-pr/TPTBusiness/Predix?style=flat-square" alt="Pull Requests">
+  </a>
+  <a href="https://github.com/TPTBusiness/Predix/commits/master">
+    <img src="https://img.shields.io/github/last-commit/TPTBusiness/Predix?style=flat-square" alt="Last Commit">
+  </a>
+  <a href="https://github.com/TPTBusiness/Predix/contributors">
+    <img src="https://img.shields.io/github/contributors/TPTBusiness/Predix?style=flat-square" alt="Contributors">
+  </a>
 </p>
 
 ---
