@@ -590,8 +590,17 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                     "factors_used": factor_names,
                 }
             
-            # Execute strategy code with factor data
+            # Load OHLCV close prices for strategies that need them
+            close = self.load_ohlcv_close()
+            if close is not None:
+                # Reindex close to match factor index
+                close = close.reindex(df_factors.index).ffill()
+            
+            # Execute strategy code with factor data and close prices
             local_vars = {"factors": df_factors}
+            if close is not None:
+                local_vars["close"] = close
+            
             try:
                 exec(strategy_code, {"np": np, "pd": pd, "numpy": np}, local_vars)
             except Exception as e:
@@ -657,9 +666,24 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             # Calculate metrics
             total_return = float(returns.sum())
             n_periods = len(returns)
-            ann_factor = np.sqrt(252 * 1440 / 96)  # Annualization for 1min data
+            
+            # Annualization for 1-minute data
+            # 252 trading days * 1440 minutes per day = 362880 minutes per year
+            minutes_per_year = 252 * 1440
+            ann_factor = np.sqrt(minutes_per_year)  # ~602 for 1-min data
+            
+            # Calculate years of data (minimum 0.1 years = ~36 days to avoid extreme values)
+            years = max(n_periods / minutes_per_year, 0.1) if n_periods > 0 else 0.1
+            
+            # Annualized return (compound, not linear)
+            # For short periods, scale linearly to avoid extreme values
+            if years >= 1 and (1 + total_return) > 0:
+                ann_return = (1 + total_return) ** (1 / years) - 1
+            else:
+                # For < 1 year, linear scaling is more appropriate
+                ann_return = total_return / years
+            
             volatility = float(returns.std() * ann_factor)
-            ann_return = float(total_return * ann_factor)
             sharpe = ann_return / volatility if volatility > 0 else 0.0
 
             # Max drawdown
