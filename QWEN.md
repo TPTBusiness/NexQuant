@@ -27,11 +27,13 @@
 Predix/
 ├── rdagent/                    # Core agent framework
 │   ├── app/
-│   │   └── cli.py              # Main CLI entry point (rdagent command)
+│   │   └── cli.py              # Main CLI entry point (rdagent command) + P4 Commands
 │   ├── components/
 │   │   ├── backtesting/        # Backtest engine, metrics, database
 │   │   ├── coder/
 │   │   │   ├── factor_coder/   # Factor generation & EURUSD-specific modules
+│   │   │   ├── strategy_orchestrator.py  # P2: Strategy generation from factors
+│   │   │   ├── optuna_optimizer.py       # P3: Optuna hyperparameter optimization
 │   │   │   └── rl/             # RL Trading Agent
 │   │   ├── loader.py           # Prompt loader (auto-loads local prompts)
 │   │   └── model_loader.py     # Model loader (auto-loads local models)
@@ -68,6 +70,31 @@ rdagent fin_quant                        # Start factor evolution
 rdagent fin_quant --loop-n 5             # 5 evolution loops
 rdagent fin_quant --with-dashboard       # With web dashboard
 rdagent fin_quant --cli-dashboard        # With CLI Rich dashboard
+rdagent fin_quant --auto-strategies      # Auto-generate strategies after threshold
+rdagent fin_quant --auto-strategies --auto-strategies-threshold 1000
+```
+
+#### Strategy Generation (P4 - NEW)
+```bash
+rdagent generate_strategies                     # Generate 10 strategies (default)
+rdagent generate_strategies -n 20 -w 8          # 20 strategies, 8 workers
+rdagent generate_strategies -s daytrading       # Day trading style
+rdagent generate_strategies --no-optuna         # Skip Optuna optimization
+rdagent generate_strategies --optuna-trials 50  # 50 Optuna trials per strategy
+```
+
+#### Portfolio Optimization (P4 - NEW)
+```bash
+rdagent optimize_portfolio                      # Mean-variance, top 30 strategies
+rdagent optimize_portfolio --method risk_parity # Risk parity weighting
+rdagent optimize_portfolio --top-n 20           # Top 20 strategies only
+```
+
+#### Strategy Reports (P4 - NEW)
+```bash
+rdagent strategies_report                       # Reports for ALL strategies
+rdagent strategies_report -s path/to/strategy.json  # Single strategy
+rdagent strategies_report -o custom/reports/    # Custom output directory
 ```
 
 #### Parallel Execution
@@ -736,11 +763,15 @@ report = risk_manager.generate_risk_report(returns, weights)
 - ✅ Risk Management (Correlation, Portfolio Optimization)
 - ✅ Trading Protection System (Drawdown, Cooldown, Stoploss Guard, Low Performance)
 - ✅ RL Trading Agent (PPO/A2C/SAC with Gymnasium environment + fallback)
+- ✅ Strategy Orchestrator (P2 - LLM factor combination + strategy generation)
+- ✅ Optuna Optimizer (P3 - Hyperparameter optimization for strategies)
+- ✅ CLI Commands (P4 - generate_strategies, optimize_portfolio, strategies_report)
+- ✅ Auto-Strategies Hook (fin_quant --auto-strategies integration)
 - ✅ Strategy Worker (LLM strategy generation + FTMO-compliant backtesting)
 - ✅ Data Loader (OHLCV + factor data loading with caching)
 - ✅ Dashboards (Web + CLI)
-- ✅ CLI Commands (`fin_quant`, `rl_trading`, `health_check`, etc.)
-- ✅ Integration Tests (200+ tests, run before EVERY commit)
+- ✅ CLI Commands (`fin_quant`, `rl_trading`, `generate_strategies`, `optimize_portfolio`, etc.)
+- ✅ Integration Tests (220+ tests, run before EVERY commit)
 - ✅ Security Scanning (Bandit pre-commit hook)
 - ⏳ Live Trading (Paper trading - in development)
 
@@ -750,9 +781,12 @@ report = risk_manager.generate_risk_report(returns, weights)
 2. ✅ Connect RL with Backtesting Engine (DONE)
 3. ✅ Add CLI command for RL Trading (DONE)
 4. ✅ Ensure GitHub users can run full system (DONE - fallback system)
-5. Backtest all 110 factors
-6. Select top 20 by IC/Sharpe
-7. Portfolio optimization
+5. ✅ P2: Strategy Orchestrator (DONE)
+6. ✅ P3: Optuna Optimizer (DONE)
+7. ✅ P4: CLI Commands (DONE)
+8. Backtest all 110 factors
+9. Select top 20 by IC/Sharpe
+10. Portfolio optimization
 8. 4 weeks paper trading
 9. Live trading with small capital
 

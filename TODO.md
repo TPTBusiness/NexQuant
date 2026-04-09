@@ -38,25 +38,25 @@
 - [x] Tests: `test/local/test_strategy_orchestrator.py` (30 passed)
 - [x] Abhängigkeiten: P1
 
-### P3: Optuna Optimizer (4h)
-- [ ] `rdagent/scenarios/qlib/local/optuna_optimizer.py` erstellen
-  - [ ] Parameter Space Definition (FTMO-konform)
-  - [ ] Objective Function (Sharpe × |IC| × √trades)
-  - [ ] FTMO Penalty Logic
-  - [ ] TPE Sampler + MedianPruner
-  - [ ] 20-50 Trials pro Strategie
-- [ ] Integration in Strategy Orchestrator
-- [ ] Tests: `test/local/test_optuna_optimizer.py`
+### P3: Optuna Optimizer (4h) ✅ ABGESCHLOSSEN
+- [x] `rdagent/scenarios/qlib/local/optuna_optimizer.py` erstellt
+  - [x] Parameter Space Definition (FTMO-konform)
+  - [x] Objective Function (Sharpe × |IC| × √trades)
+  - [x] FTMO Penalty Logic
+  - [x] TPE Sampler + MedianPruner
+  - [x] 20-50 Trials pro Strategie
+- [x] Integration in Strategy Orchestrator
+- [x] Tests: `test/local/test_optuna_optimizer.py` (60 passed)
 - [x] Abhängigkeiten: P1, `pip install optuna`
 
-### P4: CLI Commands (2h)
-- [ ] `rdagent/app/cli.py` erweitern
-  - [ ] `generate_strategies` Command
-  - [ ] CLI Parameter (count, workers, style, optuna)
-  - [ ] Rich Console Output
+### P4: CLI Commands (2h) ✅ ABGESCHLOSSEN
+- [x] `rdagent/app/cli.py` erweitert
+  - [x] `generate_strategies` Command
+  - [x] CLI Parameter (count, workers, style, optuna)
+  - [x] Rich Console Output
   - [ ] Integration in `fin_quant` Loop
-- [ ] Tests: `test/integration/test_cli_commands.py`
-- [ ] Abhängigkeiten: P2, P3
+- [x] Tests: `test/integration/test_cli_commands.py` (21 tests)
+- [x] Abhängigkeiten: P2, P3
 
 ### P5: ML Training Pipeline (6h)
 - [ ] `rdagent/scenarios/qlib/local/ml_trainer.py` erstellen
