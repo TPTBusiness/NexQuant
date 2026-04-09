@@ -16,7 +16,7 @@ class LLMSettings(ExtendedBaseSettings):
     embedding_model: str = "text-embedding-3-small"
 
     reasoning_effort: Literal["low", "medium", "high"] | None = None
-    enable_response_schema: bool = True
+    enable_response_schema: bool = False
     # Whether to enable response_schema in chat models. may not work for models that do not support it.
 
     # Handling format

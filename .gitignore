@@ -103,3 +103,9 @@ test_credentials.py
 # Closed source local components
 rdagent/scenarios/qlib/local/
 docs/COMPLETE_WORKFLOW.md
+
+# Local scripts (not for public)
+predix_quick_daytrading.py
+predix_smart_strategy_gen.py
+test/backtesting/test_smart_strategy_gen.py
+docs/SMART_STRATEGY_GEN.md
