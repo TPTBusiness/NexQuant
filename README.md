@@ -54,6 +54,18 @@
 
 ---
 
+## 🖥️ CLI Dashboard
+
+```bash
+rdagent predix
+```
+
+![Predix CLI Welcome Screen](docs/cli-welcome-screen.png)
+
+*The Predix CLI shows system status, available commands, and quick start guide.*
+
+---
+
 ## Overview
 
 **Predix** is an autonomous AI agent for quantitative trading strategies in the EUR/USD forex market. Built on a multi-agent framework, Predix automates the full research and development cycle:
