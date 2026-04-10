@@ -392,14 +392,46 @@ predix/
 
 ## Data Setup
 
-Predix uses 1-minute EUR/USD data. To prepare your dataset:
+Predix requires **1-minute EUR/USD OHLCV data** in HDF5 format.
 
-```bash
-# Run the data setup script (if provided)
-./setup_predix_eurusd.sh
+### Required Format
 
-# Or manually place data in:
-# ~/.qlib/qlib_data/eurusd_1min_data/
+The data file must be saved as `intraday_pv.h5` with the following structure:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| **Index** | MultiIndex `(datetime, instrument)` | Timestamp + currency pair |
+| **`$open`** | float32 | Open price |
+| **`$close`** | float32 | Close price |
+| **`$high`** | float32 | High price |
+| **`$low`** | float32 | Low price |
+| **`$volume`** | float32 | Tick volume |
+
+**Save location:** `git_ignore_folder/factor_implementation_source_data/intraday_pv.h5`
+
+### Where to Get Data
+
+| Source | Cost | Notes |
+|--------|------|-------|
+| **[Dukascopy](https://www.dukascopy.com/swiss/english/marketfeed/historical/)** | Free | Best free EUR/USD tick data |
+| **[OANDA API](https://developer.oanda.com/)** | Free (demo) | Requires API key |
+| **[TrueFX](https://truefx.com/)** | Free | Institutional-quality data |
+| **[Kaggle](https://www.kaggle.com/datasets?search=EURUSD+1min)** | Free | Search "EURUSD 1 minute" |
+| **MetaTrader 5** | Free | Export via `copy_rates_range()` |
+
+### Quick CSV Conversion
+
+```python
+import pandas as pd
+
+df = pd.read_csv('eurusd_1min.csv', parse_dates=['datetime'])
+df = df.rename(columns={'open': '$open', 'close': '$close', 
+                        'high': '$high', 'low': '$low', 'volume': '$volume'})
+df['instrument'] = 'EURUSD'
+df = df.set_index(['datetime', 'instrument'])
+for col in ['$open', '$close', '$high', '$low', '$volume']:
+    df[col] = df[col].astype('float32')
+df.to_hdf('intraday_pv.h5', key='data', mode='w')
 ```
 
 Expected data columns: `$open`, `$close`, `$high`, `$low`, `$volume`
