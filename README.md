@@ -97,7 +97,7 @@ All code in Predix is originally written and implemented independently. Predix e
 
 ### Prerequisites
 
-- **Python 3.10 or 3.11**
+- **Conda** (Miniconda or Anaconda) - Required for environment management
 - **Docker** (required for sandboxed code execution)
 - **Linux** (officially supported; macOS/Windows may work with adjustments)
 
@@ -106,15 +106,18 @@ All code in Predix is originally written and implemented independently. Predix e
 ```bash
 # Clone repository
 git clone https://github.com/TPTBusiness/Predix
-cd predix
+cd Predix
 
-# Create conda environment
-conda create -n predix python=3.10
+# Create and activate conda environment
+conda create -n predix python=3.10 -y
 conda activate predix
 
 # Install in editable mode
-pip install -e .[test,lint]
+pip install -e .
 ```
+
+> **Important:** Predix requires a conda environment to manage dependencies properly.
+> Using plain Python or other environment managers may cause conflicts.
 
 ### Configuration
 
