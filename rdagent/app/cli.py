@@ -1595,3 +1595,23 @@ def report_cli(
     except KeyboardInterrupt:
         typer.echo("\n⚠️  Interrupted by user")
         raise typer.Exit(code=1)
+
+
+
+@app.command(name="predix")
+def predix_welcome():
+    """
+    Show Predix welcome screen with system overview.
+    
+    This command displays a beautiful dashboard showing:
+    - System status (factors, strategies, security)
+    - Available commands
+    - Quick start guide
+    
+    Perfect for GitHub README screenshots!
+    
+    Examples:
+      rdagent predix
+    """
+    from rdagent.app.cli_welcome import show_welcome
+    show_welcome()
