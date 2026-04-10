@@ -47,6 +47,17 @@ factor_evolution:
 
 
     Suggest specific improvements to beat current performance.'
+factor_generation:
+  user: "\n\n⚠️ CRITICAL COLUMN NAME RULES:\n- The DataFrame columns are named: '$open',\
+    \ '$close', '$high', '$low', '$volume'\n- DO NOT use 'close', 'open', 'high',\
+    \ 'low', 'volume' without the $ prefix!\n- DO NOT use df.groupby() for simple\
+    \ calculations - use direct vectorized operations!\n- Always use: df['$close'],\
+    \ df['$high'], df['$low'], etc.\n- Example CORRECT: df['$close'] - df['$close'].shift(15)\n\
+    - Example WRONG: df['close'] - df['close'].shift(15)\n- Example WRONG: df.groupby(level=1)['close'].shift(15)\n\
+    \nExample of correct code:\n```python\ndef calculate_my_factor():\n    df = pd.read_hdf('intraday_pv.h5',\
+    \ key='data')\n    df['return_15'] = (df['$close'] - df['$close'].shift(15)) /\
+    \ df['$close'].shift(15)\n    result = pd.DataFrame({'my_factor': df['return_15']},\
+    \ index=df.index)\n    result.to_hdf('result.h5', key='data', mode='w')\n```"
 model_coder:
   system: 'You are an expert ML engineer specialized in EURUSD trading models.
 
