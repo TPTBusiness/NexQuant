@@ -61,8 +61,24 @@ def get_loop_status(task_path: Path, loop_id: int) -> tuple[str, bool | None]:
     return "?", None
 
 
-def get_max_loops(job_path: Path) -> int:
+def _validate_job_path(job_path: Path, safe_root: Path) -> Path:
+    """Resolve and validate that job_path stays within safe_root."""
+    resolved_root = safe_root.expanduser().resolve()
+    resolved_job = job_path.expanduser().resolve()
+    try:
+        resolved_job.relative_to(resolved_root)
+        return resolved_job
+    except ValueError:
+        raise ValueError(f"Job path {resolved_job} is outside allowed root {resolved_root}")
+
+
+def get_max_loops(job_path: Path, safe_root: Path | None = None) -> int:
     """Get maximum number of loops across all tasks"""
+    if safe_root is not None:
+        try:
+            job_path = _validate_job_path(job_path, safe_root)
+        except ValueError:
+            return 0
     max_loops = 0
     for task_dir in job_path.iterdir():
         if is_valid_task(task_dir):
@@ -71,8 +87,14 @@ def get_max_loops(job_path: Path) -> int:
     return max_loops
 
 
-def get_job_summary_df(job_path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+def get_job_summary_df(job_path: Path, safe_root: Path | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Generate summary DataFrame for all tasks in job"""
+    if safe_root is not None:
+        try:
+            job_path = _validate_job_path(job_path, safe_root)
+        except ValueError:
+            return pd.DataFrame(), pd.DataFrame()
+
     if not job_path.exists():
         return pd.DataFrame(), pd.DataFrame()
 
@@ -149,12 +171,18 @@ def style_df_with_decisions(df: pd.DataFrame, decisions_df: pd.DataFrame):
     return df.style.apply(lambda _: styles, axis=None)
 
 
-def render_job_summary(job_path: Path, is_root: bool = False) -> None:
+def render_job_summary(job_path: Path, safe_root: Path, is_root: bool = False) -> None:
     """Render job summary UI"""
+    try:
+        job_path = _validate_job_path(job_path, safe_root)
+    except ValueError:
+        st.warning("Invalid job path outside allowed root")
+        return
+
     title = "Standalone Tasks" if is_root else f"Job: {job_path.name}"
     st.subheader(title)
 
-    df, decisions_df = get_job_summary_df(job_path)
+    df, decisions_df = get_job_summary_df(job_path, safe_root)
     if df.empty:
         st.warning("No valid tasks found in this job directory")
         return
