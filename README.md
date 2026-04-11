@@ -26,6 +26,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/TPTBusiness/Predix/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/TPTBusiness/Predix/ci.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI Status">
+  </a>
+  <a href="https://codecov.io/gh/TPTBusiness/Predix">
+    <img src="https://img.shields.io/codecov/c/github/TPTBusiness/Predix?style=flat-square&logo=codecov" alt="Coverage">
+  </a>
   <a href="https://github.com/TPTBusiness/Predix/blob/master/LICENSE">
     <img src="https://img.shields.io/github/license/TPTBusiness/Predix?style=flat-square" alt="License">
   </a>
@@ -44,7 +50,7 @@
   <a href="https://github.com/TPTBusiness/Predix/pulls">
     <img src="https://img.shields.io/github/issues-pr/TPTBusiness/Predix?style=flat-square" alt="Pull Requests">
   </a>
-  <a href="https://github.com/TPTBusiness/Predix/commits/master">
+  <a href="https://github.com/TPTBusiness/Predix/commits/main">
     <img src="https://img.shields.io/github/last-commit/TPTBusiness/Predix?style=flat-square" alt="Last Commit">
   </a>
   <a href="https://github.com/TPTBusiness/Predix/contributors">
