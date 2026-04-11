@@ -1,0 +1,42 @@
+# CODEOWNERS
+# Diese Datei definiert die Verantwortlichen für Code-Reviews
+# Siehe: https://docs.github.com/en/repositories/working-with-files/managing-files/about-code-owners
+
+# Core Maintainer (Standard-Reviewer für alle Änderungen)
+* @nico
+
+# RD-Agent Core-Module
+/rdagent/core/ @nico
+/rdagent/components/ @nico
+/rdagent/app/ @nico
+
+# Trading-Spezifika
+/rdagent/scenarios/ @nico
+/prompts/ @nico
+
+# Dokumentation
+/docs/ @nico
+/README.md @nico
+/examples/ @nico
+/CONTRIBUTING.md @nico
+/CODE_OF_CONDUCT.md @nico
+
+# Konfiguration & Build
+/pyproject.toml @nico
+/requirements.txt @nico
+/setup.py @nico
+/Makefile @nico
+
+# CI/CD & Security
+/.github/ @nico
+/.pre-commit-config.yaml @nico
+/.bandit.yml @nico
+/SECURITY.md @nico
+
+# Dashboard & Visualization
+/dashboard/ @nico
+/web/ @nico
+
+# Data Pipeline
+/data/ @nico
+/scripts/download*.py @nico

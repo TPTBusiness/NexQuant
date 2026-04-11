@@ -95,3 +95,8 @@ def show_welcome():
 
 if __name__ == "__main__":
     show_welcome()
+
+
+def main():
+    """Entry point for 'predix' CLI command."""
+    show_welcome()
