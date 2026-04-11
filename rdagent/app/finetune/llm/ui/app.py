@@ -66,14 +66,14 @@ def validate_path_within_cwd(user_path: Path) -> Path:
     return resolved_path
 
 
-def get_job_options(base_path: Path) -> list[str]:
+def get_job_options(base_path: Path, safe_root: Path | None = None) -> list[str]:
     """
     Scan directory and return job options list.
     - "." means standalone tasks in root directory
     - Others are job directory names
 
     Security: Validates base_path to prevent path traversal attacks.
-    Only allows scanning directories within the current working directory.
+    If safe_root is provided, validates against it; otherwise uses CWD.
     """
     options = []
     has_root_tasks = False
@@ -81,17 +81,19 @@ def get_job_options(base_path: Path) -> list[str]:
 
     # Security: Validate base_path to prevent path traversal
     try:
-        # Use dedicated validation function for path traversal prevention
-        base_path_resolved = validate_path_within_cwd(base_path)
+        base_path_resolved = base_path.expanduser().resolve()
+        if safe_root is not None:
+            safe_root_resolved = safe_root.expanduser().resolve()
+            base_path_resolved.relative_to(safe_root_resolved)
+        else:
+            base_path_resolved = validate_path_within_cwd(base_path)
     except ValueError:
         # Path is outside the allowed root, reject it.
-        st.error("Invalid log base path: Must be within project directory")
         return options
-    except (OSError, RuntimeError) as e:
-        st.error(f"Invalid path: {e}")
+    except (OSError, RuntimeError):
         return options
 
-    if not base_path_resolved.exists():
+    if not base_path_resolved.exists():  # nosec B614 – validated above
         return options
 
     for d in base_path_resolved.iterdir():
@@ -149,7 +151,8 @@ def main():
                 st.error("Invalid base folder: must be within the configured log directory.")
                 base_path = safe_root
 
-            job_options = get_job_options(base_path)
+            # base_path is validated against safe_root – nosec B614
+            job_options = get_job_options(base_path, safe_root)  # nosec B614 – validated above
             if job_options:
                 selected_job = st.selectbox("Select Job", job_options, key="job_select")
                 if selected_job.startswith("."):
