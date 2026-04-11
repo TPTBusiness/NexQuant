@@ -85,7 +85,17 @@ def extract_stage(tag: str) -> str:
     return ""
 
 
-def get_valid_sessions(log_folder: Path) -> list[str]:
+def get_valid_sessions(log_folder: Path, safe_root: Path | None = None) -> list[str]:
+    """Get list of valid session directories, optionally validating against a safe root."""
+    # Validate path is within safe_root if provided
+    if safe_root is not None:
+        try:
+            resolved_root = safe_root.expanduser().resolve()
+            resolved_folder = log_folder.expanduser().resolve()
+            resolved_folder.relative_to(resolved_root)
+        except ValueError:
+            return []
+
     if not log_folder.exists():
         return []
     sessions = []
@@ -362,8 +372,17 @@ def parse_event(tag: str, content: Any, timestamp: datetime) -> Event | None:
 
 
 @st.cache_data(ttl=300, hash_funcs={Path: str})
-def load_ft_session(log_path: Path) -> Session:
-    """Load events into hierarchical session structure"""
+def load_ft_session(log_path: Path, safe_root: Path | None = None) -> Session:
+    """Load events into hierarchical session structure, optionally validating against safe root."""
+    # Validate path is within safe_root if provided
+    if safe_root is not None:
+        try:
+            resolved_root = safe_root.expanduser().resolve()
+            resolved_path = log_path.expanduser().resolve()
+            resolved_path.relative_to(resolved_root)
+        except ValueError:
+            return Session()  # Return empty session if path is outside allowed root
+
     session = Session()
     storage = FileStorage(log_path)
 

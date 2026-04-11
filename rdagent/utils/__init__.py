@@ -200,7 +200,10 @@ def remove_path_info_from_str(base_path: Path, target_string: str) -> str:
 
 
 def md5_hash(input_string: str) -> str:
-    hash_md5 = hashlib.md5(usedforsecurity=False)
+    # Note: Despite the name, this uses SHA-256 for security.
+    # MD5 was replaced due to CodeQL alert py/weak-sensitive-data-hashing.
+    # Used for cache keys/identifiers, not cryptographic purposes.
+    hash_sha256 = hashlib.sha256()
     input_bytes = input_string.encode("utf-8")
-    hash_md5.update(input_bytes)
-    return hash_md5.hexdigest()
+    hash_sha256.update(input_bytes)
+    return hash_sha256.hexdigest()
