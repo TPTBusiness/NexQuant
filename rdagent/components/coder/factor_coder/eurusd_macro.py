@@ -116,14 +116,14 @@ def get_live_fx_data() -> dict:
             "success": True
         }
         
-    except Exception as e:
+    except Exception:
         return {
             "eurusd_price": None,
             "dxy_price": None,
             "realized_volatility": None,
             "eurusd_24h_change": None,
             "success": False,
-            "error": str(e)
+            "error": "Internal error while fetching live FX data"
         }
 
 
