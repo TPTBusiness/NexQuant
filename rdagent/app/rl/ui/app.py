@@ -206,7 +206,7 @@ def main():
             st.warning(str(e))
             return
         if job_path.exists():
-            render_job_summary(job_path, is_root=is_root_job)
+            render_job_summary(job_path, safe_root, is_root=is_root_job)
         else:
             st.warning(f"Job folder not found: {job_folder}")
         return
