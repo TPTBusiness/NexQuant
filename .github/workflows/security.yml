@@ -1,0 +1,135 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Weekly on Monday at 6:00 UTC
+    - cron: '0 6 * * 1'
+
+jobs:
+  security:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-security-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-security-
+
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit safety
+
+    - name: Run Bandit (code security)
+      run: |
+        echo "=== Running Bandit Security Scan ==="
+        bandit \
+          -c .bandit.yml \
+          -r rdagent/ \
+          -f json \
+          -o bandit-report.json \
+          --exit-zero || true
+
+        # Show summary
+        bandit -c .bandit.yml -r rdagent/ -ll || true
+
+    - name: Upload Bandit report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bandit-security-report
+        path: bandit-report.json
+        retention-days: 30
+
+    - name: Check dependencies for vulnerabilities
+      run: |
+        echo "=== Checking Dependencies for Vulnerabilities ==="
+        safety check --json || {
+          echo "::warning::Some dependencies have known vulnerabilities"
+          echo "Please review and update dependencies."
+          exit 0  # Non-blocking
+        }
+
+    - name: Check for exposed secrets
+      run: |
+        echo "=== Scanning for Exposed Secrets ==="
+
+        # Check for common secret patterns
+        PATTERNS=(
+          "api_key\s*=\s*['\"][^'\"]+['\"]"
+          "secret\s*=\s*['\"][^'\"]+['\"]"
+          "password\s*=\s*['\"][^'\"]+['\"]"
+          "token\s*=\s*['\"][^'\"]+['\"]"
+          "PRIVATE.KEY"
+          "BEGIN RSA PRIVATE KEY"
+        )
+
+        FOUND_SECRETS=0
+        for pattern in "${PATTERNS[@]}"; do
+          if grep -rInE "$pattern" --include='*.py' --include='*.yml' --include='*.yaml' --include='*.json' . | \
+             grep -v '.git' | \
+             grep -v 'test/' | \
+             grep -v 'example' | \
+             grep -v '# ' | \
+             grep -v 'os.environ' | \
+             grep -v 'getenv' | \
+             grep -v 'argparse'; then
+            FOUND_SECRETS=1
+          fi
+        done
+
+        if [ $FOUND_SECRETS -eq 1 ]; then
+          echo "::error::Potential secrets exposure detected!"
+          echo "Please review the output above and remove any hardcoded credentials."
+          echo "Use environment variables or .env files instead."
+          exit 1
+        fi
+
+        echo "✓ No exposed secrets found"
+
+    - name: Verify closed-source files not committed
+      run: |
+        echo "=== Verifying No Closed-Source Assets Committed ==="
+
+        CLOSED_PATTERNS=(
+          "git_ignore_folder/"
+          "results/"
+          ".env"
+          "models/local/"
+          "prompts/local/"
+          "rdagent/scenarios/qlib/local/"
+          "*.db"
+          "*.log"
+        )
+
+        FOUND_CLOSED=0
+        for pattern in "${CLOSED_PATTERNS[@]}"; do
+          if git ls-files | grep -q "$pattern"; then
+            echo "::error::Found closed-source asset: $pattern"
+            FOUND_CLOSED=1
+          fi
+        done
+
+        if [ $FOUND_CLOSED -eq 1 ]; then
+          echo "CRITICAL: Closed-source assets must not be committed to the repository!"
+          echo "Please remove them and add to .gitignore if needed."
+          exit 1
+        fi
+
+        echo "✓ No closed-source assets found"
