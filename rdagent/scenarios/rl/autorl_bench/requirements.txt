@@ -13,8 +13,14 @@ setuptools<75  # uv venv doesn't include, opencompass depends on pkg_resources
 
 # Inference acceleration (optional, TRL supports 0.10.2-0.12.0)
 # Security: Version >=0.14.0 fixes CVE-2026-22807 (RCE via auto_map dynamic module loading)
-# Current spec (>=0.18.0) is already safe. Dependabot alert is false positive due to missing lockfile.
-vllm>=0.18.0  # Security fix: CVE-2026-22778 (RCE via JPEG2000 heap overflow) + CVE-2026-27893
+# Security: Version >=0.19.0 fixes:
+#   - CVE-2026-34753: SSRF in download_bytes_from_url
+#   - CVE-2026-34756: OOM DoS via unbounded 'n' parameter
+#   - CVE-2026-34755: OOM DoS via unbounded video/jpeg frame count
+#   - CVE-2026-22778: RCE via JPEG2000 heap overflow
+#   - CVE-2026-27893
+# Current spec (>=0.19.0) is already safe. Dependabot alerts are false positives due to missing lockfile.
+vllm>=0.19.0
 
 # Data processing
 numpy>=1.26.0
@@ -25,10 +31,11 @@ pydantic>=2.4.0  # Security fix: CVE-2024-3772 (ReDoS via crafted email)
 # Security: transformers >=4.51.0 fixes CVE-2025-3263 (ReDoS in get_configuration_file)
 # Security: transformers >=4.50.0 fixes CVE-2025-1194 (ReDoS in GPT-NeoX-Japanese tokenizer)
 # Security: transformers >=4.52.1 fixes CVE-2025-3777 (URL validation bypass via username injection)
-# Current spec (>=4.53.0) is already safe. Dependabot alerts are false positives due to missing lockfile.
+# Security: transformers >=5.0.0rc3 fixes CVE-2026-1839 (RCE via Trainer._load_rng_state without weights_only=True)
+# Current spec (>=5.0.0rc3) is already safe. Dependabot alerts are false positives due to missing lockfile.
 # Security: torch >=2.7.1 fixes CVE-2025-2953 (DoS in mkldnn_max_pool2d) - current spec >=2.8.0 is safe
 torch>=2.8.0  # Security fix: CVE-2025-32434 (torch.load RCE), CVE-2025-3730 (DoS in ctc_loss), CVE-2025-2953 (DoS in mkldnn_max_pool2d)
-transformers>=4.53.0  # Security fix: CVE-2024-11393 (RCE), CVE-2025-3264/3933/2099/6051/1194/6638 (ReDoS), CVE-2025-3777 (URL validation)
+transformers>=5.0.0rc3  # Security fix: CVE-2024-11393 (RCE), CVE-2025-3264/3933/2099/6051/1194/6638 (ReDoS), CVE-2025-3777 (URL validation), CVE-2026-1839 (RCE in Trainer)
 huggingface_hub>=0.20.0
 
 # Web services
