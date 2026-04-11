@@ -205,7 +205,8 @@ def main():
         except ValueError as e:
             st.warning(str(e))
             return
-        if job_path.exists():
+        # job_path is validated by _safe_resolve() above
+        if job_path.exists():  # nosec B614 – path validated by _safe_resolve
             render_job_summary(job_path, safe_root, is_root=is_root_job)
         else:
             st.warning(f"Job folder not found: {job_folder}")
