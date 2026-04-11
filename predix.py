@@ -53,14 +53,53 @@ def quant(
     ),
 ):
     """
-    Start EURUSD quantitative trading loop.
+    Start EUR/USD quantitative trading loop with LLM-powered factor generation.
+
+    Executes the RD-Agent quantitative trading loop that uses large language models
+    to generate, test, and iterate on alpha factors for EUR/USD trading. Supports
+    both local llama.cpp inference and cloud-based OpenRouter models. Results are
+    automatically logged and stored in the results directory.
+
+    Args:
+        model: LLM backend to use. 'local' for llama.cpp (requires local server
+            running on OPENAI_API_BASE), 'openrouter' for cloud API. (default: "local")
+        dashboard: If True, starts the Flask-based web dashboard on port 5000
+            for real-time monitoring of the trading loop. (default: False)
+        cli_dashboard: If True, starts the Rich-based CLI dashboard with a 3-second
+            refresh interval for terminal-based monitoring. (default: False)
+        log_file: Path for the log file. If None, auto-detects based on run_id
+            (e.g., 'fin_quant.log' or 'fin_quant_run1.log'). Use 'none' to disable.
+        step_n: Number of individual steps to execute within the loop. None means
+            use the default from configuration.
+        loop_n: Number of complete loops to run. Each loop generates and evaluates
+            new alpha factors. None means use the default from configuration.
+        run_id: Parallel run identifier for isolated execution. When > 0, creates
+            separate log files, results directories, and workspace directories.
+            0 = single run mode (default: 0)
 
     Examples:
-        predix quant                          # Local llama.cpp
-        predix quant -m openrouter            # OpenRouter cloud model
-        predix quant -d                       # With web dashboard
-        predix quant -m openrouter -d         # Both
-        predix quant --run-id 1               # Parallel run #1 (isolated)
+        $ predix quant                          # Local llama.cpp, single run
+        $ predix quant -m openrouter            # OpenRouter cloud model
+        $ predix quant -d                       # With web dashboard on :5000
+        $ predix quant -m openrouter -d         # Cloud model + web dashboard
+        $ predix quant --run-id 1               # Parallel run #1 (isolated)
+        $ predix quant --run-id 2 --loop-n 50   # Parallel run #2, 50 loops
+        $ predix quant --log-file custom.log    # Custom log file path
+
+    Expected Output:
+        - Generated alpha factors saved to results/factors/ as JSON files
+        - Backtest results stored in results/db/backtest_results.db
+        - Log file created in project root (e.g., fin_quant.log)
+        - Optional: Web dashboard at http://localhost:5000
+
+    Estimated Time:
+        ~5-15 minutes per loop depending on model and data size.
+        Local models are faster but may have lower quality than cloud models.
+
+    See Also:
+        predix evaluate - Evaluate existing factors with full 1min data
+        predix top - Show top-performing factors by IC or Sharpe
+        predix health - Check system health and configuration
     """
     import subprocess
     import threading
@@ -219,17 +258,47 @@ def evaluate(
     ),
 ):
     """
-    Evaluate existing factors with full 1min data (2020-2026).
+    Evaluate existing alpha factors with full 1-minute intraday data (2020-2026).
 
-    Computes IC, Sharpe, Max DD, Win Rate for each factor.
-    Automatically skips already evaluated factors (use --force to re-evaluate).
+    Computes comprehensive performance metrics including Information Coefficient (IC),
+    Sharpe Ratio, Maximum Drawdown, and Win Rate for each factor. Factors are loaded
+    from JSON files in results/factors/ and executed against historical data to produce
+    out-of-sample performance estimates. Already evaluated factors are automatically
+    skipped unless --force is specified.
+
+    Args:
+        top: Number of unevaluated factors to process. Only applies when --all is
+            not set. Higher values increase total runtime linearly. (default: 100)
+        all_factors: If True, evaluates ALL unevaluated factors in the factors
+            directory, ignoring the --top parameter. Use with caution as this
+            may take hours for large factor sets. (default: False)
+        parallel: Number of parallel worker processes for factor evaluation.
+            Higher values speed up evaluation but increase memory usage.
+            Recommended: 4-8 for most systems. (default: 4)
+        force: If True, re-evaluates ALL factors including those that already
+            have valid results. Useful when underlying data has changed or
+            when recalculating with updated methodology. (default: False)
 
     Examples:
-        predix evaluate                   # Evaluate 100 NEW factors
-        predix evaluate --top 500         # Evaluate 500 NEW factors
-        predix evaluate --all             # Evaluate all NEW factors
-        predix evaluate --force --top 50  # Re-evaluate 50 factors
-        predix evaluate -p 8              # Use 8 parallel workers
+        $ predix evaluate                   # Evaluate 100 NEW factors
+        $ predix evaluate --top 500         # Evaluate 500 NEW factors
+        $ predix evaluate --all             # Evaluate all remaining factors
+        $ predix evaluate --force --top 50  # Re-evaluate 50 factors
+        $ predix evaluate -p 8              # Use 8 parallel workers
+
+    Expected Output:
+        - Updated JSON files in results/factors/ with IC, Sharpe, Max DD, Win Rate
+        - Summary statistics printed to console
+        - Factors with errors are logged and skipped gracefully
+
+    Estimated Time:
+        ~2-10 minutes per factor depending on complexity and data size.
+        With --parallel 4, expect ~30-60 seconds per factor wall-clock time.
+
+    See Also:
+        predix top - Show top-performing factors by IC or Sharpe
+        predix portfolio - Select a diversified portfolio of uncorrelated factors
+        predix quant - Generate new factors via LLM trading loop
     """
     from rich.panel import Panel
 
@@ -272,12 +341,40 @@ def top(
     ),
 ):
     """
-    Show top-performing factors by IC or Sharpe.
+    Display top-performing alpha factors ranked by IC or Sharpe ratio.
+
+    Loads all evaluated factor results from results/factors/ and presents them
+    in a formatted table sorted by the chosen metric. Only factors with valid
+    IC values (status='success') are included. This is useful for quickly
+    identifying the most promising factors before building portfolios or strategies.
+
+    Args:
+        n: Number of top factors to display. Shows fewer if fewer exist in
+            the results directory. (default: 20)
+        metric: Sorting metric for ranking factors. 'ic' sorts by absolute
+            Information Coefficient, 'sharpe' sorts by absolute Sharpe Ratio.
+            IC measures predictive power, Sharpe measures risk-adjusted returns.
+            (default: "ic")
 
     Examples:
-        predix top                      # Top 20 by IC
-        predix top -n 50                # Top 50 by IC
-        predix top -m sharpe            # Top 20 by Sharpe
+        $ predix top                      # Top 20 factors by absolute IC
+        $ predix top -n 50                # Top 50 factors by absolute IC
+        $ predix top -m sharpe            # Top 20 factors by absolute Sharpe
+        $ predix top -n 100 -m sharpe     # Top 100 factors by Sharpe
+
+    Expected Output:
+        - Formatted table showing Factor name, IC, Sharpe, Annualized Return,
+          Max Drawdown, and Win Rate for each factor
+        - Summary panel with average and best IC/Sharpe across all factors
+
+    Estimated Time:
+        Nearly instantaneous (< 1 second) for typical factor counts.
+        May take a few seconds with thousands of factor files.
+
+    See Also:
+        predix evaluate - Evaluate factors to generate performance metrics
+        predix portfolio - Select diversified portfolio from top factors
+        predix build-strategies - Combine factors into trading strategies
     """
     import json
     import glob as glob_module
@@ -383,15 +480,46 @@ def portfolio(
     ),
 ):
     """
-    Select a diversified portfolio of uncorrelated factors.
+    Select a diversified portfolio of uncorrelated alpha factors.
 
-    Analyzes the top factors by IC and selects a subset that are
-    not highly correlated, reducing redundancy.
+    Analyzes the top factors by IC and selects a subset that minimizes redundancy
+    by calculating the correlation matrix of factor values. Uses a greedy selection
+    algorithm that prioritizes high-IC factors while ensuring pairwise correlations
+    stay below the specified threshold. This reduces overfitting risk and creates
+    more robust composite signals.
+
+    Args:
+        top: Number of candidate factors to consider for portfolio construction.
+            Factors are pre-selected by absolute IC before correlation analysis.
+            Higher values provide more diversity but increase computation time.
+            (default: 50)
+        target: Number of factors to include in the final portfolio. The algorithm
+            will attempt to select this many uncorrelated factors from the candidate
+            pool. May return fewer if insufficient uncorrelated factors exist.
+            (default: 10)
+        max_corr: Maximum allowed absolute correlation between any two selected
+            factors. Lower values produce more diverse portfolios but may exclude
+            high-IC factors. Typical range: 0.2-0.5. (default: 0.3)
 
     Examples:
-        predix portfolio                   # Select top 10 from top 50
-        predix portfolio -n 100 -t 20      # Select top 20 from top 100
-        predix portfolio -c 0.5            # Allow higher correlation
+        $ predix portfolio                   # Select top 10 from top 50 candidates
+        $ predix portfolio -n 100 -t 20      # Select top 20 from top 100
+        $ predix portfolio -c 0.5            # Allow higher correlation (0.5)
+        $ predix portfolio -n 200 -t 15 -c 0.2  # Strict diversification
+
+    Expected Output:
+        - Formatted table showing selected factors with IC, Sharpe, and max correlation
+        - Portfolio saved to results/portfolio/selected_factors.json
+        - Summary of skipped factors and errors (if any)
+
+    Estimated Time:
+        ~2-10 minutes depending on candidate count.
+        Each factor must be re-evaluated to compute time-series values for correlation.
+
+    See Also:
+        predix portfolio-simple - Faster category-based diversification
+        predix top - View top factors before portfolio selection
+        predix build-strategies - Build strategies from selected factors
     """
     import json
     import glob as glob_module
@@ -660,15 +788,38 @@ def portfolio_simple(
     ),
 ):
     """
-    Select a diversified portfolio based on factor categories (Simple Method).
+    Select a diversified portfolio using keyword-based category grouping (fast method).
 
-    Instead of calculating correlations (which requires valid time-series data),
-    this method groups factors by their names/types (e.g., momentum, volatility,
-    mean_reversion, session) and selects the best from each group.
+    Instead of computing expensive correlation matrices, this method groups factors
+    by their names into categories (momentum, volatility, mean_reversion, session,
+    volume, pattern) and selects the highest-IC factor from each category. This
+    provides a quick approximation of diversification without re-evaluating factors.
+    Falls back to 'other' category for factors that don't match any keywords.
+
+    Args:
+        top: Number of candidate factors to consider before categorization.
+            Factors are pre-selected by absolute IC. Higher values increase
+            the chance of finding factors in all categories. (default: 100)
 
     Examples:
-        predix portfolio-simple              # Top factors from different categories
-        predix portfolio-simple -n 200       # Consider top 200 factors
+        $ predix portfolio-simple              # Top factors from different categories
+        $ predix portfolio-simple -n 200       # Consider top 200 factors
+        $ predix portfolio-simple -n 50        # Quick selection from top 50
+
+    Expected Output:
+        - Formatted table showing selected factors with their category, IC, and Sharpe
+        - Portfolio saved to results/portfolio/portfolio_simple.json
+        - Categories include: Momentum, Volatility, Mean Reversion, Session,
+          Volume, Pattern, and Other
+
+    Estimated Time:
+        Nearly instantaneous (< 1 second). No factor re-evaluation required.
+        Only loads existing JSON results and performs keyword matching.
+
+    See Also:
+        predix portfolio - Correlation-based diversification (more accurate but slower)
+        predix top - View top factors before portfolio selection
+        predix build-strategies - Build strategies from selected factors
     """
     import json
     import glob as glob_module
@@ -806,18 +957,45 @@ def build_strategies(
     ),
 ):
     """
-    Build trading strategies by systematically combining factors.
+    Build trading strategies by systematically combining alpha factors.
 
-    This command:
-    1. Loads top evaluated factors
-    2. Generates systematic combinations (pairs, triplets)
-    3. Evaluates each combination using walk-forward validation
-    4. Ranks by Sharpe ratio and saves best strategies
+    This command loads top evaluated factors, generates systematic combinations
+    (pairs, triplets, etc.), and evaluates each combination using walk-forward
+    validation. Results are ranked by Sharpe ratio and the best strategies are
+    saved for later use. This is ideal for discovering synergies between factors
+    that individually may have modest performance but work well together.
+
+    Args:
+        top: Number of top factors (by IC) to use as building blocks for
+            strategy combinations. Higher values increase the number of
+            combinations exponentially. (default: 50)
+        max_combo: Maximum number of factors per combination. 2 creates only
+            pairs, 3 creates pairs and triplets, etc. Higher values dramatically
+            increase the combination count (n choose k). (default: 2)
+        diversified: If True, only generates cross-category combinations,
+            ensuring factors come from different groups (momentum, volatility,
+            etc.). This reduces redundancy but may miss strong single-category
+            strategies. (default: False)
 
     Examples:
-        predix build-strategies                   # Build from top 50, pairs only
-        predix build-strategies -n 100 -c 3       # Top 100, up to triplets
-        predix build-strategies -d                # Diversified only
+        $ predix build-strategies                   # Build from top 50, pairs only
+        $ predix build-strategies -n 100 -c 3       # Top 100, up to triplets
+        $ predix build-strategies -d                # Diversified (cross-category) only
+        $ predix build-strategies -n 30 -c 2 -d     # Top 30, diversified pairs
+
+    Expected Output:
+        - Formatted table of top strategies ranked by Sharpe ratio
+        - Strategy files saved to results/strategies/
+        - Summary with total combinations, success rate, avg/best Sharpe
+
+    Estimated Time:
+        ~1-5 minutes for pairs, ~10-30 minutes for triplets.
+        Scales with O(n^k) where n=factors, k=max_combo_size.
+
+    See Also:
+        predix build-strategies-ai - AI-powered strategy generation via LLM
+        predix portfolio - Select diversified factors before combining
+        predix top - View top factors before building strategies
     """
     import pandas as pd
     import numpy as np
@@ -931,21 +1109,54 @@ def build_strategies_ai(
     ),
 ):
     """
-    Build trading strategies using AI (LLM-based StrategyCoSTEER).
+    Build trading strategies using AI-powered iterative improvement (StrategyCoSTEER).
 
-    Uses LLM to generate, test, and improve trading strategies from
-    existing factors. Follows the CoSTEER pattern:
-    1. Load top factors by IC
-    2. LLM generates strategy hypothesis and code
-    3. Execute backtest and evaluate
-    4. Feed results back to LLM for improvement
-    5. Repeat until convergence or max loops
+    Uses a large language model to generate, test, and refine trading strategies
+    from existing alpha factors. Follows the CoSTEER (Continuous Strategy
+    Evolution via Evaluative Refinement) pattern: the LLM proposes strategy
+    hypotheses and code, backtests are executed, results are fed back to the
+    LLM for analysis and improvement, and the cycle repeats until acceptance
+    criteria are met or max loops are reached. Requires OpenRouter API key.
+
+    Args:
+        top: Number of top factors (by IC) to provide as building blocks for
+            the AI. The LLM will select from this pool to construct strategies.
+            (default: 50)
+        max_loops: Maximum number of improvement cycles per strategy. Each loop
+            the LLM receives previous results and refines its approach. Higher
+            values may find better strategies but cost more API calls. (default: 5)
+        min_sharpe: Minimum Sharpe ratio threshold for strategy acceptance.
+            Strategies below this threshold are rejected and the LLM attempts
+            to improve them in subsequent loops. (default: 1.5)
+        max_drawdown: Maximum acceptable drawdown threshold. Strategies exceeding
+            this drawdown (more negative) are rejected. Expressed as a negative
+            decimal (e.g., -0.20 = 20% max drawdown). (default: -0.20)
+        count: Number of accepted strategies to generate. Set to 0 for unlimited
+            mode (runs until max_batches or Ctrl+C). Each accepted strategy
+            may require multiple improvement loops. (default: 1)
 
     Examples:
-        predix build-strategies-ai           # Default: top 50, 5 loops
-        predix build-strategies-ai -t 100    # Use top 100 factors
-        predix build-strategies-ai -l 10     # 10 improvement loops
-        predix build-strategies-ai --min-sharpe 2.0  # Stricter target
+        $ predix build-strategies-ai                  # Generate 1 strategy, 5 loops max
+        $ predix build-strategies-ai -t 100           # Use top 100 factors as pool
+        $ predix build-strategies-ai -l 10            # Allow 10 improvement loops
+        $ predix build-strategies-ai --min-sharpe 2.0 # Stricter Sharpe requirement
+        $ predix build-strategies-ai --max-dd -0.15   # Tighter drawdown limit
+        $ predix build-strategies-ai -c 5             # Generate 5 accepted strategies
+
+    Expected Output:
+        - Formatted table of accepted strategies with Sharpe, return, drawdown,
+          win rate, and real IC from backtest
+        - Strategy files saved to results/strategies/
+        - Each strategy includes LLM-generated hypothesis and implementation code
+
+    Estimated Time:
+        ~5-20 minutes per accepted strategy depending on max_loops and backtest size.
+        Each loop requires a full backtest execution plus LLM API calls.
+
+    See Also:
+        predix build-strategies - Systematic (non-AI) strategy combination
+        predix quant - Generate new alpha factors via LLM trading loop
+        predix evaluate - Evaluate factors before strategy building
     """
     from rich.panel import Panel
     from pathlib import Path
@@ -1124,14 +1335,64 @@ def build_strategies_ai(
 
 @app.command()
 def health():
-    """Check system health and configuration."""
+    """Check system health and configuration status.
+
+    Runs a comprehensive diagnostic check of the PREDIX trading system including
+    Python version, installed dependencies, environment variables, database
+    connectivity, data file availability, and LLM API configuration. This command
+    helps identify setup issues before running computationally expensive operations.
+
+    Examples:
+        $ predix health                    # Run full system health check
+        $ predix health --verbose          # Detailed output (if supported)
+
+    Expected Output:
+        - Python version and dependency status
+        - Environment variable check (API keys, API base URLs)
+        - Database connectivity test
+        - Data file availability (OHLCV data)
+        - LLM model connectivity test (if configured)
+        - Overall health status: PASS or FAIL per check
+
+    Estimated Time:
+        ~5-15 seconds depending on network and database checks.
+
+    See Also:
+        predix status - Show current trading loop status and statistics
+        predix quant - Main trading loop command
+    """
     from rdagent.app.utils.health_check import health_check
     health_check()
 
 
 @app.command()
 def status():
-    """Show current trading loop status."""
+    """Show current trading loop status and database statistics.
+
+    Displays whether the quantitative trading loop (fin_quant) is currently
+    running by checking active processes. Also connects to the SQLite results
+    database and shows summary statistics including total backtest runs and
+    number of evaluated factors. Useful for monitoring long-running sessions
+    and verifying data persistence.
+
+    Examples:
+        $ predix status                    # Show current trading loop status
+        $ predix status --json             # JSON output (if supported)
+
+    Expected Output:
+        - Trading loop process status: RUNNING or STOPPED
+        - Number of backtest runs in database
+        - Number of evaluated factors in database
+        - Database file path
+
+    Estimated Time:
+        Nearly instantaneous (< 1 second).
+
+    See Also:
+        predix health - Check system health and configuration
+        predix quant - Start the quantitative trading loop
+        predix top - View top evaluated factors
+    """
     import sqlite3
 
     # Process check
