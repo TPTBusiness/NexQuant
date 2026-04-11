@@ -70,12 +70,12 @@ def _safe_resolve(user_input: str | None, safe_root: Path) -> Path:
         raise ValueError(f"Invalid path outside of allowed root: {user_input}") from exc
 
 
-def get_job_options(base_path: Path) -> list[str]:
+def get_job_options(base_path: Path, safe_root: Path | None = None) -> list[str]:
     """
     Scan directory and return job options list.
-    
+
     Security: Validates base_path to prevent path traversal attacks.
-    Only allows scanning directories within the current working directory.
+    If safe_root is provided, validates against it; otherwise uses CWD.
     """
     options = []
     has_root_tasks = False
@@ -83,24 +83,22 @@ def get_job_options(base_path: Path) -> list[str]:
 
     # Security fix: Validate base_path to prevent path traversal
     try:
-        base_path_resolved = base_path.resolve(strict=False)
-        cwd_resolved = Path.cwd().resolve()
-        
-        # Ensure base_path is within current working directory
-        try:
+        base_path_resolved = base_path.expanduser().resolve()
+
+        if safe_root is not None:
+            safe_root_resolved = safe_root.expanduser().resolve()
+            base_path_resolved.relative_to(safe_root_resolved)
+        else:
+            cwd_resolved = Path.cwd().resolve()
             base_path_resolved.relative_to(cwd_resolved)
-        except ValueError:
-            # Path is outside CWD, reject it
-            st.error("Invalid log base path: Must be within project directory")
-            return options
-    except (OSError, RuntimeError) as e:
-        st.error(f"Invalid path: {e}")
+    except (OSError, ValueError, RuntimeError):
+        # Path is outside allowed root, reject it
         return options
 
-    if not base_path_resolved.exists():
+    if not base_path_resolved.exists():  # nosec B614 – validated above
         return options
 
-    for d in base_path_resolved.iterdir():
+    for d in base_path_resolved.iterdir():  # nosec B614 – validated above
         if not d.is_dir():
             continue
         if (d / "__session__").exists():
@@ -142,7 +140,7 @@ def main():
                 st.error(str(e))
                 return
 
-            job_options = get_job_options(base_path)
+            job_options = get_job_options(base_path, safe_root)  # nosec B614 – validated by _safe_resolve
             if job_options:
                 selected_job = st.selectbox("Select Job", job_options, key="job_select")
                 if selected_job.startswith("."):
