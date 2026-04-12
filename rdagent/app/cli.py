@@ -567,7 +567,7 @@ def rl_trading_cli(
 @app.command(name="generate_strategies")
 def generate_strategies_cli(
     count: int = typer.Option(10, "--count", "-n", help="Number of strategies to generate"),
-    workers: int = typer.Option(4, "--workers", "-w", help="Parallel workers"),
+    workers: int = typer.Option(2, "--workers", "-w", help="Parallel workers (default: 2 to avoid LLM overload)"),
     style: str = typer.Option("swing", "--style", "-s", help="Trading style: daytrading or swing"),
     optuna: bool = typer.Option(True, "--optuna/--no-optuna", help="Enable Optuna optimization"),
     optuna_trials: int = typer.Option(30, "--optuna-trials", help="Number of Optuna trials per strategy"),

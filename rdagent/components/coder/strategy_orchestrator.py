@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+import requests
 
 from rdagent.components.prompt_loader import load_prompt
 from rdagent.components.coder.optuna_optimizer import OptunaOptimizer
@@ -289,7 +290,12 @@ class StrategyOrchestrator:
             logger.warning(f"Failed to load factor values for {factor_name}: {e}")
             return None
 
-    def generate_strategy_code(self, factors: List[Dict[str, Any]], strategy_name: str) -> Optional[str]:
+    def generate_strategy_code(
+        self,
+        factors: List[Dict[str, Any]],
+        strategy_name: str,
+        max_retries: int = 3,
+    ) -> Optional[str]:
         """
         Generate strategy code using LLM from factor combinations.
 
@@ -299,6 +305,8 @@ class StrategyOrchestrator:
             List of factor info dicts to combine
         strategy_name : str
             Name for the generated strategy
+        max_retries : int
+            Maximum number of retry attempts with feedback (default: 3)
 
         Returns
         -------
@@ -308,7 +316,22 @@ class StrategyOrchestrator:
         factor_names = [f["factor_name"] for f in factors]
         factor_ics = {f["factor_name"]: f.get("ic", 0) for f in factors}
 
-        # Build prompt context
+        # Build prompt context with proper template variable replacement
+        if isinstance(self.strategy_prompt, dict):
+            user_prompt_raw = self.strategy_prompt.get("user", "")
+            # Replace ALL template variables
+            user_prompt = user_prompt_raw
+            user_prompt = user_prompt.replace("{{ factors }}", str(factor_ics))
+            user_prompt = user_prompt.replace("{{ ic_values }}", str(factor_ics))  # IC values for each factor
+            user_prompt = user_prompt.replace("{{ additional_context }}", f"Strategy name: {strategy_name}")
+            user_prompt = user_prompt.replace("{{ trading_style }}", self.trading_style)
+            user_prompt = user_prompt.replace("{{ min_sharpe }}", str(self.min_sharpe))
+            user_prompt = user_prompt.replace("{{ max_drawdown }}", str(self.max_drawdown))
+            system_prompt = self.strategy_prompt.get("system", "")
+        else:
+            user_prompt = ""
+            system_prompt = ""
+
         context = {
             "strategy_name": strategy_name,
             "factor_names": factor_names,
@@ -316,213 +339,314 @@ class StrategyOrchestrator:
             "trading_style": self.trading_style,
             "min_sharpe": self.min_sharpe,
             "max_drawdown": self.max_drawdown,
-            "system_prompt": self.strategy_prompt.get("system", "") if isinstance(self.strategy_prompt, dict) else "",
-            "user_prompt": self.strategy_prompt.get("user", "").replace("{{ factors }}", str(factor_ics)).replace("{{ additional_context }}", f"Strategy name: {strategy_name}") if isinstance(self.strategy_prompt, dict) else "",
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
         }
 
-        # Try LLM first
+        # Try LLM first with retry logic
         if self.strategy_prompt is not None:
-            try:
-                code = self._generate_with_llm(context)
-                if code:
-                    return code
-            except Exception as e:
-                logger.warning(f"LLM strategy generation failed: {e}")
+            last_error = None
+            for attempt in range(1, max_retries + 1):
+                try:
+                    feedback = last_error if attempt > 1 else None
+                    code = self._generate_with_llm(context, attempt=attempt, feedback=feedback)
+                    if code:
+                        logger.info(f"LLM generated valid code on attempt {attempt} ({len(code)} chars)")
+                        return code
+                    last_error = f"Attempt {attempt}: LLM returned empty or invalid code"
+                    logger.warning(f"LLM attempt {attempt}/{max_retries} failed: {last_error}")
+                except Exception as e:
+                    last_error = f"Attempt {attempt}: {str(e)}"
+                    logger.warning(f"LLM attempt {attempt}/{max_retries} failed with exception: {e}")
+
+            logger.warning(
+                f"LLM strategy generation failed after {max_retries} attempts. "
+                f"Last error: {last_error}"
+            )
 
         # Fallback: generate template code programmatically
+        logger.info("Using fallback code generation")
         return self._generate_fallback_code(context)
 
-    def _generate_with_llm(self, context: Dict[str, Any]) -> Optional[str]:
-        """Generate strategy code using LLM."""
-        import os
-        import requests
-        
-        # Use local llama.cpp server (running on port 8081)
-        api_url = "http://localhost:8081/v1"
-        api_key = "local"
-        model = ""
-        
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-        
-        payload = {
-            
-            "model": "Qwen3.5-35B-A3B-Q3_K_M.gguf",
-            "messages": [
-                {"role": "system", "content": context.get("system_prompt", "")},
-                {"role": "user", "content": context.get("user_prompt", "")},
-            ],
-            "max_tokens": 4096,
-            "temperature": 0.5,
-            "include_reasoning": False,
-        }
-        
-        # Build API URL
-        api_base = api_url.rstrip("/")
-        if not api_base.endswith("/v1"):
-            api_base = f"{api_base}/v1"
-        api_endpoint = f"{api_base}/chat/completions"
-        
-        response = requests.post(
-            api_endpoint,
-            headers=headers,
-            json=payload,
-            timeout=120,
-        )
-        
-        if response.status_code != 200:
-            logger.warning(f"LLM API error: {response.text[:200]}")
+    def _generate_with_llm(
+        self,
+        context: Dict[str, Any],
+        attempt: int = 1,
+        feedback: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Generate strategy code using LLM with APIBackend (same as Factor Coder).
+
+        Parameters
+        ----------
+        context : Dict[str, Any]
+            Prompt context including system and user prompts
+        attempt : int
+            Current retry attempt number (1-based)
+        feedback : str, optional
+            Feedback message from previous failed attempts
+
+        Returns
+        -------
+        str or None
+            Validated Python strategy code, or None if invalid
+        """
+        import json as json_module
+
+        # Build user message with optional feedback
+        user_content = context.get("user_prompt", "")
+        if feedback:
+            user_content += f"\n\nPREVIOUS ATTEMPT FAILED: {feedback}\n\nPlease output ONLY valid JSON with a 'code' field."
+
+        system_content = context.get("system_prompt", "")
+
+        # Use APIBackend factory function (same as Factor Coder)
+        from rdagent.oai.llm_utils import APIBackend
+
+        try:
+            response = APIBackend().build_messages_and_create_chat_completion(
+                user_prompt=user_content,
+                system_prompt=system_content,
+                json_mode=True,
+            )
+        except Exception as e:
+            logger.warning(f"APIBackend call failed (attempt {attempt}): {e}")
             return None
-        
-        data = response.json()
-        message = data.get("choices", [{}])[0].get("message", {})
-        content = message.get("content", "") or message.get("reasoning_content", "")
-        
-        if not content:
-            # Try fallback: some models put content in different fields
-            content = data.get("output", "") or data.get("text", "")
-            if not content:
-                logger.warning(f"LLM returned empty response. Model: {model}, Full response: {str(data)[:500]}")
-                return None
-        
-        # Debug: log what we got}, first 100 chars: {content[:100]}")
-        
-        code = content.strip()
-        
-        # Extract code from markdown blocks or reasoning content
+
+        if not response:
+            logger.warning(f"APIBackend returned empty response (attempt {attempt})")
+            return None
+
+        # Log response for debugging
+        logger.info(f"[DEBUG] APIBackend response (attempt {attempt}): {len(response)} chars, preview: {response[:100]!r}")
+
+        # === STEP 1: Try JSON extraction FIRST ===
+        content = response.strip()
+        json_data = self._extract_json(content)
+
+        if json_data is not None:
+            logger.info(f"[DEBUG] JSON extracted successfully, keys: {list(json_data.keys())}")
+            code = self._extract_code_from_json(json_data)
+            if code:
+                if self._validate_python_code(code):
+                    logger.info(f"[DEBUG] Valid Python code extracted ({len(code)} chars)")
+                    return code
+                else:
+                    logger.warning(f"JSON 'code' field contains invalid Python (attempt {attempt}). Preview: {code[:200]}")
+            else:
+                logger.warning(f"JSON parsed but no valid 'code' field found (attempt {attempt}). Keys: {list(json_data.keys())}")
+
+        # === STEP 2: Fallback - Extract Python code block directly (like Factor Coder) ===
+        import re
+        code_block_match = re.search(r'```python\s*\n(.*?)\n```', content, re.DOTALL)
+        if code_block_match:
+            code = code_block_match.group(1).strip()
+            if code and self._validate_python_code(code):
+                logger.info(f"[DEBUG] Python code block extracted ({len(code)} chars)")
+                return code
+
+        logger.warning(f"All extraction methods failed (attempt {attempt}). Response preview: {response[:200]}")
+        return None
+
+    def _extract_json(self, content: str) -> Optional[Dict[str, Any]]:
+        """
+        Extract JSON object from LLM response content.
+
+        Tries multiple strategies:
+        1. Direct parse if content starts with {
+        2. Find ```json ... ``` blocks
+        3. Find ```python ... ``` blocks (Qwen often wraps JSON in python blocks)
+        4. Find first { to last } in content
+        5. Find ``` ... ``` blocks (any language tag)
+
+        Returns
+        -------
+        Dict or None
+            Parsed JSON data, or None if no valid JSON found
+        """
+        import json as json_module
+        import re
+
+        # Strategy 1: Direct parse
+        stripped = content.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
+            try:
+                return json_module.loads(stripped)
+            except json_module.JSONDecodeError:
+                pass
+
+        # Strategy 2: Find ```json ... ``` blocks
+        json_block_match = re.search(r'```json\s*\n(.*?)\n```', content, re.DOTALL)
+        if json_block_match:
+            try:
+                return json_module.loads(json_block_match.group(1))
+            except json_module.JSONDecodeError:
+                pass
+
+        # Strategy 3: Find ```python ... ``` blocks (Qwen often puts JSON in python blocks)
+        python_block_match = re.search(r'```python\s*\n(.*?)\n```', content, re.DOTALL)
+        if python_block_match:
+            block = python_block_match.group(1).strip()
+            if block.startswith("{") and block.endswith("}"):
+                try:
+                    return json_module.loads(block)
+                except json_module.JSONDecodeError:
+                    pass
+
+        # Strategy 4: Find first { to last }
+        first_brace = content.find("{")
+        last_brace = content.rfind("}")
+        if first_brace != -1 and last_brace > first_brace:
+            json_str = content[first_brace : last_brace + 1]
+            try:
+                return json_module.loads(json_str)
+            except json_module.JSONDecodeError:
+                # Try to fix common JSON issues (trailing commas, unescaped newlines)
+                try:
+                    # Remove trailing commas before } or ]
+                    json_str_fixed = re.sub(r',\s*([}\]])', r'\1', json_str)
+                    return json_module.loads(json_str_fixed)
+                except json_module.JSONDecodeError:
+                    pass
+
+        # Strategy 5: Find ``` ... ``` blocks (any language tag)
+        code_block_match = re.search(r'```\w*\s*\n(.*?)\n```', content, re.DOTALL)
+        if code_block_match:
+            block = code_block_match.group(1).strip()
+            if block.startswith("{") and block.endswith("}"):
+                try:
+                    return json_module.loads(block)
+                except json_module.JSONDecodeError:
+                    pass
+
+        return None
+
+    def _extract_code_from_json(self, json_data: Dict[str, Any]) -> Optional[str]:
+        """
+        Extract Python code from parsed JSON data.
+
+        Checks multiple possible field names: 'code', 'strategy_code', 'python_code'
+        Also handles nested JSON where code might have literal \n characters.
+
+        Returns
+        -------
+        str or None
+            Extracted Python code
+        """
+        # Try known field names in priority order
+        for key in ("code", "strategy_code", "python_code", "strategy"):
+            if key in json_data:
+                code_value = json_data[key]
+                if isinstance(code_value, str) and code_value.strip():
+                    # Handle JSON-escaped newlines
+                    code = code_value.replace("\\n", "\n")
+                    return code.strip()
+
+        return None
+
+    def _extract_code_from_raw(self, content: str) -> Optional[str]:
+        """
+        Extract Python code from raw (non-JSON) LLM response.
+
+        Tries:
+        1. Extract from ```python ... ``` blocks
+        2. Extract from ``` ... ``` blocks
+        3. Use entire content as code
+
+        Returns
+        -------
+        str or None
+            Extracted Python code
+        """
         import re
         from collections import Counter
-        
-        # First try to find code between ``` markers
-        if "```" in code:
-            match = re.search(r'```python\s*\n(.*?)\n```', code, re.DOTALL)
-            if match:
-                code = match.group(1)
-            else:
-                match = re.search(r'```\s*\n(.*?)\n```', code, re.DOTALL)
-                if match:
-                    code = match.group(1)
-        
-        # If code has indent from reasoning, dedent it
-        if code:
-            # Find code before first ``` if present
-            match = re.search(r'^(.*?)(?:```)', code, re.DOTALL)
-            if match:
-                code = match.group(1).strip()
-            
-            # Smart dedent: find most common indent
-            lines = code.split('\n')
-            indents = Counter()
-            for line in lines:
-                if line.strip():
-                    indent = len(line) - len(line.lstrip())
-                    indents[indent] += 1
-            
-            if len(indents) > 1 and indents.get(0, 0) <= 1:
-                indents.pop(0, None)
-            
-            if indents:
-                common_indent = indents.most_common(1)[0][0]
-            else:
-                common_indent = 0
-            
-            dedented = []
-            for line in lines:
-                if len(line) >= common_indent and line[:common_indent].isspace():
-                    dedented.append(line[common_indent:])
-                else:
-                    dedented.append(line.lstrip())
-            
-            code = '\n'.join(dedented).strip()
-            
-            # Remove non-code lines (bullets, commentary after code)
-            final_lines = []
-            for line in code.split('\n'):
-                stripped = line.strip()
-                if not stripped:
-                    continue
-                if stripped.startswith('*') or stripped.startswith('\u2022') or stripped.startswith('Wait') or stripped.startswith('Also') or stripped.startswith('One more'):
-                    break
-                final_lines.append(line)
-            
-            code = '\n'.join(final_lines).strip()
-        
-        # Remove non-ASCII (emojis etc)
-        code = code.encode('ascii', 'ignore').decode('ascii').strip()
-        
-        
-        if not code:
-            logger.warning("LLM returned empty code after cleaning")
+
+        code = content.strip()
+
+        # Try to find ```python blocks
+        python_match = re.search(r'```python\s*\n(.*?)\n```', code, re.DOTALL)
+        if python_match:
+            code = python_match.group(1)
+        else:
+            # Try generic ``` blocks
+            block_match = re.search(r'```\s*\n(.*?)\n```', code, re.DOTALL)
+            if block_match:
+                code = block_match.group(1)
+
+        if not code or not code.strip():
             return None
-        
-        # Try to parse as JSON and extract code field
-        import json
-        if code.startswith('{'):
-            try:
-                data = json.loads(code)
-                # Extract code from JSON response
-                if 'code' in data:
-                    code = data['code']
-                    logger.info(f"Extracted code from JSON response ({len(code)} chars)")
-                elif 'strategy_code' in data:
-                    code = data['strategy_code']
-                    logger.info(f"Extracted strategy_code from JSON response ({len(code)} chars)")
-            except json.JSONDecodeError:
-                pass  # Not valid JSON, treat as raw code
-        
-        # Validate it's valid Python}")
+
+        # Remove markdown code fences if still present
+        code = code.replace("```python", "").replace("```", "").strip()
+
+        # Smart dedent: find most common non-zero indent
+        lines = code.split("\n")
+        indents = Counter()
+        for line in lines:
+            if line.strip():  # Non-empty line
+                indent = len(line) - len(line.lstrip())
+                indents[indent] += 1
+
+        # Remove empty lines from consideration
+        indents.pop(0, None)
+
+        if indents:
+            common_indent = indents.most_common(1)[0][0]
+        else:
+            common_indent = 0
+
+        dedented = []
+        for line in lines:
+            if len(line) >= common_indent and line[:common_indent].isspace():
+                dedented.append(line[common_indent:])
+            else:
+                dedented.append(line.lstrip())
+
+        code = "\n".join(dedented).strip()
+
+        # Remove non-code commentary lines
+        final_lines = []
+        for line in code.split("\n"):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            # Stop at commentary (bullets, conversational text)
+            commentary_patterns = ["*", "\u2022", "Wait", "Also", "One more", "Note:", "Here", "This strategy"]
+            if any(stripped.startswith(p) for p in commentary_patterns):
+                break
+            final_lines.append(line)
+
+        code = "\n".join(final_lines).strip()
+
+        # Remove non-ASCII characters (emojis, etc.)
+        code = code.encode("ascii", "ignore").decode("ascii").strip()
+
+        return code if code else None
+
+    def _validate_python_code(self, code: str) -> bool:
+        """
+        Validate that a string is valid Python code.
+
+        Parameters
+        ----------
+        code : str
+            Code string to validate
+
+        Returns
+        -------
+        bool
+            True if code compiles successfully
+        """
+        if not code or len(code) < 10:
+            logger.debug("Code too short to be valid")
+            return False
+
         try:
             compile(code, "<strategy>", "exec")
-            
-            return code
+            return True
         except SyntaxError as e:
-            logger.warning(f"LLM generated invalid Python code: {e}")
-            logger.warning(f"Code was: {code[:500]}")
-            return None
-        
-        system_prompt = """You are an expert quantitative trading developer.
-Generate a complete Python trading strategy that:
-1. Takes factor values as input
-2. Produces trading signals (1=LONG, -1=SHORT, 0=NEUTRAL)
-3. Includes proper risk management
-4. Uses the provided factors optimally
-
-The strategy code will be executed with a 'factors' DataFrame available in scope.
-Output ONLY valid Python code, no markdown formatting."""
-
-        user_prompt = f"""Generate a {context['trading_style']} trading strategy named '{context['strategy_name']}'.
-
-Factors to use (with IC scores):
-{json.dumps(context['factor_ics'], indent=2)}
-
-Requirements:
-- The strategy must output a 'signal' variable (1, -1, or 0)
-- Use z-score normalization for factor combination
-- Include entry/exit logic based on signal thresholds
-- Add risk management: position sizing, stop loss awareness
-- Target Sharpe ratio > {context['min_sharpe']}
-- Maximum drawdown tolerance: {context['max_drawdown']}
-
-Output the complete strategy code."""
-
-        code = api.build_messages_and_create_chat_completion(
-            user_prompt=user_prompt,
-            system_prompt=system_prompt,
-            json_mode=False,
-        ).strip()
-
-        # Remove markdown code blocks if present
-        code = code.replace("```python\n", "").replace("```", "").strip()
-
-        # Validate it's valid Python
-        try:
-            compile(code, "<strategy>", "exec")
-            return code
-        except SyntaxError:
-            logger.warning("LLM generated invalid Python code")
-            return None
+            logger.debug(f"Python syntax error: {e}")
+            return False
 
     def _generate_fallback_code(self, context: Dict[str, Any]) -> str:
         """Generate fallback strategy code programmatically."""
@@ -850,7 +974,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
     def generate_strategies(
         self,
         count: int = 10,
-        workers: int = 4,
+        workers: int = 2,  # Reduced from 4 to 2 to avoid LLM server overload
         progress_callback=None,
     ) -> List[Dict[str, Any]]:
         """
