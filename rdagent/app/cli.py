@@ -572,18 +572,23 @@ def generate_strategies_cli(
     optuna: bool = typer.Option(True, "--optuna/--no-optuna", help="Enable Optuna optimization"),
     optuna_trials: int = typer.Option(30, "--optuna-trials", help="Number of Optuna trials per strategy"),
     top_factors: int = typer.Option(20, "--top-factors", help="Number of top factors to consider"),
+    continuous: bool = typer.Option(True, "--continuous/--single-pass", help="Optimize ALL strategies including rejected ones"),
+    max_iterations: int = typer.Option(1, "--max-iterations", "-i", help="Number of generation-optimization cycles (1 = single pass, >1 = continuous)"),
 ):
     """
     Generate trading strategies from evaluated factors.
 
     Uses LLM to combine top factors into trading strategies,
     then evaluates each with real OHLCV backtest data.
+    Optuna optimizes hyperparameters (thresholds, windows, etc.)
 
     Examples:
-        rdagent generate_strategies                     # 10 strategies, swing
+        rdagent generate_strategies                     # 10 strategies, swing, Optuna
         rdagent generate_strategies -n 20 -w 8          # 20 strategies, 8 workers
         rdagent generate_strategies -s daytrading       # Day trading style
         rdagent generate_strategies --no-optuna         # Skip optimization
+        rdagent generate_strategies -i 5                # 5 continuous iterations
+        rdagent generate_strategies -n 3 -i 10 --optuna-trials 50  # Deep optimization
     """
     from rich.console import Console
     from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn
@@ -613,88 +618,80 @@ def generate_strategies_cli(
     console.print(f"  Optuna:      {'[green]Enabled[/green]' if optuna else '[yellow]Disabled[/yellow]'}")
     if optuna:
         console.print(f"  Trials:      [cyan]{optuna_trials}[/cyan]")
+    console.print(f"  Continuous:  {'[green]Yes[/green]' if continuous else '[yellow]No[/yellow]'}")
+    console.print(f"  Iterations:  [cyan]{max_iterations}[/cyan]")
     console.print(f"  Top Factors: [cyan]{top_factors}[/cyan]")
     console.print(f"[bold blue]{'='*60}[/bold blue]\n")
 
     try:
         from rdagent.components.coder.strategy_orchestrator import StrategyOrchestrator
+        import pandas as pd
 
-        # Initialize orchestrator
-        orchestrator = StrategyOrchestrator(
-            top_factors=top_factors,
-            trading_style=style,
-        )
+        all_results = []
+        best_strategy = None
+        best_sharpe = float('-inf')
 
-        # Progress tracking
-        progress_data = {"generated": 0, "accepted": 0, "rejected": 0, "errors": []}
+        # CONTINUOUS OPTIMIZATION LOOP
+        for iteration in range(1, max_iterations + 1):
+            if max_iterations > 1:
+                console.print(f"\n[bold cyan]{'='*60}[/bold cyan]")
+                console.print(f"[bold cyan]  ITERATION {iteration}/{max_iterations}[/bold cyan]")
+                console.print(f"[bold cyan]{'='*60}[/bold cyan]\n")
 
-        def progress_callback(current, total, result):
-            progress_data["generated"] = current
-            if result.get("status") == "accepted":
-                progress_data["accepted"] += 1
-            else:
-                progress_data["rejected"] += 1
-
-        # Generate strategies
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("[bold]{task.completed}/{task.total}[/bold]"),
-            TimeRemainingColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task(f"Generating {count} strategies...", total=count)
-
-            results = orchestrator.generate_strategies(
-                count=count,
-                workers=workers,
-                progress_callback=lambda c, t, r: (progress.update(task, completed=c), progress_callback(c, t, r)),
+            # Initialize orchestrator
+            orchestrator = StrategyOrchestrator(
+                top_factors=top_factors,
+                trading_style=style,
+                use_optuna=optuna,
+                optuna_trials=optuna_trials,
+                continuous_optimization=continuous,
             )
 
-        # Run Optuna optimization if enabled
-        if optuna and results:
-            console.print(f"\n[yellow]Running Optuna optimization ({optuna_trials} trials)...[/yellow]")
-            try:
-                from rdagent.components.coder.optuna_optimizer import OptunaOptimizer
-                from rdagent.components.coder.strategy_orchestrator import StrategyOrchestrator
+            # Progress tracking
+            progress_data = {"generated": 0, "accepted": 0, "rejected": 0, "errors": []}
 
-                optimizer = OptunaOptimizer(n_trials=optuna_trials)
-
-                # Load factor values for optimization
-                orchestrator2 = StrategyOrchestrator(top_factors=top_factors, trading_style=style)
-                factors = orchestrator2.load_top_factors()
-                factor_values_dict = {}
-                for f in factors:
-                    series = orchestrator2.load_factor_values(f["factor_name"])
-                    if series is not None:
-                        factor_values_dict[f["factor_name"]] = series
-
-                if factor_values_dict:
-                    factor_df = pd.DataFrame(factor_values_dict).dropna()
-                    accepted = [r for r in results if r.get("status") == "accepted"]
-
-                    if accepted:
-                        opt_results = optimizer.optimize_batch(
-                            accepted, factor_df, progress_callback=None
-                        )
-                        console.print(f"[green]Optimization complete for {len(opt_results)} strategies.[/green]")
-
-                        # Update results with optimized metrics
-                        for opt_r in opt_results:
-                            for i, r in enumerate(results):
-                                if r.get("strategy_name") == opt_r.get("strategy_name"):
-                                    results[i] = opt_r
-                                    break
-                    else:
-                        console.print("[yellow]No accepted strategies to optimize.[/yellow]")
+            def progress_callback(current, total, result):
+                progress_data["generated"] = current
+                if result.get("status") == "accepted":
+                    progress_data["accepted"] += 1
                 else:
-                    console.print("[yellow]No factor values available for optimization.[/yellow]")
+                    progress_data["rejected"] += 1
 
-            except ImportError:
-                console.print("[yellow]Optuna not installed. Skipping optimization.[/yellow]")
-            except Exception as e:
-                console.print(f"[yellow]Optimization failed: {e}[/yellow]")
+            # Generate strategies
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TextColumn("[bold]{task.completed}/{task.total}[/bold]"),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task(f"Generating {count} strategies (iter {iteration})...", total=count)
+
+                results = orchestrator.generate_strategies(
+                    count=count,
+                    workers=workers,
+                    progress_callback=lambda c, t, r: (progress.update(task, completed=c), progress_callback(c, t, r)),
+                )
+
+            all_results.extend(results)
+
+            # Track best strategy
+            for r in results:
+                sharpe = r.get("sharpe_ratio", float('-inf'))
+                if sharpe > best_sharpe:
+                    best_sharpe = sharpe
+                    best_strategy = r
+
+            # Summary for this iteration
+            accepted = [r for r in results if r.get("status") == "accepted"]
+            console.print(f"\n[bold green]Iteration {iteration} complete: {len(accepted)}/{len(results)} accepted[/bold green]")
+            if accepted:
+                best_in_iter = max(accepted, key=lambda x: x.get("sharpe_ratio", 0))
+                console.print(f"  Best: [green]{best_in_iter['strategy_name']}[/green] | Sharpe={best_in_iter.get('sharpe_ratio', 0):.4f}")
+
+        # Use all_results for final summary
+        results = all_results
 
         # Print summary table
         accepted = [r for r in results if r.get("status") == "accepted"]
@@ -727,6 +724,22 @@ def generate_strategies_cli(
 
         console.print(table)
 
+        # Show best strategy details
+        if best_strategy:
+            console.print(f"\n[bold gold1]{'='*60}[/bold gold1]")
+            console.print(f"[bold gold1]  BEST STRATEGY[/bold gold1]")
+            console.print(f"[bold gold1]{'='*60}[/bold gold1]")
+            console.print(f"  Name:        [cyan]{best_strategy.get('strategy_name', 'Unknown')}[/cyan]")
+            console.print(f"  Sharpe:      [green]{best_strategy.get('sharpe_ratio', 0):.4f}[/green]")
+            console.print(f"  Ann.Return:  [green]{best_strategy.get('annualized_return', 0):.4f}[/green]")
+            console.print(f"  Max DD:      [yellow]{best_strategy.get('max_drawdown', 0):.2%}[/yellow]")
+            console.print(f"  Win Rate:    [cyan]{best_strategy.get('win_rate', 0):.2%}[/cyan]")
+            if best_strategy.get("best_params"):
+                console.print(f"\n  [bold]Optimized Parameters:[/bold]")
+                for param, val in best_strategy["best_params"].items():
+                    console.print(f"    {param}: [cyan]{val}[/cyan]")
+            console.print(f"[bold gold1]{'='*60}[/bold gold1]")
+
         if accepted:
             console.print(f"\n[bold]Accepted Strategies:[/bold]")
             acc_table = Table(show_header=True, header_style="bold cyan")
@@ -736,8 +749,10 @@ def generate_strategies_cli(
             acc_table.add_column("Ann. Return", justify="right", width=12)
             acc_table.add_column("Max DD", justify="right", width=10)
             acc_table.add_column("Win Rate", justify="right", width=10)
+            acc_table.add_column("Optuna", justify="right", width=8)
 
             for i, strat in enumerate(sorted(accepted, key=lambda x: x.get("sharpe_ratio", 0), reverse=True), 1):
+                optuna_status = "[green]Yes[/green]" if strat.get("best_params") else "[dim]No[/dim]"
                 acc_table.add_row(
                     str(i),
                     strat.get("strategy_name", "Unknown")[:30],
@@ -745,6 +760,7 @@ def generate_strategies_cli(
                     f"{strat.get('annualized_return', 0):.4f}",
                     f"{strat.get('max_drawdown', 0):.2%}",
                     f"{strat.get('win_rate', 0):.2%}",
+                    optuna_status,
                 )
             console.print(acc_table)
 
