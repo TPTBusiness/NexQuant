@@ -22,3 +22,5 @@ skips:
   - 'B608'
   # B609: linux_commands_wildcard_injection - intentional usage
   - 'B609'
+  # B102: exec_used - required for sandboxed strategy code evaluation
+  - 'B102'
