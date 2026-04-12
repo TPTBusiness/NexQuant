@@ -63,6 +63,7 @@ class StrategyOrchestrator:
         results_dir: Optional[str] = None,
         use_optuna: bool = True,
         optuna_trials: int = 20,
+        continuous_optimization: bool = True,
     ):
         """
         Parameters
@@ -79,6 +80,13 @@ class StrategyOrchestrator:
             Minimum win rate for strategy acceptance
         results_dir : str, optional
             Path to results directory
+        use_optuna : bool
+            Enable Optuna hyperparameter optimization
+        optuna_trials : int
+            Number of Optuna trials per strategy
+        continuous_optimization : bool
+            If True, optimize ALL strategies (including rejected ones)
+            Optuna can often rescue strategies with bad initial parameters
         """
         self.top_factors = top_factors
         self.trading_style = trading_style.lower()
@@ -87,6 +95,7 @@ class StrategyOrchestrator:
         self.min_win_rate = min_win_rate
         self.use_optuna = use_optuna
         self.optuna_trials = optuna_trials
+        self.continuous_optimization = continuous_optimization
 
         if results_dir is None:
             project_root = Path(__file__).parent.parent.parent.parent
@@ -1102,21 +1111,38 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
         # Evaluate
         result = self.evaluate_strategy(code, strategy_name, factors)
         result["code"] = code
-        
-        # Optimize with Optuna if enabled and accepted
-        if result.get("status") == "accepted" and self.use_optuna:
-            logger.info(f"Running Optuna optimization for {strategy_name}...")
+
+        # Optimize with Optuna if enabled
+        # KEY CHANGE: Optimize ALL strategies, not just accepted ones
+        # Optuna can often rescue strategies with bad initial parameters
+        # by finding optimal entry/exit thresholds, signal smoothing, etc.
+        if self.use_optuna:
+            initial_status = result.get("status", "rejected")
+            initial_sharpe = result.get("sharpe_ratio", float('-inf'))
+            logger.info(f"Running Optuna optimization for {strategy_name} (initial: {initial_status}, Sharpe={initial_sharpe:.4f})...")
             optimizer = OptunaOptimizer(n_trials=self.optuna_trials)
-            
+
             # Prepare factor values for optimization
             factor_values = self._prepare_factor_values(factors)
-            
+
             if factor_values is not None:
                 optimized = optimizer.optimize_strategy(result, factor_values)
-                if optimized.get("best_value", float('-inf')) > result.get("sharpe_ratio", 0):
-                    logger.info(f"Optuna improved {strategy_name}: {optimized.get('best_value', 0):.2f}")
+                optimized_sharpe = optimized.get("sharpe_ratio", float('-inf'))
+                optimized_status = optimized.get("status", "rejected")
+
+                # Check if Optuna improved the strategy
+                if optimized_sharpe > initial_sharpe:
+                    improvement = optimized_sharpe - initial_sharpe
+                    logger.info(
+                        f"Optuna {'RESCUED' if optimized_status == 'accepted' and initial_status == 'rejected' else 'improved'} "
+                        f"{strategy_name}: Sharpe {initial_sharpe:.4f} → {optimized_sharpe:.4f} (+{improvement:.4f})"
+                    )
                     result.update(optimized)
-        
+                else:
+                    logger.debug(f"Optuna did not improve {strategy_name}: {initial_sharpe:.4f} vs {optimized_sharpe:.4f}")
+            else:
+                logger.warning(f"No factor values available for Optuna optimization of {strategy_name}")
+
         return result
 
     def _prepare_factor_values(self, factors: List[Dict]) -> Optional[pd.DataFrame]:
