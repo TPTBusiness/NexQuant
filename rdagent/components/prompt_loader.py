@@ -39,8 +39,8 @@ def get_local_prompt_path(name: str) -> Optional[Path]:
     if not LOCAL_PROMPTS_DIR.exists():
         return None
     
-    # Try versioned files first (v3, v2, v1, etc.)
-    for version in ["v3", "v2", "v1"]:
+    # Try versioned files first (v4, v3, v2, v1, etc.)
+    for version in ["v4", "v3", "v2", "v1"]:
         for ext in ["yaml", "yml"]:
             path = LOCAL_PROMPTS_DIR / f"{name}_{version}.{ext}"
             if path.exists():
@@ -101,12 +101,15 @@ def load_prompt(
     if local_path:
         print(f"✓ Loading prompt '{name}' from local: {local_path}")
         data = load_yaml_file(local_path)
-        
+
         if section:
             return data.get(section, "")
-        
-        # If data is dict with 'system' and 'user', return full dict
+
+        # If data is dict, unwrap single-key dicts (e.g., {'strategy_generation': {'system': ...}})
         if isinstance(data, dict):
+            # If only one key and it matches the name, unwrap it
+            if len(data) == 1 and name in data:
+                return data[name]
             return data
         return str(data)
     
