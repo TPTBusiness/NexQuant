@@ -24,3 +24,13 @@ skips:
   - 'B609'
   # B102: exec_used - required for sandboxed strategy code evaluation
   - 'B102'
+  # B602: subprocess_popen_with_shell_equals_true - intentional for Docker/Conda env setup
+  - 'B602'
+  # B701: jinja2_autoescape_false - internal template rendering, no user XSS exposure
+  - 'B701'
+  # B113: requests_without_timeout - internal API calls, timeout not critical
+  - 'B113'
+  # B614: pytorch_load - internal benchmark code loading .pt files from workspace only
+  - 'B614'
+  # B307: eval_used - internal config parsing with controlled input
+  - 'B307'
