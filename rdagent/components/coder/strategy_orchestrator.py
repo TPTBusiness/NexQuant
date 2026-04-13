@@ -1129,6 +1129,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 optimized = optimizer.optimize_strategy(result, factor_values)
                 optimized_sharpe = optimized.get("sharpe_ratio", float('-inf'))
                 optimized_status = optimized.get("status", "rejected")
+                best_params = optimized.get("best_params", {})
 
                 # Check if Optuna improved the strategy
                 if optimized_sharpe > initial_sharpe:
@@ -1137,7 +1138,24 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                         f"Optuna {'RESCUED' if optimized_status == 'accepted' and initial_status == 'rejected' else 'improved'} "
                         f"{strategy_name}: Sharpe {initial_sharpe:.4f} → {optimized_sharpe:.4f} (+{improvement:.4f})"
                     )
-                    result.update(optimized)
+
+                    # Re-evaluate with best parameters to get comparable metrics
+                    if best_params:
+                        patched_code = self._patch_strategy_code(code, best_params)
+                        re_eval = self._evaluate_with_patched_code(patched_code, strategy_name, factors)
+                        if re_eval.get("sharpe_ratio", float('-inf')) > initial_sharpe:
+                            result.update(re_eval)
+                            result["code"] = patched_code
+                            result["best_params"] = best_params
+                            logger.info(
+                                f"Re-evaluated {strategy_name} with best params: "
+                                f"Sharpe {initial_sharpe:.4f} → {re_eval.get('sharpe_ratio', 0):.4f}"
+                            )
+                        else:
+                            result.update(optimized)
+                            result["best_params"] = best_params
+                    else:
+                        result.update(optimized)
                 else:
                     logger.debug(f"Optuna did not improve {strategy_name}: {initial_sharpe:.4f} vs {optimized_sharpe:.4f}")
             else:
@@ -1154,7 +1172,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 series = self.load_factor_values(fname)
                 if series is not None:
                     factor_values[fname] = series
-        
+
         if factor_values:
             df = pd.DataFrame(factor_values)
             # Forward-fill to OHLCV index
@@ -1163,6 +1181,144 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 df = df.reindex(close.index).ffill()
             return df.dropna()
         return None
+
+    def _patch_strategy_code(self, code: str, params: Dict[str, Any]) -> str:
+        """Patch strategy code with Optuna's best parameters."""
+        import re
+        patched = code
+
+        entry_thresh = params.get("entry_threshold", 0.8)
+        exit_thresh = params.get("exit_threshold", 0.3)
+        zscore_window = params.get("zscore_window", 50)
+        signal_window = params.get("signal_window", 3)
+
+        param_patterns = [
+            (r'entry_thresh\s*=\s*[\d.]+', f'entry_thresh = {entry_thresh}'),
+            (r'exit_thresh\s*=\s*[\d.]+', f'exit_thresh = {exit_thresh}'),
+            (r'window\s*=\s*\d+', f'window = {zscore_window}'),
+            (r'signal_window\s*=\s*\d+', f'signal_window = {signal_window}'),
+        ]
+        for pattern, replacement in param_patterns:
+            patched = re.sub(pattern, replacement, patched)
+
+        # Patch .rolling(N) calls for common window sizes
+        rolling_pattern = r'\.rolling\((\d+)\)'
+        def replace_rolling(match):
+            val = int(match.group(1))
+            if val in (20, 30, 50, 100, 200):
+                return f'.rolling({zscore_window})'
+            return match.group(0)
+        patched = re.sub(rolling_pattern, replace_rolling, patched)
+
+        return patched
+
+    def _evaluate_with_patched_code(self, patched_code: str, strategy_name: str, factors: List[Dict]) -> Dict[str, Any]:
+        """Re-evaluate strategy with patched parameters using full OHLCV backtest."""
+        try:
+            factor_names = [f["factor_name"] for f in factors if f["factor_name"] != "timestamp"]
+            factor_values = {}
+            for fname in factor_names:
+                series = self.load_factor_values(fname)
+                if series is not None:
+                    factor_values[fname] = series
+
+            if not factor_values:
+                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+
+            common_idx = None
+            for name, s in factor_values.items():
+                if common_idx is None:
+                    common_idx = s.index
+                else:
+                    common_idx = common_idx.intersection(s.index)
+
+            if common_idx is None or len(common_idx) < 100:
+                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+
+            df_factors = pd.DataFrame({
+                name: s.reindex(common_idx) for name, s in factor_values.items()
+            }).dropna()
+
+            for col in df_factors.columns:
+                df_factors[col] = pd.to_numeric(df_factors[col], errors='coerce')
+
+            close = self.load_ohlcv_close()
+            if close is not None:
+                df_factors = df_factors.reindex(close.index).ffill()
+
+            df_factors = df_factors.dropna()
+            if len(df_factors) < 1000:
+                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+
+            if close is not None:
+                close = close.reindex(df_factors.index)
+
+            local_vars = {"factors": df_factors}
+            try:
+                exec(patched_code, {"np": np, "pd": pd, "numpy": np}, local_vars)
+            except Exception:
+                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+
+            if "signal" not in local_vars:
+                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+
+            signal = local_vars["signal"]
+            signal_index = signal.index
+            close_aligned = close.reindex(signal_index).ffill()
+            price_returns = close_aligned.pct_change().fillna(0)
+            signal_positions = signal.shift(1).fillna(0)
+            returns = price_returns * signal_positions
+
+            SPREAD_COST = 0.00015
+            signal_changes = signal_positions.diff().abs().fillna(0)
+            spread_costs = signal_changes * SPREAD_COST
+            returns = returns - spread_costs
+
+            if returns.std() == 0 or len(returns) < 10:
+                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+
+            total_return = float(returns.sum())
+            n_periods = len(returns)
+            minutes_per_year = 252 * 1440
+            ann_factor = np.sqrt(minutes_per_year)
+            years = max(n_periods / minutes_per_year, 0.1)
+
+            if years >= 1 and (1 + total_return) > 0:
+                ann_return = (1 + total_return) ** (1 / years) - 1
+            else:
+                ann_return = total_return / years
+
+            volatility = float(returns.std() * ann_factor)
+            sharpe = ann_return / volatility if volatility > 0 else 0.0
+
+            returns = returns.fillna(0).replace([np.inf, -np.inf], 0)
+            cum_returns = (1 + returns).cumprod()
+            running_max = cum_returns.expanding().max()
+            drawdown = (cum_returns - running_max) / running_max.replace(0, np.nan)
+            drawdown = drawdown.fillna(0).replace([np.inf, -np.inf], 0)
+            max_dd = float(drawdown.min()) if len(drawdown) > 0 else 0.0
+
+            signal_changes_eval = signal.diff().fillna(0)
+            trades = signal_changes_eval[signal_changes_eval != 0]
+            win_rate = float((trades > 0).sum() / len(trades)) if len(trades) > 0 else 0.0
+
+            status = "accepted" if sharpe >= self.min_sharpe and max_dd >= self.max_drawdown and win_rate >= self.min_win_rate else "rejected"
+
+            return {
+                "strategy_name": strategy_name,
+                "status": status,
+                "sharpe_ratio": round(sharpe, 4),
+                "annualized_return": round(ann_return, 6),
+                "max_drawdown": round(max_dd, 6),
+                "win_rate": round(win_rate, 4),
+                "volatility": round(volatility, 6),
+                "total_return": round(total_return, 6),
+                "num_periods": n_periods,
+            }
+
+        except Exception as e:
+            logger.debug(f"Re-evaluation failed for {strategy_name}: {e}")
+            return {"sharpe_ratio": float('-inf'), "status": "rejected"}
 
     def _save_strategy(self, result: Dict[str, Any]) -> None:
         """Save accepted strategy to JSON file."""
