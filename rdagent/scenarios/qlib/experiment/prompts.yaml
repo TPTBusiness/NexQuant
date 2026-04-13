@@ -36,41 +36,90 @@ qlib_factor_strategy: |-
   Ensure that for every step of data processing, the data format (including indexes) is clearly explained through comments.
   Each transformation or calculation should be accompanied by a detailed description of how the data is structured, especially focusing on key aspects like whether the data has multi-level indexing, how to access specific columns or index levels, and any operations that affect the data shape (e.g., `reset_index()`, `groupby()`, `merge()`).
   This step-by-step explanation will ensure clarity and accuracy in data handling. For example:
-  1. **Start with multi-level index**:  
+  1. **Start with multi-level index**:
     ```python
     # The initial DataFrame has a multi-level index with 'datetime' and 'instrument'.
     # To access the 'datetime' index, use df.index.get_level_values('datetime').
     datetime_values = df.index.get_level_values('datetime')
     ```
- 
-  2. **Reset the index if necessary**:  
+
+  2. **Reset the index if necessary**:
     ```python
     # Resetting the index to move 'datetime' and 'instrument' from the index to columns.
     # This operation flattens the multi-index structure.
     df = df.reset_index()
     ```
- 
-  3. **Perform groupby operations**:  
+
+  3. **Perform groupby operations**:
     ```python
     # Grouping by 'datetime' and 'instrument' to aggregate the data.
     # After groupby, the result will maintain 'datetime' and 'instrument' as a multi-level index.
     df_grouped = df.groupby(['datetime', 'instrument']).sum()
     ```
- 
-  4. **Ensure consistent datetime formats**:  
+
+  4. **Ensure consistent datetime formats**:
     ```python
     # Before merging, ensure that the 'datetime' column in both DataFrames is of the same format.
     # Convert to datetime format if necessary.
     df['datetime'] = pd.to_datetime(df['datetime'])
     other_df['datetime'] = pd.to_datetime(other_df['datetime'])
     ```
- 
-  5. **Merge operations**:  
+
+  5. **Merge operations**:
     ```python
     # When merging DataFrames, ensure you are merging on both 'datetime' and 'instrument'.
     # If these are part of the index, reset the index before merging.
     merged_df = pd.merge(df, other_df, on=['datetime', 'instrument'], how='inner')
     ```
+
+  ====== CRITICAL RULES FOR INTRADAY DATA ======
+  The source data is 1-minute EURUSD OHLCV from 2020-01-01 to 2026-03-20 with ~2.2M rows.
+  You MUST avoid these common errors that cause factor rejection:
+
+  1. **DO NOT use `.date` on datetime index**: Using `df.index.get_level_values('datetime').date` converts to Python date objects which LOSES data outside the filtered range. Use `.floor('D')` or `.normalize()` instead to keep the full date range:
+     ```python
+     # WRONG: This filters to only one year!
+     df['date'] = df.index.get_level_values('datetime').date
+
+     # CORRECT: Preserves full 2020-2026 range
+     df['date'] = df.index.get_level_values('datetime').floor('D')
+     ```
+
+  2. **DO NOT use `df.merge()` — it destroys MultiIndex**: After a merge, the MultiIndex is lost and replaced with a RangeIndex. Use `pd.merge()` with explicit index reset/restore, or use `.join()` or `.map()` instead:
+     ```python
+     # WRONG: merge() destroys the MultiIndex!
+     df = df.merge(other_df, on='instrument')  # Index becomes RangeIndex!
+
+     # CORRECT: Use join on aligned indices, or reset/set index around merge
+     df = df.join(other_df.set_index('instrument'), on='instrument')
+     # OR: after merge, explicitly restore MultiIndex
+     df.index = pd.MultiIndex.from_arrays([df['datetime'], df['instrument']], names=['datetime', 'instrument'])
+     ```
+
+  3. **Column name MUST be the factor_name**: The output column must be named exactly as the factor_name, NOT a shortened alias:
+     ```python
+     # WRONG: result_df.columns = ['divergence_score']
+     # CORRECT:
+     result_df = daily_agg[['daily_volume_price_divergence']].copy()
+     result_df.columns = ['daily_volume_price_divergence']
+     ```
+
+  4. **Process ALL data — do not filter dates**: The source HDF5 contains data from 2020-01-01 to 2026-03-20. Do NOT filter to a single year. If your output has only 314 entries (one year of daily data), the factor will be rejected. Expected output: ~1500+ daily entries for 2020-2026.
+
+  5. **Use `transform()` instead of `apply()` for per-group calculations**: `transform()` preserves the original index while `apply()` may reduce the number of rows unexpectedly:
+     ```python
+     # CORRECT: transform keeps the same index as input
+     df['daily_vol'] = df.groupby(['date', 'instrument'])['return'].transform('std')
+
+     # WRONG for per-row output: apply reduces rows
+     daily_vol = df.groupby(['date', 'instrument'])['return'].apply('std')  # Loses intraday rows!
+     ```
+
+  6. **Preserve the MultiIndex until the very end**: The final `result.h5` must have a MultiIndex with levels ['datetime', 'instrument']. Always verify before saving:
+     ```python
+     assert isinstance(result_df.index, pd.MultiIndex), "Index must be MultiIndex!"
+     assert result_df.index.names == ['datetime', 'instrument'], f"Index names must be ['datetime', 'instrument'], got {result_df.index.names}"
+     ```
 
 qlib_factor_output_format: |-
   Your output should be a pandas dataframe similar to the following example information:
