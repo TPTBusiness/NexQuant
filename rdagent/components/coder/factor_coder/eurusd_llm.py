@@ -123,7 +123,7 @@ class MultiProviderLLM:
                 name="ollama-llama3.2",
                 priority=4,
                 endpoint="http://localhost:11434/v1",
-                api_key="ollama",
+                api_key=os.getenv("OLLAMA_API_KEY", ""),  # nosec B106: placeholder for local Ollama, not a real secret
                 model="llama3.2:3b",
                 timeout=120,
                 max_retries=1
