@@ -132,12 +132,15 @@ def quant(
         if log_file is None:
             log_file = "fin_quant.log"
 
-    # ---- Log File Setup ----
-    if log_file.lower() != "none":
-        log_path = Path(__file__).parent / log_file
-        log_path.parent.mkdir(parents=True, exist_ok=True)
+    # ---- Log File Setup (daily-rotated) ----
+    from datetime import datetime as _dt
+    _today = _dt.now().strftime("%Y-%m-%d")
+    _daily_dir = Path(__file__).parent / "logs" / _today
+    _daily_dir.mkdir(parents=True, exist_ok=True)
 
-        # Open log file for appending
+    if log_file.lower() != "none":
+        log_path = _daily_dir / log_file
+        # Open log file for appending (raw stdout/stderr capture)
         log_f = open(log_path, "a", encoding="utf-8")
 
         # Redirect stdout and stderr to both console and log file
@@ -163,7 +166,7 @@ def quant(
         sys.stdout = TeeWriter(sys.__stdout__, log_f)
         sys.stderr = TeeWriter(sys.__stderr__, log_f)
 
-        console.print(f"\n[dim]📝 Logging to: {log_path}[/dim]")
+        console.print(f"\n[dim]📝 Logging to: logs/{_today}/{log_file}[/dim]")
     else:
         console.print("\n[dim]⚠️  Logging disabled (console only)[/dim]")
 
@@ -225,13 +228,23 @@ def quant(
 
     # ---- Start fin_quant ----
     from rdagent.app.qlib_rd_loop.quant import main as fin_quant
+    from rdagent.log.daily_log import session as _daily_session
 
     console.print(f"\n[bold cyan]📊 Starting EURUSD Trading Loop...[/bold cyan]\n")
 
-    fin_quant(
-        step_n=step_n,
-        loop_n=loop_n,
-    )
+    _ctx = {"model": model}
+    if run_id:
+        _ctx["run_id"] = run_id
+    if loop_n:
+        _ctx["loops"] = loop_n
+    if step_n:
+        _ctx["steps"] = step_n
+
+    with _daily_session("fin_quant", **_ctx):
+        fin_quant(
+            step_n=step_n,
+            loop_n=loop_n,
+        )
 
 
 @app.command()
@@ -301,6 +314,7 @@ def evaluate(
         predix quant - Generate new factors via LLM trading loop
     """
     from rich.panel import Panel
+    from rdagent.log.daily_log import session as _daily_session
 
     console.print(Panel(
         "[bold cyan]📊 Predix Factor Evaluator[/bold cyan]\n"
@@ -312,13 +326,17 @@ def evaluate(
     # Import and run the evaluator
     from predix_full_eval import main as eval_main
 
+    _eval_ctx = {"top": "all" if all_factors else top, "workers": parallel}
+    if force:
+        _eval_ctx["force"] = True
     try:
-        eval_main(
-            top=top,
-            all_factors=all_factors,
-            parallel=parallel,
-            force=force,
-        )
+        with _daily_session("evaluate", **_eval_ctx):
+            eval_main(
+                top=top,
+                all_factors=all_factors,
+                parallel=parallel,
+                force=force,
+            )
     except KeyboardInterrupt:
         console.print("\n[yellow]Evaluation interrupted by user[/yellow]")
     except Exception as e:

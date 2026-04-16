@@ -273,6 +273,12 @@ class StrategyOrchestrator:
 
         try:
             df = pd.read_parquet(str(parquet_path))
+            
+            # Handle empty DataFrame
+            if df.empty or len(df.columns) == 0:
+                logger.warning(f"Empty parquet file: {parquet_path}")
+                return None
+            
             # Handle MultiIndex (datetime, instrument)
             if isinstance(df.index, pd.MultiIndex):
                 # Get the factor column name (should be the only column)
@@ -781,10 +787,21 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             
             # Forward-fill daily factors to match OHLCV 1-min index
             # Many factors are daily (1 value per day), need to ffill to 1-min
+            # FIX 6: Track ffill ratio for data quality monitoring
             close = self.load_ohlcv_close()
             if close is not None:
+                original_len = len(df_factors)
                 df_factors = df_factors.reindex(close.index).ffill()
-            
+
+                # Log how much was ffill'd
+                ffill_ratio = 1.0 - (original_len / len(df_factors)) if len(df_factors) > original_len else 0.0
+                logger.info(
+                    f"[DEBUG] {strategy_name}: data quality: "
+                    f"original_rows={original_len}, "
+                    f"ffill_rows={len(df_factors) - original_len}, "
+                    f"ffill_ratio={ffill_ratio:.2%}"
+                )
+
             df_factors = df_factors.dropna()
             
             if len(df_factors) < 1000:
@@ -824,27 +841,36 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 }
 
             signal = local_vars["signal"]
-            
-            # Debug: check signal distribution
+
+            # FIX 4: Debug-Logging nach Signal-Berechnung
+            logger.info(
+                f"[DEBUG] {strategy_name}: signal stats: "
+                f"len={len(signal)}, "
+                f"long={int((signal > 0).sum())}, "
+                f"short={int((signal < 0).sum())}, "
+                f"flat={int((signal == 0).sum())}, "
+                f"unique={signal.nunique()}"
+            )
 
             # Calculate REAL returns using OHLCV data
             close = self.load_ohlcv_close()
-            
+            combined_factor = df_factors.mean(axis=1)  # Always define combined_factor
+            price_returns = combined_factor.pct_change().fillna(0)  # Default fallback
+
             if close is not None:
                 # Use factor timestamps as the base (signal is generated on factor data)
                 # Resample OHLCV close to factor timestamps
                 signal_index = signal.index
                 close_aligned = close.reindex(signal_index).ffill()
-                
+
                 # Calculate real price returns
                 price_returns = close_aligned.pct_change().fillna(0)
-                
+
                 # Apply signal positions to real returns (lagged signal)
                 signal_positions = signal.shift(1).fillna(0)
                 returns = price_returns * signal_positions
-                
+
                 # Include spread costs (1.5 bps per trade = 0.00015)
-                combined_factor = df_factors.mean(axis=1)
                 SPREAD_COST = 0.00015
                 signal_changes = signal_positions.diff().abs().fillna(0)
                 spread_costs = signal_changes * SPREAD_COST
@@ -853,7 +879,6 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 # Fallback: use factor proxy if OHLCV unavailable
                 logger.warning("OHLCV data unavailable, using factor proxy")
                 signal_positions = signal.shift(1).fillna(0)
-                combined_factor = df_factors.mean(axis=1)
                 return_proxy = combined_factor * 0.0001
                 returns = return_proxy * signal_positions
             
@@ -867,42 +892,73 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                     "factors_used": factor_names,
                 }
 
-            # Calculate metrics
+            # FIX 1: Korrekte Sharpe Ratio Annualisierung für 1-Minuten-Daten
+            # Verwende mean_return * bars_per_year statt komplexer Jahres-Berechnung
+            bars_per_year = 252 * 1440  # 252 Handelstage * 1440 Minuten/Tag
+            ann_factor = np.sqrt(bars_per_year)  # Für Annualisierung von Mean/Std
+            mean_return = float(returns.mean())
+            ann_return = mean_return * bars_per_year
+            volatility = float(returns.std() * np.sqrt(bars_per_year))
+            sharpe = ann_return / volatility if volatility > 0 else 0.0
             total_return = float(returns.sum())
             n_periods = len(returns)
+
+            # FIX 3: Drawdown-Berechnung mit korrektem Error-Handling
+            # Stelle sicher, dass returns keine Inf/NaN haben VOR der Berechnung
+            returns_clean = returns.fillna(0).replace([np.inf, -np.inf], 0)
+            # Clip extreme values that could cause unrealistic drawdown
+            returns_clean = returns_clean.clip(-0.1, 0.1)  # Max 10% per bar realistic
+            cum_returns = (1 + returns_clean).cumprod()
             
-            # Annualization for 1-minute data
-            # 252 trading days * 1440 minutes per day = 362880 minutes per year
-            minutes_per_year = 252 * 1440
-            ann_factor = np.sqrt(minutes_per_year)  # ~602 for 1-min data
-            
-            # Calculate years of data (minimum 0.1 years = ~36 days to avoid extreme values)
-            years = max(n_periods / minutes_per_year, 0.1) if n_periods > 0 else 0.1
-            
-            # Annualized return (compound, not linear)
-            # For short periods, scale linearly to avoid extreme values
-            if years >= 1 and (1 + total_return) > 0:
-                ann_return = (1 + total_return) ** (1 / years) - 1
+            # Handle empty cum_returns
+            if len(cum_returns) == 0 or cum_returns.isna().all():
+                max_dd = 0.0
             else:
-                # For < 1 year, linear scaling is more appropriate
-                ann_return = total_return / years
-            
-            volatility = float(returns.std() * ann_factor)
-            sharpe = ann_return / volatility if volatility > 0 else 0.0
+                running_max = cum_returns.expanding().max()
+                # Avoid division by zero: use clip instead of replace
+                running_max_safe = running_max.clip(lower=1e-8)  # Prevent div-by-zero
+                drawdown = (cum_returns - running_max) / running_max_safe
+                drawdown = drawdown.fillna(0).replace([np.inf, -np.inf], 0)
+                max_dd = float(drawdown.min()) if len(drawdown) > 0 else 0.0
 
-            # Max drawdown
-            # Handle any NaN/inf in returns
-            returns = returns.fillna(0).replace([np.inf, -np.inf], 0)
-            cum_returns = (1 + returns).cumprod()
-            running_max = cum_returns.expanding().max()
-            drawdown = (cum_returns - running_max) / running_max.replace(0, np.nan)
-            drawdown = drawdown.fillna(0).replace([np.inf, -np.inf], 0)
-            max_dd = float(drawdown.min()) if len(drawdown) > 0 else 0.0
+            # FIX 2: Win Rate korrigieren - echte Trade-P&L Berechnung
+            signal_positions = signal.shift(1).fillna(0).astype(int)
+            # Finde Trade-Einstiegspunkte
+            position_changes = signal_positions.diff().fillna(0)
 
-            # Win rate
-            signal_changes = signal.diff().fillna(0)
-            trades = signal_changes[signal_changes != 0]
-            win_rate = float((trades > 0).sum() / len(trades)) if len(trades) > 0 else 0.0
+            # Berechne P&L für jede Position
+            trade_pnl = []
+            current_pnl = 0.0
+            in_position = False
+
+            for idx in signal_positions.index:
+                pos = signal_positions[idx]
+                ret = returns_clean.get(idx, 0)
+
+                if pos != 0:  # In Position (Long oder Short)
+                    current_pnl += ret * np.sign(pos)
+                    in_position = True
+                elif in_position and pos == 0:  # Ausstieg
+                    trade_pnl.append(current_pnl)
+                    current_pnl = 0.0
+                    in_position = False
+
+            # Offene Position am Ende schließen
+            if in_position and current_pnl != 0:
+                trade_pnl.append(current_pnl)
+
+            num_real_trades = len(trade_pnl)
+            win_rate = float(sum(1 for p in trade_pnl if p > 0) / num_real_trades) if num_real_trades > 0 else 0.0
+
+            # FIX 4: Debug-Logging nach Return-Berechnung
+            logger.info(
+                f"[DEBUG] {strategy_name}: return stats: "
+                f"mean={returns.mean():.6e}, "
+                f"std={returns.std():.6e}, "
+                f"skew={returns.skew():.3f}, "
+                f"total_return={total_return:.6f}, "
+                f"num_trades={num_real_trades}"
+            )
 
             # Information ratio (signal vs buy-and-hold)
             if close is not None:
@@ -926,12 +982,20 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 "information_ratio": round(ir, 4),
                 "total_return": round(total_return, 6),
                 "num_periods": n_periods,
+                "num_real_trades": num_real_trades,
                 "factors_used": factor_names,
                 "trading_style": self.trading_style,
                 "generated_at": datetime.now().isoformat(),
             }
 
             if metrics["status"] == "rejected":
+                # FIX 4: Debug-Logging bei Ablehnung
+                logger.info(
+                    f"[DEBUG] {strategy_name}: rejection breakdown: "
+                    f"sharpe={sharpe:.4f} (need>={self.min_sharpe}), "
+                    f"dd={max_dd:.4f} (need>={self.max_drawdown}), "
+                    f"wr={win_rate:.4f} (need>={self.min_win_rate})"
+                )
                 metrics["reason"] = self._get_rejection_reason(sharpe, max_dd, win_rate)
 
             return metrics
@@ -1147,6 +1211,9 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                             result.update(re_eval)
                             result["code"] = patched_code
                             result["best_params"] = best_params
+                            # Clear old rejection reason if now accepted
+                            if result.get("status") == "accepted":
+                                result.pop("reason", None)
                             logger.info(
                                 f"Re-evaluated {strategy_name} with best params: "
                                 f"Sharpe {initial_sharpe:.4f} → {re_eval.get('sharpe_ratio', 0):.4f}"
@@ -1154,8 +1221,14 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                         else:
                             result.update(optimized)
                             result["best_params"] = best_params
+                            # Clear old rejection reason if now accepted
+                            if result.get("status") == "accepted":
+                                result.pop("reason", None)
                     else:
                         result.update(optimized)
+                        # Clear old rejection reason if now accepted
+                        if result.get("status") == "accepted":
+                            result.pop("reason", None)
                 else:
                     logger.debug(f"Optuna did not improve {strategy_name}: {initial_sharpe:.4f} vs {optimized_sharpe:.4f}")
             else:
@@ -1277,30 +1350,53 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             if returns.std() == 0 or len(returns) < 10:
                 return {"sharpe_ratio": float('-inf'), "status": "rejected"}
 
+            # FIX 1: Korrekte Sharpe Ratio Annualisierung für 1-Minuten-Daten
+            bars_per_year = 252 * 1440
+            mean_return = float(returns.mean())
+            ann_return = mean_return * bars_per_year
+            volatility = float(returns.std() * np.sqrt(bars_per_year))
+            sharpe = ann_return / volatility if volatility > 0 else 0.0
             total_return = float(returns.sum())
             n_periods = len(returns)
-            minutes_per_year = 252 * 1440
-            ann_factor = np.sqrt(minutes_per_year)
-            years = max(n_periods / minutes_per_year, 0.1)
 
-            if years >= 1 and (1 + total_return) > 0:
-                ann_return = (1 + total_return) ** (1 / years) - 1
+            # FIX 3: Drawdown-Berechnung mit korrektem Error-Handling
+            returns_clean = returns.fillna(0).replace([np.inf, -np.inf], 0)
+            returns_clean = returns_clean.clip(-0.1, 0.1)
+            cum_returns = (1 + returns_clean).cumprod()
+            
+            # Handle empty cum_returns
+            if len(cum_returns) == 0 or cum_returns.isna().all():
+                max_dd = 0.0
             else:
-                ann_return = total_return / years
+                running_max = cum_returns.expanding().max()
+                # Avoid division by zero: use clip instead of replace
+                running_max_safe = running_max.clip(lower=1e-8)  # Prevent div-by-zero
+                drawdown = (cum_returns - running_max) / running_max_safe
+                drawdown = drawdown.fillna(0).replace([np.inf, -np.inf], 0)
+                max_dd = float(drawdown.min()) if len(drawdown) > 0 else 0.0
 
-            volatility = float(returns.std() * ann_factor)
-            sharpe = ann_return / volatility if volatility > 0 else 0.0
+            # FIX 2: Win Rate korrigieren - echte Trade-P&L Berechnung
+            sig_pos = signal.shift(1).fillna(0).astype(int)
+            trade_pnl = []
+            current_pnl = 0.0
+            in_position = False
 
-            returns = returns.fillna(0).replace([np.inf, -np.inf], 0)
-            cum_returns = (1 + returns).cumprod()
-            running_max = cum_returns.expanding().max()
-            drawdown = (cum_returns - running_max) / running_max.replace(0, np.nan)
-            drawdown = drawdown.fillna(0).replace([np.inf, -np.inf], 0)
-            max_dd = float(drawdown.min()) if len(drawdown) > 0 else 0.0
+            for idx in sig_pos.index:
+                pos = sig_pos[idx]
+                ret = returns_clean.get(idx, 0)
+                if pos != 0:
+                    current_pnl += ret * np.sign(pos)
+                    in_position = True
+                elif in_position and pos == 0:
+                    trade_pnl.append(current_pnl)
+                    current_pnl = 0.0
+                    in_position = False
 
-            signal_changes_eval = signal.diff().fillna(0)
-            trades = signal_changes_eval[signal_changes_eval != 0]
-            win_rate = float((trades > 0).sum() / len(trades)) if len(trades) > 0 else 0.0
+            if in_position and current_pnl != 0:
+                trade_pnl.append(current_pnl)
+
+            num_real_trades = len(trade_pnl)
+            win_rate = float(sum(1 for p in trade_pnl if p > 0) / num_real_trades) if num_real_trades > 0 else 0.0
 
             status = "accepted" if sharpe >= self.min_sharpe and max_dd >= self.max_drawdown and win_rate >= self.min_win_rate else "rejected"
 
@@ -1314,6 +1410,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 "volatility": round(volatility, 6),
                 "total_return": round(total_return, 6),
                 "num_periods": n_periods,
+                "num_real_trades": num_real_trades,
             }
 
         except Exception as e:

@@ -46,8 +46,15 @@ evolving_strategy_factor_implementation_v1_system: |-
   1. The user might provide you the correct code to similar factors. Your should learn from these code to write the correct code.
   2. The user might provide you the failed former code and the corresponding feedback to the code. The feedback contains to the execution, the code and the factor value. You should analyze the feedback and try to correct the latest code.
   3. The user might provide you the suggestion to the latest fail code and some similar fail to correct pairs. Each pair contains the fail code with similar error and the corresponding corrected version code. You should learn from these suggestion to write the correct code.
-  
+
   Your must write your code based on your former latest attempt below which consists of your former code and code feedback, you should read the former attempt carefully and must not modify the right part of your former code.
+
+  CRITICAL RULES FOR EURUSD 1-MINUTE INTRADAY FACTORS:
+  - ALWAYS use `min_periods=N` where N equals the window size in rolling calculations (e.g., `.rolling(20, min_periods=20)`)
+  - ALWAYS handle infinite values after division: `.replace([np.inf, -np.inf], np.nan)` before saving results
+  - ALWAYS use `groupby(level=1)` or `groupby('instrument')` before rolling operations on MultiIndex dataframes
+  - Process the COMPLETE date range (2020-2026), do NOT filter by date
+  - Use `groupby().transform()` instead of `groupby().apply()` for single-column assignments
 
   Notice that you should not add any other text before or after the json format.
 
