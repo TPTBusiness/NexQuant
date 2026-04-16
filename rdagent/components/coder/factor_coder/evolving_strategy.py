@@ -14,6 +14,7 @@ from rdagent.components.coder.CoSTEER.knowledge_management import (
 )
 from rdagent.components.coder.factor_coder.config import FACTOR_COSTEER_SETTINGS
 from rdagent.components.coder.factor_coder.factor import FactorFBWorkspace, FactorTask
+from rdagent.components.coder.factor_coder.auto_fixer import auto_fix_factor_code
 from rdagent.core.experiment import FBWorkspace
 from rdagent.oai.llm_conf import LLM_SETTINGS
 from rdagent.oai.llm_utils import APIBackend
@@ -156,6 +157,9 @@ class FactorMultiProcessEvolvingStrategy(MultiProcessEvolvingStrategy):
                     else:
                         raise  # continue to retry
 
+                # === AUTO-FIX: Apply known fixes before returning code ===
+                code = auto_fix_factor_code(code, target_factor_task_information)
+
                 return code
 
             except (json.decoder.JSONDecodeError, KeyError):
@@ -172,7 +176,17 @@ class FactorMultiProcessEvolvingStrategy(MultiProcessEvolvingStrategy):
             # Since the `implement_one_task` method is not standardized and the `code_list` has both `str` and `dict` data types,
             # we ended up getting an `TypeError` here, so we chose to fix the problem temporarily with this dirty method.
             if isinstance(code_list[index], dict):
-                evo.sub_workspace_list[index].inject_files(**code_list[index])
+                # Auto-fix each file in the dict
+                fixed_dict = {}
+                for filename, file_code in code_list[index].items():
+                    if filename.endswith('.py'):
+                        task_info = evo.sub_tasks[index].get_task_information()
+                        fixed_dict[filename] = auto_fix_factor_code(file_code, task_info)
+                    else:
+                        fixed_dict[filename] = file_code
+                evo.sub_workspace_list[index].inject_files(**fixed_dict)
             else:
-                evo.sub_workspace_list[index].inject_files(**{"factor.py": code_list[index]})
+                task_info = evo.sub_tasks[index].get_task_information()
+                fixed_code = auto_fix_factor_code(code_list[index], task_info)
+                evo.sub_workspace_list[index].inject_files(**{"factor.py": fixed_code})
         return evo
