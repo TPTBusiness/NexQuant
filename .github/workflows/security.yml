@@ -107,24 +107,41 @@ jobs:
       run: |
         echo "=== Verifying No Closed-Source Assets Committed ==="
 
-        CLOSED_PATTERNS=(
+        FOUND_CLOSED=0
+
+        # Exact directory prefixes that must never appear (use grep -F for literal matching)
+        EXACT_PREFIXES=(
           "git_ignore_folder/"
-          "results/"
-          ".env"
           "models/local/"
           "prompts/local/"
           "rdagent/scenarios/qlib/local/"
-          "*.db"
-          "*.log"
         )
-
-        FOUND_CLOSED=0
-        for pattern in "${CLOSED_PATTERNS[@]}"; do
-          if git ls-files | grep -q "$pattern"; then
-            echo "::error::Found closed-source asset: $pattern"
+        for prefix in "${EXACT_PREFIXES[@]}"; do
+          if git ls-files | grep -qF "$prefix"; then
+            echo "::error::Found closed-source asset: $prefix"
             FOUND_CLOSED=1
           fi
         done
+
+        # results/ — allow README.md and .gitkeep but nothing else
+        if git ls-files | grep -F "results/" | grep -qvE "results/README\.md|results/\.gitkeep"; then
+          echo "::error::Found closed-source asset: results/ (non-documentation file)"
+          git ls-files | grep -F "results/" | grep -vE "results/README\.md|results/\.gitkeep"
+          FOUND_CLOSED=1
+        fi
+
+        # .env files — match only .env and .env.* exactly, not paths containing "env"
+        if git ls-files | grep -qE "(^|/)\.env($|\.)"; then
+          echo "::error::Found closed-source asset: .env file"
+          FOUND_CLOSED=1
+        fi
+
+        # Binary / data files that must never be committed
+        if git ls-files | grep -qE "\.(db|h5|parquet|log)$"; then
+          echo "::error::Found data/log file committed (*.db, *.h5, *.parquet, *.log)"
+          git ls-files | grep -E "\.(db|h5|parquet|log)$"
+          FOUND_CLOSED=1
+        fi
 
         if [ $FOUND_CLOSED -eq 1 ]; then
           echo "CRITICAL: Closed-source assets must not be committed to the repository!"
