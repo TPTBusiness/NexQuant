@@ -138,3 +138,5 @@ pickle_cache/
 
 .qwen/
 RD-Agent_workspace_run*/
+AGENTS.md
+CLAUDE.md
