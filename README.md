@@ -147,10 +147,16 @@ QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
 ```bash
 ~/llama.cpp/build/bin/llama-server \
   --model ~/models/qwen3.5/Qwen3.5-35B-A3B-Q3_K_M.gguf \
-  --n-gpu-layers 36 \
+  --n-gpu-layers 28 \
   --ctx-size 80000 \
-  --port 8081
+  --port 8081 \
+  --reasoning off
 ```
+
+> **Important flags:**
+> - `--reasoning off` — disables chain-of-thought thinking mode. Without this, Qwen3.5 spends 15–22 s per request on internal reasoning, which causes rdagent to time out after 10 retries. With it off, responses take ~0.6 s.
+> - `--n-gpu-layers 28` — use 28 instead of 36 if another GPU process (e.g. Ollama) is already running. 36 layers will exceed VRAM on a 16 GB card when Ollama occupies ~668 MB. Reduce layers further if you hit `cudaMalloc failed: out of memory`.
+> - `--ctx-size 80000` — 80 k context is required for long factor-generation prompts.
 
 ---
 
