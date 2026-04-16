@@ -34,3 +34,6 @@ skips:
   - 'B614'
   # B307: eval_used - internal config parsing with controlled input
   - 'B307'
+  # B615: huggingface_unsafe_download - RL benchmark files use HuggingFace Hub for
+  #   research datasets; revision pinning is not required for benchmark reproducibility
+  - 'B615'

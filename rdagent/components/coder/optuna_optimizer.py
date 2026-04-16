@@ -94,7 +94,11 @@ class OptunaOptimizer:
         forward_returns: Optional[pd.Series] = None,
     ) -> Dict[str, Any]:
         """
-        Optimize a single strategy's hyperparameters.
+        Optimiere eine einzelne Strategie mit mehrstufiger Suche (grob → fein).
+
+        STAGE 1: Grobe Suche mit weiten Bereichen (10 Trials)
+        STAGE 2: Feine Suche um die besten Stage-1-Parameter (15 Trials)
+        STAGE 3: Sehr feine lokale Suche (5 Trials)
 
         Parameters
         ----------
@@ -111,49 +115,67 @@ class OptunaOptimizer:
             Optimized strategy result with best parameters
         """
         strategy_name = strategy_result.get("strategy_name", "Unknown")
-        logger.info(f"Starting optimization for strategy: {strategy_name}")
+        logger.info(f"Starting multi-stage optimization for strategy: {strategy_name}")
 
-        # Define objective function
-        def objective(trial: optuna.Trial) -> float:
-            """Objective function for Optuna optimization."""
-            try:
-                # Sample hyperparameters
-                params = self._sample_hyperparameters(trial)
+        # Speichere Referenzen für Objective-Methoden
+        self._current_strategy = strategy_result
+        self._current_factors = factor_values
+        self._current_forward_returns = forward_returns
 
-                # Evaluate strategy with these parameters
-                metrics = self._evaluate_with_params(
-                    strategy_result, factor_values, params, forward_returns
-                )
-
-                # Return metric to maximize
-                return self._extract_metric(metrics, self.optimization_metric)
-
-            except Exception as e:
-                logger.debug(f"Trial failed: {e}")
-                return float("-inf")
-
-        # Create study
-        study = optuna.create_study(
+        # STAGE 1: Grobe Suche mit weiten Bereichen (10 Trials)
+        logger.info(f"Stage 1: Coarse search for {strategy_name}")
+        stage1_study = optuna.create_study(
             direction="maximize",
             sampler=optuna.samplers.TPESampler(seed=42),
-            pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=10),
+            pruner=optuna.pruners.MedianPruner(n_startup_trials=3, n_warmup_steps=5),
+        )
+        stage1_study.optimize(self._objective_coarse, n_trials=10, gc_after_trial=True)
+
+        best_stage1 = stage1_study.best_trial.params
+        best_stage1_value = stage1_study.best_trial.value
+        logger.info(
+            f"Stage 1 complete: best_value={best_stage1_value:.4f}, "
+            f"params={best_stage1}"
         )
 
-        # Run optimization
-        try:
-            study.optimize(
-                objective,
-                n_trials=self.n_trials,
-                timeout=self.timeout,
-                n_jobs=self.n_jobs,
-                gc_after_trial=True,
-            )
-        except Exception as e:
-            logger.error(f"Optimization failed for {strategy_name}: {e}")
-            return {**strategy_result, "optimization_status": "failed", "error": str(e)}
+        # STAGE 2: Feine Suche um die besten Stage-1-Parameter (15 Trials)
+        logger.info(f"Stage 2: Fine search around best params")
+        stage2_study = optuna.create_study(
+            direction="maximize",
+            sampler=optuna.samplers.TPESampler(seed=43),
+            pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=5),
+        )
+        # Verwende beste Stage-1-Parameter als Zentrum für feine Suche
+        self._fine_search_center = best_stage1
+        stage2_study.optimize(self._objective_fine, n_trials=15, gc_after_trial=True)
 
-        # Get best trial
-        best_trial = study.best_trial
+        best_stage2 = stage2_study.best_trial.params
+        best_stage2_value = stage2_study.best_trial.value
+        logger.info(
+            f"Stage 2 complete: best_value={best_stage2_value:.4f}, "
+            f"params={best_stage2}"
+        )
+
+        # STAGE 3: Sehr feine lokale Suche (5 Trials) - nur wenn Stage 2 besser war
+        if best_stage2_value > best_stage1_value:
+            logger.info(f"Stage 3: Very fine local search")
+            stage3_study = optuna.create_study(
+                direction="maximize",
+                sampler=optuna.samplers.TPESampler(seed=44),
+            )
+            self._very_fine_center = best_stage2
+            stage3_study.optimize(self._objective_very_fine, n_trials=5, gc_after_trial=True)
+
+            best_stage3_value = stage3_study.best_trial.value
+            logger.info(f"Stage 3 complete: best_value={best_stage3_value:.4f}")
+
+            # Bestes Trial über alle Stufen wählen
+            if best_stage3_value > best_stage2_value:
+                best_trial = stage3_study.best_trial
+            else:
+                best_trial = stage2_study.best_trial
+        else:
+            best_trial = stage1_study.best_trial
 
         # Re-evaluate with best params
         best_params = best_trial.params
@@ -161,7 +183,7 @@ class OptunaOptimizer:
             strategy_result, factor_values, best_params, forward_returns
         )
 
-        # Build optimized result
+        # Baue optimiertes Ergebnis
         optimized_result = {
             **strategy_result,
             "status": "accepted" if self._is_acceptable(best_metrics) else "rejected",
@@ -171,18 +193,31 @@ class OptunaOptimizer:
             "win_rate": best_metrics.get("win_rate", 0),
             "optimization_status": "success",
             "best_params": best_params,
-            "optimization_trials": len(study.trials),
-            "optimization_best_value": best_trial.value,
-            "optimization_history": [t.value for t in study.trials if t.value is not None],
+            "optimization_stages": {
+                "stage1_best": best_stage1_value,
+                "stage2_best": best_stage2_value,
+                "stage3_best": best_stage3_value if best_stage2_value > best_stage1_value else None,
+            },
+            "optimization_trials": len(stage1_study.trials) + len(stage2_study.trials) + (
+                len(stage3_study.trials) if best_stage2_value > best_stage1_value else 0
+            ),
+            "optimization_history": {
+                "stage1": [t.value for t in stage1_study.trials if t.value is not None],
+                "stage2": [t.value for t in stage2_study.trials if t.value is not None],
+                "stage3": (
+                    [t.value for t in stage3_study.trials if t.value is not None]
+                    if best_stage2_value > best_stage1_value else []
+                ),
+            },
             "optimized_at": datetime.now().isoformat(),
         }
 
-        # Save optimization results
+        # Speichere Optimierungsergebnisse
         self._save_optimization_results(optimized_result, strategy_name)
 
         logger.info(
-            f"Optimization complete for {strategy_name}: "
-            f"best_{self.optimization_metric}={best_trial.value:.4f}"
+            f"Multi-stage optimization complete for {strategy_name}: "
+            f"best_metric={best_trial.value:.4f}, status={optimized_result['status']}"
         )
 
         return optimized_result
@@ -231,6 +266,155 @@ class OptunaOptimizer:
                 })
 
         return optimized
+
+    def _sample_coarse_params(self, trial: optuna.Trial) -> Dict[str, Any]:
+        """
+        Weite Bereiche für initiale Exploration (Stage 1).
+
+        Parameters
+        ----------
+        trial : optuna.Trial
+            Current Optuna trial
+
+        Returns
+        -------
+        Dict[str, Any]
+            Sampled hyperparameters with wide ranges
+        """
+        return {
+            "entry_threshold": trial.suggest_float("entry_threshold", 0.1, 3.0, step=0.1),
+            "exit_threshold": trial.suggest_float("exit_threshold", 0.0, 1.5, step=0.1),
+            "zscore_window": trial.suggest_int("zscore_window", 5, 500, step=5),
+            "signal_window": trial.suggest_int("signal_window", 1, 30, step=1),
+            "position_size_pct": trial.suggest_float("position_size_pct", 0.05, 1.0, step=0.05),
+            "stop_loss_mult": trial.suggest_float("stop_loss_mult", 0.5, 15.0, step=0.5),
+            "take_profit_mult": trial.suggest_float("take_profit_mult", 1.0, 20.0, step=0.5),
+            "volatility_lookback": trial.suggest_int("volatility_lookback", 5, 500, step=5),
+            "signal_bias": trial.suggest_float("signal_bias", -1.0, 1.0, step=0.05),
+            "max_hold_bars": trial.suggest_int("max_hold_bars", 5, 1000, step=5),
+        }
+
+    def _sample_fine_params(self, trial: optuna.Trial) -> Dict[str, Any]:
+        """
+        Enge Bereiche zentriert um die besten Stage-1-Parameter (Stage 2).
+
+        Parameters
+        ----------
+        trial : optuna.Trial
+            Current Optuna trial
+
+        Returns
+        -------
+        Dict[str, Any]
+            Sampled hyperparameters with narrow ranges around Stage 1 best
+        """
+        center = getattr(self, "_fine_search_center", {})
+        # (center_value, half_width) für jeden Parameter
+        ranges: Dict[str, Tuple[float, float]] = {
+            "entry_threshold": (center.get("entry_threshold", 1.0), 0.3),
+            "exit_threshold": (center.get("exit_threshold", 0.3), 0.2),
+            "zscore_window": (center.get("zscore_window", 50), 20),
+            "signal_window": (center.get("signal_window", 3), 5),
+            "position_size_pct": (center.get("position_size_pct", 0.5), 0.15),
+            "stop_loss_mult": (center.get("stop_loss_mult", 5.0), 2.0),
+            "take_profit_mult": (center.get("take_profit_mult", 5.0), 2.0),
+            "volatility_lookback": (center.get("volatility_lookback", 100), 30),
+            "signal_bias": (center.get("signal_bias", 0.0), 0.2),
+            "max_hold_bars": (center.get("max_hold_bars", 100), 50),
+        }
+
+        params: Dict[str, Any] = {}
+        for key, (center_val, half_width) in ranges.items():
+            if "window" in key or "lookback" in key or "bars" in key:
+                low = max(1, int(center_val - half_width))
+                high = int(center_val + half_width)
+                params[key] = trial.suggest_int(key, low, high)
+            else:
+                low = max(0.0, center_val - half_width)
+                high = center_val + half_width
+                step = half_width / 10
+                params[key] = trial.suggest_float(key, low, high, step=step)
+        return params
+
+    def _sample_very_fine_params(self, trial: optuna.Trial) -> Dict[str, Any]:
+        """
+        Sehr enge Bereiche für finale Verfeinerung (Stage 3).
+
+        Parameters
+        ----------
+        trial : optuna.Trial
+            Current Optuna trial
+
+        Returns
+        -------
+        Dict[str, Any]
+            Sampled hyperparameters with very narrow ranges around Stage 2 best
+        """
+        center = getattr(
+            self, "_very_fine_center", getattr(self, "_fine_search_center", {})
+        )
+        # (center_value, half_width) — ein Drittel der Stage-2-Breite
+        ranges: Dict[str, Tuple[float, float]] = {
+            "entry_threshold": (center.get("entry_threshold", 1.0), 0.1),
+            "exit_threshold": (center.get("exit_threshold", 0.3), 0.07),
+            "zscore_window": (center.get("zscore_window", 50), 7),
+            "signal_window": (center.get("signal_window", 3), 2),
+            "position_size_pct": (center.get("position_size_pct", 0.5), 0.05),
+            "stop_loss_mult": (center.get("stop_loss_mult", 5.0), 0.7),
+            "take_profit_mult": (center.get("take_profit_mult", 5.0), 0.7),
+            "volatility_lookback": (center.get("volatility_lookback", 100), 10),
+            "signal_bias": (center.get("signal_bias", 0.0), 0.07),
+            "max_hold_bars": (center.get("max_hold_bars", 100), 17),
+        }
+
+        params: Dict[str, Any] = {}
+        for key, (center_val, half_width) in ranges.items():
+            if "window" in key or "lookback" in key or "bars" in key:
+                low = max(1, int(center_val - half_width))
+                high = int(center_val + half_width)
+                params[key] = trial.suggest_int(key, low, high)
+            else:
+                low = max(0.0, center_val - half_width)
+                high = center_val + half_width
+                step = half_width / 5
+                params[key] = trial.suggest_float(key, low, high, step=step)
+        return params
+
+    def _objective_coarse(self, trial: optuna.Trial) -> float:
+        """Objective-Funktion für Stage 1 (grobe Suche)."""
+        try:
+            params = self._sample_coarse_params(trial)
+            metrics = self._evaluate_with_params(
+                self._current_strategy, self._current_factors, params, self._current_forward_returns
+            )
+            return self._extract_metric(metrics, self.optimization_metric)
+        except Exception as e:
+            logger.debug(f"Stage 1 trial failed: {e}")
+            return float("-inf")
+
+    def _objective_fine(self, trial: optuna.Trial) -> float:
+        """Objective-Funktion für Stage 2 (feine Suche)."""
+        try:
+            params = self._sample_fine_params(trial)
+            metrics = self._evaluate_with_params(
+                self._current_strategy, self._current_factors, params, self._current_forward_returns
+            )
+            return self._extract_metric(metrics, self.optimization_metric)
+        except Exception as e:
+            logger.debug(f"Stage 2 trial failed: {e}")
+            return float("-inf")
+
+    def _objective_very_fine(self, trial: optuna.Trial) -> float:
+        """Objective-Funktion für Stage 3 (sehr feine Suche)."""
+        try:
+            params = self._sample_very_fine_params(trial)
+            metrics = self._evaluate_with_params(
+                self._current_strategy, self._current_factors, params, self._current_forward_returns
+            )
+            return self._extract_metric(metrics, self.optimization_metric)
+        except Exception as e:
+            logger.debug(f"Stage 3 trial failed: {e}")
+            return float("-inf")
 
     def _sample_hyperparameters(self, trial: optuna.Trial) -> Dict[str, Any]:
         """
@@ -415,23 +599,47 @@ class OptunaOptimizer:
             if len(returns) < 10 or returns.std() == 0:
                 return self._default_metrics()
 
-            # Calculate metrics
-            total_return = float(returns.sum())
-            ann_factor = np.sqrt(252 * 1440 / 96)  # Annualization for 1-min data
-            volatility = float(returns.std() * ann_factor)
-            ann_return = float(total_return * ann_factor)
+            # FIX 1: Korrekte Sharpe Ratio Annualisierung für 1-Minuten-Daten
+            bars_per_year = 252 * 1440  # 252 Handelstage * 1440 Minuten/Tag
+            mean_return = float(returns.mean())
+            ann_return = mean_return * bars_per_year
+            volatility = float(returns.std() * np.sqrt(bars_per_year))
             sharpe = ann_return / volatility if volatility > 0 else 0.0
+            total_return = float(returns.sum())
 
-            # Max drawdown
-            cum = (1 + returns).cumprod()
+            # FIX 3: Drawdown-Berechnung mit korrektem Error-Handling
+            returns_clean = returns.fillna(0).replace([np.inf, -np.inf], 0)
+            returns_clean = returns_clean.clip(-0.1, 0.1)  # Max 10% pro Bar
+            cum = (1 + returns_clean).cumprod()
             running_max = cum.expanding().max()
             drawdown = (cum - running_max) / running_max.replace(0, np.nan)
+            drawdown = drawdown.fillna(0).replace([np.inf, -np.inf], 0)
             max_dd = float(drawdown.min()) if len(drawdown) > 0 else 0.0
 
-            # Win rate
-            trades = signal.diff().fillna(0)
-            trades = trades[trades != 0]
-            win_rate = float((trades > 0).sum() / len(trades)) if len(trades) > 0 else 0.0
+            # FIX 2: Win Rate korrigieren - echte Trade-P&L Berechnung
+            signal_positions = signal.shift(1).fillna(0).astype(int)
+
+            trade_pnl = []
+            current_pnl = 0.0
+            in_position = False
+
+            for idx in signal_positions.index:
+                pos = signal_positions[idx]
+                ret = returns_clean.get(idx, 0)
+
+                if pos != 0:  # In Position (Long oder Short)
+                    current_pnl += ret * np.sign(pos)
+                    in_position = True
+                elif in_position and pos == 0:  # Ausstieg
+                    trade_pnl.append(current_pnl)
+                    current_pnl = 0.0
+                    in_position = False
+
+            if in_position and current_pnl != 0:
+                trade_pnl.append(current_pnl)
+
+            num_real_trades = len(trade_pnl)
+            win_rate = float(sum(1 for p in trade_pnl if p > 0) / num_real_trades) if num_real_trades > 0 else 0.0
 
             return {
                 "sharpe_ratio": sharpe,
@@ -440,7 +648,7 @@ class OptunaOptimizer:
                 "win_rate": win_rate,
                 "volatility": volatility,
                 "total_return": total_return,
-                "num_trades": int(len(trades)),
+                "num_trades": num_real_trades,
             }
 
         except Exception as e:
