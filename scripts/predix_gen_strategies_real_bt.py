@@ -331,7 +331,17 @@ print(json.dumps(result))
 # ============================================================================
 def main(target_count=10):
     """Generate strategies in parallel with real backtesting."""
-    
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent.parent))
+    from rdagent.log import daily_log as _dlog
+    _log = _dlog.setup(
+        "strategies_bt",
+        style=TRADING_STYLE,
+        forward_bars=FORWARD_BARS,
+        target=target_count,
+        workers=N_WORKERS,
+    )
+
     console.print(f"\n[bold cyan]{STYLE_EMOJI} Parallel Strategy Generation[/bold cyan]")
     console.print(f"   Style: {STYLE_DESC}")
     console.print(f"   Forward bars: {FORWARD_BARS}")
@@ -446,18 +456,25 @@ def main(target_count=10):
                         pass
                     
                     accepted.append(strategy)
+                    _log.success(f"ACCEPTED  {strategy['strategy_name']}  IC={ic:.4f}  Sharpe={sharpe:.3f}  Trades={trades}  DD={dd:.1%}")
                     feedback_history.append(f"Excellent! IC={ic:.4f}, Sharpe={sharpe:.2f}, Trades={trades}. Try to improve further.")
-                    
+
                     progress.console.print(f"[green]✓ Strategy #{len(accepted)}:[/green] {strategy['strategy_name']} "
                                           f"IC={ic:.4f}, Sharpe={sharpe:.3f}, Trades={trades}, DD={dd:.1%}")
                 else:
+                    _log.info(f"REJECTED  IC={ic:.4f}  Sharpe={sharpe:.2f}  Trades={trades}  DD={dd:.1%}")
                     feedback_history.append(f"Failed: IC={ic:.4f}, Sharpe={sharpe:.2f}, Trades={trades}, DD={dd:.1%}. Need |IC|>{MIN_IC}, Sharpe>{MIN_SHARPE}, Trades>{MIN_TRADES}")
             
             progress.update(task, advance=1)
     
     # Summary
+    _log.info(f"DONE  accepted={len(accepted)}  target={target_count}")
+    for i, s in enumerate(sorted(accepted, key=lambda x: x['real_backtest'].get('ic', 0), reverse=True), 1):
+        bt = s['real_backtest']
+        _log.info(f"  #{i}  {s['strategy_name']}  IC={bt.get('ic',0):.4f}  Sharpe={bt.get('sharpe',0):.3f}  Monthly={bt.get('monthly_return_pct',0):.2f}%")
+
     console.print(f"\n[bold green]✓ Generated {len(accepted)}/{target_count} accepted strategies[/bold green]\n")
-    
+
     if accepted:
         accepted.sort(key=lambda x: x['real_backtest'].get('ic', 0), reverse=True)
         console.print("[bold]Results:[/bold]")

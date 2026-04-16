@@ -241,6 +241,31 @@ def fin_quant_cli(
 
         console.print(f"\n[bold green]🏠 Using local LLM:[/bold green] [cyan]{os.environ['CHAT_MODEL']}[/cyan]")
         console.print(f"   [dim]Base URL: {os.environ['OPENAI_API_BASE']}[/dim]")
+
+        # Wait until the llama.cpp server is fully loaded before starting the pipeline
+        import urllib.request
+        import urllib.error
+
+        base_url = os.environ["OPENAI_API_BASE"].rstrip("/v1").rstrip("/")
+        health_url = f"{base_url}/health"
+        console.print(f"   [yellow]⏳ Waiting for local LLM server to be ready ({health_url})...[/yellow]")
+        max_wait = 300  # seconds
+        waited = 0
+        interval = 5
+        while waited < max_wait:
+            try:
+                with urllib.request.urlopen(health_url, timeout=3) as resp:
+                    body = resp.read().decode()
+                    if '"status":"ok"' in body or '"status": "ok"' in body:
+                        console.print("   [bold green]✅ LLM server is ready.[/bold green]")
+                        break
+            except Exception:
+                pass
+            time.sleep(interval)
+            waited += interval
+            console.print(f"   [dim]Still waiting... ({waited}s)[/dim]")
+        else:
+            console.print("   [bold yellow]⚠️  Server did not report 'ok' after 300s — proceeding anyway.[/bold yellow]")
     else:
         console.print(f"\n[yellow]⚠️  Unknown model backend: '{model}'. Using current .env settings.[/yellow]")
 
@@ -271,15 +296,26 @@ def fin_quant_cli(
         time.sleep(1)
 
     # Fin Quant starten
-    fin_quant(
-        path=path,
-        step_n=step_n,
-        loop_n=loop_n,
-        all_duration=all_duration,
-        checkout=checkout,
-        auto_strategies=auto_strategies,
-        auto_strategies_threshold=auto_strategies_threshold,
-    )
+    from rdagent.log.daily_log import session as _daily_session
+
+    _ctx: dict = {"model": model}
+    if loop_n is not None:
+        _ctx["loops"] = loop_n
+    if step_n is not None:
+        _ctx["steps"] = step_n
+    if auto_strategies:
+        _ctx["auto_strategies_threshold"] = auto_strategies_threshold
+
+    with _daily_session("fin_quant", **_ctx):
+        fin_quant(
+            path=path,
+            step_n=step_n,
+            loop_n=loop_n,
+            all_duration=all_duration,
+            checkout=checkout,
+            auto_strategies=auto_strategies,
+            auto_strategies_threshold=auto_strategies_threshold,
+        )
 
 
 @app.command(name="fin_factor_report")
@@ -623,6 +659,19 @@ def generate_strategies_cli(
     console.print(f"  Top Factors: [cyan]{top_factors}[/cyan]")
     console.print(f"[bold blue]{'='*60}[/bold blue]\n")
 
+    from rdagent.log import daily_log as _dlog
+
+    _strat_ctx = {
+        "style": style,
+        "count": count,
+        "workers": workers,
+        "optuna": optuna,
+        "iterations": max_iterations,
+    }
+    if optuna:
+        _strat_ctx["trials"] = optuna_trials
+    _slog = _dlog.setup("strategies", **_strat_ctx)
+
     try:
         from rdagent.components.coder.strategy_orchestrator import StrategyOrchestrator
         import pandas as pd
@@ -666,12 +715,12 @@ def generate_strategies_cli(
                 TimeRemainingColumn(),
                 console=console,
             ) as progress:
-                task = progress.add_task(f"Generating {count} strategies (iter {iteration})...", total=count)
+                task = progress.add_task(f"Generating {count} strategies (iter {iteration})...", total=None)  # Unknown total
 
                 results = orchestrator.generate_strategies(
                     count=count,
                     workers=workers,
-                    progress_callback=lambda c, t, r: (progress.update(task, completed=c), progress_callback(c, t, r)),
+                    progress_callback=lambda c, t, r: (progress.update(task, completed=c, total=t), progress_callback(c, t, r)),
                 )
 
             all_results.extend(results)
@@ -766,12 +815,15 @@ def generate_strategies_cli(
 
         console.print(f"\n[bold green]Strategies saved to:[/bold green] [cyan]results/strategies_new/[/cyan]")
         console.print(f"[bold blue]{'='*60}[/bold blue]\n")
+        _slog.success(f"Generated {len(all_results)} strategies ({len([r for r in all_results if r.get('status')=='accepted'])} accepted)")
 
     except ImportError as e:
+        _slog.error(f"Strategy components not available: {e}")
         console.print(f"[bold red]Error: Strategy components not available.[/bold red]")
         console.print(f"Details: {e}")
         raise typer.Exit(code=1)
     except Exception as e:
+        _slog.error(f"Strategy generation failed: {e}")
         console.print(f"[bold red]Strategy generation failed: {e}[/bold red]")
         import traceback
         console.print(f"[dim]{traceback.format_exc()}[/dim]")
@@ -1336,6 +1388,7 @@ def parallel_cli(
     import subprocess
     import sys
     from pathlib import Path
+    from rdagent.log import daily_log as _dlog
 
     project_root = Path(__file__).parent.parent.parent.parent
     script = project_root / "scripts" / "predix_parallel.py"
@@ -1346,6 +1399,7 @@ def parallel_cli(
 
     cmd = [sys.executable, str(script), "--runs", str(runs), "--api-keys", str(api_keys), "-m", "local"]
 
+    _plog = _dlog.setup("parallel", runs=runs, api_keys=api_keys, model="local")
     typer.echo(f"🚀 Starting {runs} parallel runs...")
     typer.echo(f"   Script: {script}")
     typer.echo(f"   API Keys: {api_keys}")
@@ -1353,8 +1407,10 @@ def parallel_cli(
 
     try:
         result = subprocess.run(cmd, cwd=str(project_root))
+        _plog.info(f"Parallel runs finished  returncode={result.returncode}")
         raise typer.Exit(code=result.returncode)
     except KeyboardInterrupt:
+        _plog.warning("Parallel runs interrupted by user")
         typer.echo("\n⚠️  Interrupted by user")
         raise typer.Exit(code=1)
 
@@ -1383,6 +1439,7 @@ def eval_all_cli(
     import subprocess
     import sys
     from pathlib import Path
+    from rdagent.log import daily_log as _dlog
 
     project_root = Path(__file__).parent.parent.parent.parent
     script = project_root / "scripts" / "predix_full_eval.py"
@@ -1397,14 +1454,17 @@ def eval_all_cli(
     if parallel > 1:
         cmd.extend(["--parallel", str(parallel)])
 
+    _elog = _dlog.setup("evaluate", top=top, workers=parallel)
     typer.echo(f"📊 Evaluating top {top} factors with full data...")
     typer.echo(f"   Script: {script}")
     typer.echo(f"   Workers: {parallel}")
 
     try:
         result = subprocess.run(cmd, cwd=str(project_root))
+        _elog.info(f"Evaluation finished  returncode={result.returncode}")
         raise typer.Exit(code=result.returncode)
     except KeyboardInterrupt:
+        _elog.warning("Evaluation interrupted by user")
         typer.echo("\n⚠️  Interrupted by user")
         raise typer.Exit(code=1)
 
