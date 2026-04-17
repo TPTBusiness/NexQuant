@@ -74,12 +74,12 @@ def extract_stage(tag: str) -> str:
 
 def get_valid_sessions(log_folder: Path, safe_root: Path | None = None) -> list[str]:
     """Get list of valid session directories, optionally validating against a safe root."""
-    # Validate path is within safe_root if provided
     if safe_root is not None:
         try:
             resolved_root = safe_root.expanduser().resolve()
             resolved_folder = log_folder.expanduser().resolve()
-            resolved_folder.relative_to(resolved_root)
+            # Reconstruct from the trusted root so file ops use a root-derived path.
+            log_folder = resolved_root / resolved_folder.relative_to(resolved_root)
         except ValueError:
             return []
 
@@ -251,7 +251,8 @@ def load_session(log_path: Path, safe_root: Path | None = None) -> Session:
         try:
             resolved_root = safe_root.expanduser().resolve()
             resolved_path = log_path.expanduser().resolve()
-            resolved_path.relative_to(resolved_root)
+            # Reconstruct from the trusted root so file ops use a root-derived path.
+            log_path = resolved_root / resolved_path.relative_to(resolved_root)
         except ValueError:
             return Session()  # Return empty session if path is outside allowed root
 
