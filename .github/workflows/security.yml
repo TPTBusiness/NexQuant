@@ -9,6 +9,9 @@ on:
     # Weekly on Monday at 6:00 UTC
     - cron: '0 6 * * 1'
 
+permissions:
+  contents: read
+
 jobs:
   security:
     name: Security Analysis
