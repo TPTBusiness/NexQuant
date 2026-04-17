@@ -1,7 +1,9 @@
 """
 Predix Backtesting Engine - IC, Sharpe, Drawdown
 
-Supports both factor-based backtesting and RL agent backtesting.
+Thin wrapper around the unified ``vbt_backtest.backtest_signal`` engine.
+All metric formulas live in ``vbt_backtest``; this module exists for
+backwards compatibility with the FactorBacktester API and the RL path.
 """
 import numpy as np
 import pandas as pd
@@ -10,65 +12,113 @@ from typing import Dict, Optional, Any, List
 from datetime import datetime
 import json
 
+from rdagent.components.backtesting.vbt_backtest import (
+    DEFAULT_BARS_PER_YEAR,
+    DEFAULT_TXN_COST_BPS,
+    backtest_from_forward_returns,
+    backtest_signal,
+)
+
+
 class BacktestMetrics:
-    def __init__(self, risk_free_rate: float = 0.02):
+    """
+    Legacy metric helper. All methods delegate to the unified engine to
+    guarantee identical formulas across the repo. Kept so external callers
+    that still use ``BacktestMetrics().calculate_*`` continue to work.
+    """
+
+    def __init__(self, risk_free_rate: float = 0.02, bars_per_year: int = DEFAULT_BARS_PER_YEAR):
         self.risk_free_rate = risk_free_rate
-    
+        self.bars_per_year = bars_per_year
+
     def calculate_ic(self, factor_values: pd.Series, forward_returns: pd.Series) -> float:
         mask = factor_values.notna() & forward_returns.notna()
-        if mask.sum() < 10: return np.nan
+        if mask.sum() < 10:
+            return np.nan
         return factor_values[mask].corr(forward_returns[mask])
-    
+
     def calculate_sharpe(self, returns: pd.Series, annualize: bool = True) -> float:
-        if len(returns) < 10 or returns.std() == 0: return np.nan
-        sharpe = (returns.mean() - self.risk_free_rate/252) / returns.std()
-        return sharpe * np.sqrt(252) if annualize else sharpe
-    
+        if len(returns) < 10 or returns.std() == 0:
+            return np.nan
+        rf_per_bar = self.risk_free_rate / self.bars_per_year
+        sharpe = (returns.mean() - rf_per_bar) / returns.std()
+        return sharpe * np.sqrt(self.bars_per_year) if annualize else sharpe
+
     def calculate_max_drawdown(self, equity: pd.Series) -> float:
         running_max = equity.cummax()
-        drawdown = (equity - running_max) / running_max
+        drawdown = (equity - running_max) / running_max.replace(0, np.nan)
         return float(drawdown.min())
-    
-    def calculate_all(self, returns: pd.Series, equity: pd.Series, 
-                     factor_values: Optional[pd.Series] = None, 
-                     forward_returns: Optional[pd.Series] = None) -> Dict:
+
+    def calculate_all(
+        self,
+        returns: pd.Series,
+        equity: pd.Series,
+        factor_values: Optional[pd.Series] = None,
+        forward_returns: Optional[pd.Series] = None,
+    ) -> Dict:
         metrics = {
-            'total_return': float((1 + returns).prod() - 1),
-            'annualized_return': float(returns.mean() * 252),
-            'sharpe_ratio': self.calculate_sharpe(returns),
-            'max_drawdown': self.calculate_max_drawdown(equity),
-            'win_rate': float((returns > 0).mean()),
-            'total_trades': len(returns),
+            "total_return": float((1 + returns).prod() - 1),
+            "annualized_return": float(returns.mean() * self.bars_per_year),
+            "sharpe_ratio": self.calculate_sharpe(returns),
+            "max_drawdown": self.calculate_max_drawdown(equity),
+            "win_rate": float((returns > 0).mean()),
+            "total_trades": len(returns),
         }
         if factor_values is not None and forward_returns is not None:
-            metrics['ic'] = self.calculate_ic(factor_values, forward_returns)
+            metrics["ic"] = self.calculate_ic(factor_values, forward_returns)
         return metrics
+
 
 class FactorBacktester:
     def __init__(self):
         self.metrics = BacktestMetrics()
         self.results_path = Path(__file__).parent.parent.parent / "results" / "backtests"
         self.results_path.mkdir(parents=True, exist_ok=True)
-    
-    def run_backtest(self, factor_values: pd.Series, forward_returns: pd.Series, 
-                     factor_name: str, transaction_cost: float = 0.00015) -> Dict:
-        ic = self.metrics.calculate_ic(factor_values, forward_returns)
-        signals = np.sign(factor_values)
-        strategy_returns = signals.shift(1) * forward_returns - transaction_cost
-        equity = (1 + strategy_returns).cumprod()
-        
-        metrics = self.metrics.calculate_all(strategy_returns, equity, factor_values, forward_returns)
-        metrics['ic'] = ic if not np.isnan(ic) else np.nan
-        metrics['factor_name'] = factor_name
-        metrics['timestamp'] = datetime.now().isoformat()
-        
-        # Speichern
+
+    def run_backtest(
+        self,
+        factor_values: pd.Series,
+        forward_returns: pd.Series,
+        factor_name: str,
+        transaction_cost: float = DEFAULT_TXN_COST_BPS / 10_000.0,
+    ) -> Dict:
+        """
+        Factor-sign backtest via unified engine.
+
+        ``transaction_cost`` remains in decimal form (e.g. 0.00015 = 1.5 bps)
+        for backwards compatibility; it is converted to bps internally.
+        """
+        txn_cost_bps = transaction_cost * 10_000.0
+        result = backtest_from_forward_returns(
+            factor_values=factor_values,
+            forward_returns=forward_returns,
+            txn_cost_bps=txn_cost_bps,
+        )
+
+        metrics: Dict[str, Any] = {
+            "total_return": result.get("total_return", np.nan),
+            "annualized_return": result.get("annualized_return", np.nan),
+            "sharpe_ratio": result.get("sharpe", np.nan),
+            "max_drawdown": result.get("max_drawdown", np.nan),
+            "win_rate": result.get("win_rate", np.nan),
+            "total_trades": result.get("n_trades", 0),
+            "ic": result.get("ic", np.nan),
+            "factor_name": factor_name,
+            "timestamp": datetime.now().isoformat(),
+        }
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_name = factor_name.replace("/", "_")
-        
-        with open(self.results_path / f"{safe_name}_{timestamp}.json", 'w') as f:
-            json.dump({k: (None if isinstance(v, float) and np.isnan(v) else v) for k, v in metrics.items()}, f, indent=2)
-        
+        with open(self.results_path / f"{safe_name}_{timestamp}.json", "w") as f:
+            json.dump(
+                {
+                    k: (None if isinstance(v, float) and np.isnan(v) else v)
+                    for k, v in metrics.items()
+                },
+                f,
+                indent=2,
+            )
+
         return metrics
 
     def run_rl_backtest(

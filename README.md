@@ -146,17 +146,35 @@ QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
 2. **Start LLM server (llama.cpp):**
 ```bash
 ~/llama.cpp/build/bin/llama-server \
-  --model ~/models/qwen3.5/Qwen3.5-35B-A3B-Q3_K_M.gguf \
-  --n-gpu-layers 28 \
-  --ctx-size 80000 \
+  --model ~/models/qwen3.6/Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf \
+  --n-gpu-layers 26 \
+  --no-mmap \
   --port 8081 \
-  --reasoning off
+  --ctx-size 240000 \
+  --parallel 3 \
+  --batch-size 512 --ubatch-size 512 \
+  --host 0.0.0.0 \
+  -ctk q4_0 -ctv q4_0 \
+  --reasoning-budget 0 \
+  --chat-template-kwargs '{"enable_thinking":false}'
 ```
 
-> **Important flags:**
-> - `--reasoning off` — disables chain-of-thought thinking mode. Without this, Qwen3.5 spends 15–22 s per request on internal reasoning, which causes rdagent to time out after 10 retries. With it off, responses take ~0.6 s.
-> - `--n-gpu-layers 28` — use 28 instead of 36 if another GPU process (e.g. Ollama) is already running. 36 layers will exceed VRAM on a 16 GB card when Ollama occupies ~668 MB. Reduce layers further if you hit `cudaMalloc failed: out of memory`.
-> - `--ctx-size 80000` — 80 k context is required for long factor-generation prompts.
+> **Important flags and token budget:**
+> - `--ctx-size 240000 --parallel 3` — allocates **3 slots × 80,000 tokens each**. This is required because `fin_quant` hypothesis prompts include up to `MAX_FACTOR_HISTORY` past experiments and can reach **25,000–35,000 tokens**. With less context per slot (e.g. 33 k from `--ctx-size 100000 --parallel 3`) prompts overflow silently and produce empty/invalid responses.
+>
+>   **Token budget breakdown per fin_quant request:**
+>   | Component | Approx. tokens |
+>   |---|---|
+>   | System prompt + scenario description | ~3,000 |
+>   | `MAX_FACTOR_HISTORY=5` past experiments × ~2,500 | ~12,500 |
+>   | RAG context + instructions | ~2,000 |
+>   | **Total** | **~17,500** (safe under 80k slot) |
+>
+>   Formula: `ctx_size / parallel` must be at least `MAX_FACTOR_HISTORY × 2500 + 8000`.
+>
+> - `--reasoning-budget 0` — disables chain-of-thought. Without this, Qwen3 spends 15–22 s per request, causing rdagent to time out after 10 retries.
+> - `--n-gpu-layers 26` — use 26 on RTX 5060 Ti (16 GB) when Ollama is also running. Frees ~500 MB VRAM needed for the larger KV cache (1.3 GB at 240k ctx Q4_0).
+> - `-ctk q4_0 -ctv q4_0` — quantise the KV cache to 4-bit, reducing VRAM from ~5 GB to ~1.3 GB at 240k context.
 
 ---
 
