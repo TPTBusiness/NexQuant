@@ -66,10 +66,10 @@ def _validate_job_path(job_path: Path, safe_root: Path) -> Path:
     resolved_root = safe_root.expanduser().resolve()
     resolved_job = job_path.expanduser().resolve()
     try:
-        resolved_job.relative_to(resolved_root)
-        return resolved_job
+        # Reconstruct from trusted root so the returned path is root-derived.
+        return resolved_root / resolved_job.relative_to(resolved_root)
     except ValueError:
-        raise ValueError(f"Job path {resolved_job} is outside allowed root {resolved_root}")
+        raise ValueError(f"Job path is outside allowed root {resolved_root}")
 
 
 def get_max_loops(job_path: Path, safe_root: Path | None = None) -> int:
