@@ -182,7 +182,15 @@ class RDLoop(LoopBase, metaclass=LoopMeta):
         return modified_feedback
 
     def _propose(self):
-        hypothesis = self.hypothesis_gen.gen(self.trace, self.plan)
+        from rdagent.core.exception import LLMUnavailableError
+
+        try:
+            hypothesis = self.hypothesis_gen.gen(self.trace, self.plan)
+        except LLMUnavailableError as e:
+            # LLM timeout at the proposal stage: skip_loop_error would leave
+            # hypothesis=None in trace.hist and corrupt all future iterations.
+            # Reset the whole loop instead so state stays consistent.
+            raise self.LoopResumeError("LLM unavailable during proposal, resetting loop") from e
 
         # user can change the hypothesis here
         hypothesis = self._interact_hypo(hypothesis)
@@ -237,5 +245,10 @@ class RDLoop(LoopBase, metaclass=LoopMeta):
 
     def record(self, prev_out: dict[str, Any]):
         feedback = prev_out["feedback"]
-        exp = prev_out.get("running") or prev_out.get("coding") or prev_out.get("direct_exp_gen", {}).get("exp_gen")
+        exp = prev_out.get("running") or prev_out.get("coding") or (prev_out.get("direct_exp_gen") or {}).get("exp_gen")
+        if exp is None or getattr(exp, "hypothesis", None) is None:
+            # Loop was reset or skipped — nothing valid to record in trace history.
+            # Storing None here would corrupt quant_proposal.py which reads
+            # trace.hist[-1][0].hypothesis on the next iteration.
+            return
         self.trace.sync_dag_parent_and_hist((exp, feedback), prev_out[self.LOOP_IDX_KEY])
