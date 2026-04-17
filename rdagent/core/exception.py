@@ -4,6 +4,14 @@ class WorkflowError(Exception):
     """
 
 
+class LLMUnavailableError(RuntimeError):
+    """
+    Raised when the LLM backend fails to respond after all retries.
+    Registered as skip_loop_error in QuantRDLoop so a transient LLM outage
+    skips the current loop iteration instead of killing the whole process.
+    """
+
+
 class FormatError(WorkflowError):
     """
     After multiple attempts, we are unable to obtain the answer in the correct format to proceed.

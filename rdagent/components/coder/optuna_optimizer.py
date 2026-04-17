@@ -586,69 +586,36 @@ class OptunaOptimizer:
             if signal_bias != 0.0:
                 signal = (signal.astype(float) + signal_bias).round().astype(int).clip(-1, 1)
 
-            # Calculate returns using factor changes as proxy
+            # Build a synthetic close from the factor-mean so we can route
+            # through the same unified engine as every other backtest path.
+            # Backtest formulas must match the orchestrator's real-OHLCV path.
             combined = df_factors.mean(axis=1)
-            returns = combined.pct_change().fillna(0) * signal.shift(1).fillna(0)
+            combined_ret = combined.pct_change().fillna(0)
+            synthetic_close = (1 + combined_ret).cumprod() * 100.0
 
-            # Apply spread costs
-            SPREAD_COST = 0.00015
-            signal_changes = signal.diff().abs().fillna(0)
-            spread_costs = signal_changes * SPREAD_COST
-            returns = returns - spread_costs
+            from rdagent.components.backtesting.vbt_backtest import (
+                backtest_signal,
+                DEFAULT_TXN_COST_BPS,
+            )
+            import os as _os
 
-            if len(returns) < 10 or returns.std() == 0:
+            bt = backtest_signal(
+                close=synthetic_close,
+                signal=signal,
+                txn_cost_bps=float(_os.getenv("TXN_COST_BPS", DEFAULT_TXN_COST_BPS)),
+                freq="1min",
+            )
+            if bt.get("status") != "success":
                 return self._default_metrics()
 
-            # FIX 1: Korrekte Sharpe Ratio Annualisierung für 1-Minuten-Daten
-            bars_per_year = 252 * 1440  # 252 Handelstage * 1440 Minuten/Tag
-            mean_return = float(returns.mean())
-            ann_return = mean_return * bars_per_year
-            volatility = float(returns.std() * np.sqrt(bars_per_year))
-            sharpe = ann_return / volatility if volatility > 0 else 0.0
-            total_return = float(returns.sum())
-
-            # FIX 3: Drawdown-Berechnung mit korrektem Error-Handling
-            returns_clean = returns.fillna(0).replace([np.inf, -np.inf], 0)
-            returns_clean = returns_clean.clip(-0.1, 0.1)  # Max 10% pro Bar
-            cum = (1 + returns_clean).cumprod()
-            running_max = cum.expanding().max()
-            drawdown = (cum - running_max) / running_max.replace(0, np.nan)
-            drawdown = drawdown.fillna(0).replace([np.inf, -np.inf], 0)
-            max_dd = float(drawdown.min()) if len(drawdown) > 0 else 0.0
-
-            # FIX 2: Win Rate korrigieren - echte Trade-P&L Berechnung
-            signal_positions = signal.shift(1).fillna(0).astype(int)
-
-            trade_pnl = []
-            current_pnl = 0.0
-            in_position = False
-
-            for idx in signal_positions.index:
-                pos = signal_positions[idx]
-                ret = returns_clean.get(idx, 0)
-
-                if pos != 0:  # In Position (Long oder Short)
-                    current_pnl += ret * np.sign(pos)
-                    in_position = True
-                elif in_position and pos == 0:  # Ausstieg
-                    trade_pnl.append(current_pnl)
-                    current_pnl = 0.0
-                    in_position = False
-
-            if in_position and current_pnl != 0:
-                trade_pnl.append(current_pnl)
-
-            num_real_trades = len(trade_pnl)
-            win_rate = float(sum(1 for p in trade_pnl if p > 0) / num_real_trades) if num_real_trades > 0 else 0.0
-
             return {
-                "sharpe_ratio": sharpe,
-                "annualized_return": ann_return,
-                "max_drawdown": max_dd,
-                "win_rate": win_rate,
-                "volatility": volatility,
-                "total_return": total_return,
-                "num_trades": num_real_trades,
+                "sharpe_ratio": bt["sharpe"],
+                "annualized_return": bt["annualized_return"],
+                "max_drawdown": bt["max_drawdown"],
+                "win_rate": bt["win_rate"],
+                "volatility": bt["volatility"],
+                "total_return": bt["total_return"],
+                "num_trades": bt["n_trades"],
             }
 
         except Exception as e:
