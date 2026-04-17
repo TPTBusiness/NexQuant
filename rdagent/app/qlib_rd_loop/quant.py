@@ -14,7 +14,7 @@ from rdagent.components.workflow.conf import BasePropSetting
 from rdagent.components.workflow.rd_loop import RDLoop
 from rdagent.core.conf import RD_AGENT_SETTINGS
 from rdagent.core.developer import Developer
-from rdagent.core.exception import FactorEmptyError, ModelEmptyError
+from rdagent.core.exception import FactorEmptyError, LLMUnavailableError, ModelEmptyError
 from rdagent.core.proposal import (
     Experiment2Feedback,
     ExperimentPlan,
@@ -33,6 +33,7 @@ class QuantRDLoop(RDLoop):
     skip_loop_error = (
         FactorEmptyError,
         ModelEmptyError,
+        LLMUnavailableError,  # LLM timeout after all retries → skip loop, don't crash
     )
 
     def __init__(self, PROP_SETTING: BasePropSetting):
@@ -94,10 +95,15 @@ class QuantRDLoop(RDLoop):
     def coding(self, prev_out: dict[str, Any]):
         exp = None
         try:
-            if prev_out["direct_exp_gen"]["propose"].action == "factor":
-                exp = self.factor_coder.develop(prev_out["direct_exp_gen"]["exp_gen"])
-            elif prev_out["direct_exp_gen"]["propose"].action == "model":
-                exp = self.model_coder.develop(prev_out["direct_exp_gen"]["exp_gen"])
+            direct = prev_out.get("direct_exp_gen")
+            if not direct:
+                # Loop was reset (LoopResumeError) while this step was already queued.
+                # Treat as empty so skip_loop_error skips this iteration cleanly.
+                raise FactorEmptyError("direct_exp_gen result missing after loop reset")
+            if direct["propose"].action == "factor":
+                exp = self.factor_coder.develop(direct["exp_gen"])
+            elif direct["propose"].action == "model":
+                exp = self.model_coder.develop(direct["exp_gen"])
             logger.log_object(exp, tag="coder result")
         except (FactorEmptyError, ModelEmptyError) as e:
             logger.warning(f"Coding failed with {type(e).__name__}: {e}")
