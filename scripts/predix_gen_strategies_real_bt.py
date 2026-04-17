@@ -25,9 +25,19 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 from dotenv import load_dotenv
 
-# Suppress warnings
+# Suppress warnings and noisy loggers that bleed into Rich progress output
 warnings.filterwarnings('ignore')
-logging.getLogger('rdagent').setLevel(logging.WARNING)
+for _noisy in ('rdagent', 'litellm', 'LiteLLM', 'litellm.utils',
+               'litellm.main', 'httpx', 'httpcore', 'openai', 'urllib3'):
+    logging.getLogger(_noisy).setLevel(logging.CRITICAL)
+# Suppress litellm verbose flag if already imported
+try:
+    import litellm as _ll
+    _ll.suppress_debug_info = True
+    _ll.verbose = False
+    _ll.set_verbose = False
+except Exception:
+    pass
 
 # ============================================================================
 # Configuration
@@ -54,9 +64,11 @@ else:
     MIN_IC = 0.02
     MIN_SHARPE = 0.5
     MIN_TRADES = 10
-    MAX_DRAWDOWN = -1.0
+    MAX_DRAWDOWN = -0.30
     STYLE_EMOJI = '📈 Swing'
     STYLE_DESC = 'medium-term intraday'
+
+TXN_COST_BPS = float(os.getenv('TXN_COST_BPS', '1.0'))
 
 console = Console()
 
@@ -65,10 +77,10 @@ console = Console()
 # ============================================================================
 def setup_llm_env():
     """Setup LLM environment variables."""
-    load_dotenv(Path(__file__).parent / '.env')
-    router_key = os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY', '')
-    if not router_key or router_key == 'local':
-        router_key = os.getenv('OPENROUTER_API_KEY', '')
+    load_dotenv(Path(__file__).parent.parent / '.env')
+    if os.getenv('OPENAI_API_KEY') == 'local' or os.getenv('LLM_BACKEND', '').lower() == 'local':
+        return
+    router_key = os.getenv('OPENROUTER_API_KEY', '')
     if router_key:
         os.environ['OPENAI_API_KEY'] = router_key
         os.environ['OPENAI_API_BASE'] = 'https://openrouter.ai/api/v1'
@@ -211,120 +223,79 @@ Output ONLY valid JSON with these fields:
 # Backtest Runner (runs in main process to avoid re-loading data)
 # ============================================================================
 def run_backtest(close, factors_df, strategy_code):
-    """Run real backtest with actual OHLCV data."""
+    """
+    Execute LLM-generated strategy code in a sandboxed subprocess to produce
+    the signal, then delegate all metric computation to the unified
+    ``backtest_signal`` engine in the main process.
+    """
     if close is None or factors_df is None or len(factors_df.columns) < 2:
         return None
-    
+
     import tempfile
-    
+
+    # Subprocess stays minimal: it only runs the untrusted strategy code
+    # and pickles the resulting signal. All numbers come from the shared engine.
     script = f"""
 import pandas as pd
 import numpy as np
-import json
 
 close = pd.read_pickle('close.pkl')
 factors = pd.read_pickle('factors.pkl')
 
 try:
 {chr(10).join('    ' + l for l in strategy_code.split(chr(10)))}
-except:
-    print("ERROR: Strategy execution failed")
-    exit(1)
+except Exception as e:
+    print(f"ERROR: Strategy execution failed: {{e}}")
+    raise SystemExit(1)
 
 if 'signal' not in dir():
     print("ERROR: No signal generated")
-    exit(1)
+    raise SystemExit(1)
 
-signal = signal.fillna(0)
-common_idx = close.index.intersection(signal.index)
-close = close.loc[common_idx]
-signal = signal.loc[common_idx]
-
-FORWARD_BARS = {FORWARD_BARS}
-returns_fwd = close.pct_change(FORWARD_BARS).shift(-FORWARD_BARS)
-signal_aligned = signal.loc[returns_fwd.dropna().index]
-fwd_returns = returns_fwd.loc[signal_aligned.index]
-
-if len(signal_aligned) < 100 or len(fwd_returns) < 100:
-    print("ERROR: Not enough data after alignment")
-    exit(1)
-
-ic = signal_aligned.corr(fwd_returns)
-strategy_returns = signal_aligned * fwd_returns
-
-if strategy_returns.std() > 0:
-    sharpe = strategy_returns.mean() / strategy_returns.std() * np.sqrt(252 * 1440 / {FORWARD_BARS})
-else:
-    sharpe = 0
-
-cum = (1 + strategy_returns).cumprod()
-running_max = cum.expanding().max()
-drawdown = (cum - running_max) / running_max.replace(0, np.nan)
-max_dd = drawdown.min() if len(drawdown) > 0 else 0
-
-win_rate = (strategy_returns > 0).sum() / len(strategy_returns) if len(strategy_returns) > 0 else 0
-n_trades = int((signal_aligned != signal_aligned.shift(1)).sum())
-
-total_return = cum.iloc[-1] - 1
-n_bars = len(strategy_returns)
-n_months = n_bars / (252 * 1440 / {FORWARD_BARS} / 12) if n_bars > 0 else 1
-
-if n_months > 0 and (1 + total_return) > 0:
-    monthly_return = (1 + total_return) ** (1 / n_months) - 1
-    annual_return = (1 + total_return) ** (12 / n_months) - 1
-else:
-    monthly_return = total_return
-    annual_return = total_return * 12
-
-result = {{
-    "status": "success",
-    "sharpe": float(sharpe),
-    "max_drawdown": float(max_dd) if not np.isnan(max_dd) else -0.20,
-    "win_rate": float(win_rate),
-    "ic": float(ic) if not np.isnan(ic) else 0,
-    "n_trades": n_trades,
-    "total_return": float(total_return),
-    "monthly_return_pct": float(monthly_return * 100),
-    "annual_return_pct": float(annual_return * 100),
-    "n_bars": int(n_bars),
-    "n_months": float(n_months),
-    "signal_long": int((signal_aligned == 1).sum()),
-    "signal_short": int((signal_aligned == -1).sum()),
-    "signal_neutral": int((signal_aligned == 0).sum()),
-}}
-
-print(json.dumps(result))
+signal.fillna(0).to_pickle('signal.pkl')
 """
-    
+
     with tempfile.TemporaryDirectory() as td:
         tdp = Path(td)
         close.to_pickle(str(tdp / 'close.pkl'))
         factors_df.to_pickle(str(tdp / 'factors.pkl'))
-        
-        script_path = tdp / 'run.py'
-        script_path.write_text(script)
-        
+        (tdp / 'run.py').write_text(script)
+
         try:
             result = subprocess.run(
-                ['python', str(script_path)],
+                ['python', 'run.py'],
                 capture_output=True, text=True, timeout=60,
                 cwd=str(tdp)
             )
-            
             if result.returncode != 0:
-                return {'status': 'failed', 'reason': result.stderr[:200] or result.stdout[:200]}
-            
-            for line in result.stdout.strip().split('\n'):
-                try:
-                    return json.loads(line)
-                except:
-                    continue
-            
-            return {'status': 'failed', 'reason': 'No valid JSON output'}
+                return {'status': 'failed', 'reason': (result.stderr or result.stdout)[:200]}
+
+            signal = pd.read_pickle(tdp / 'signal.pkl')
         except subprocess.TimeoutExpired:
             return {'status': 'failed', 'reason': 'Timeout (60s)'}
         except Exception as e:
             return {'status': 'failed', 'reason': str(e)[:200]}
+
+    # Main process: unified backtest (identical formulas everywhere).
+    from rdagent.components.backtesting.vbt_backtest import backtest_signal
+
+    common = close.index.intersection(signal.index)
+    if len(common) < 100:
+        return {'status': 'failed', 'reason': f'Not enough aligned data ({len(common)} bars)'}
+
+    close_a = close.loc[common]
+    signal_a = signal.reindex(common).fillna(0)
+
+    # Forward returns at the configured horizon feed IC computation.
+    fwd_returns = close_a.pct_change(FORWARD_BARS).shift(-FORWARD_BARS)
+
+    return backtest_signal(
+        close=close_a,
+        signal=signal_a,
+        txn_cost_bps=TXN_COST_BPS,
+        freq='1min',
+        forward_returns=fwd_returns,
+    )
 
 # ============================================================================
 # Main Parallel Strategy Generation
@@ -393,6 +364,8 @@ def main(target_count=10):
         BarColumn(),
         TextColumn("[bold green]{task.completed}/{task.total}"),
         TimeElapsedColumn(),
+        redirect_stdout=True,
+        redirect_stderr=True,
     ) as progress:
         task = progress.add_task("Generating...", total=max_attempts)
         
