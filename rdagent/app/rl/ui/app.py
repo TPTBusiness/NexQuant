@@ -63,9 +63,8 @@ def _safe_resolve(user_input: str | None, safe_root: Path) -> Path:
 
         # Security check 6: Validate candidate is within safe_root (prevent path traversal)
         candidate_path = Path(resolved_candidate)
-        candidate_path.relative_to(safe_root)
-
-        return candidate_path
+        # Reconstruct from trusted safe_root so the returned path is root-derived.
+        return safe_root / candidate_path.relative_to(safe_root)
     except (OSError, ValueError) as exc:
         raise ValueError(f"Invalid path outside of allowed root: {user_input}") from exc
 
@@ -87,18 +86,19 @@ def get_job_options(base_path: Path, safe_root: Path | None = None) -> list[str]
 
         if safe_root is not None:
             safe_root_resolved = safe_root.expanduser().resolve()
-            base_path_resolved.relative_to(safe_root_resolved)
+            # Reconstruct from trusted root to break taint chain.
+            base_path_resolved = safe_root_resolved / base_path_resolved.relative_to(safe_root_resolved)
         else:
             cwd_resolved = Path.cwd().resolve()
-            base_path_resolved.relative_to(cwd_resolved)
+            base_path_resolved = cwd_resolved / base_path_resolved.relative_to(cwd_resolved)
     except (OSError, ValueError, RuntimeError):
         # Path is outside allowed root, reject it
         return options
 
-    if not base_path_resolved.exists():  # nosec B614 – validated above
+    if not base_path_resolved.exists():
         return options
 
-    for d in base_path_resolved.iterdir():  # nosec B614 – validated above
+    for d in base_path_resolved.iterdir():
         if not d.is_dir():
             continue
         if (d / "__session__").exists():
