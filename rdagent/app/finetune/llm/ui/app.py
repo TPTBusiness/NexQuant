@@ -142,13 +142,14 @@ def main():
             base_folder = st.text_input("Base Folder", value=default_log, key="base_folder_input")
 
             # Normalize and validate the base folder against the configured log root
-            safe_root = Path(default_log).expanduser().resolve()
-            try:
-                base_path = Path(base_folder).expanduser().resolve()
-                # Ensure the user-selected base path is within the safe root
-                base_path.relative_to(safe_root)
-            except (OSError, ValueError):
+            root_real = os.path.realpath(str(Path(default_log).expanduser()))
+            folder_real = os.path.realpath(str(Path(base_folder).expanduser()))
+            if folder_real == root_real or folder_real.startswith(root_real + os.sep):
+                base_path = Path(folder_real)
+                safe_root = Path(root_real)
+            else:
                 st.error("Invalid base folder: must be within the configured log directory.")
+                safe_root = Path(root_real)
                 base_path = safe_root
 
             # base_path is validated against safe_root – nosec B614
