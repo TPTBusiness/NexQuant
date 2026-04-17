@@ -246,7 +246,7 @@ def fin_quant_cli(
         import urllib.request
         import urllib.error
 
-        base_url = os.environ["OPENAI_API_BASE"].rstrip("/v1").rstrip("/")
+        base_url = os.environ["OPENAI_API_BASE"].removesuffix("/v1").rstrip("/")
         health_url = f"{base_url}/health"
         console.print(f"   [yellow]⏳ Waiting for local LLM server to be ready ({health_url})...[/yellow]")
         max_wait = 300  # seconds
