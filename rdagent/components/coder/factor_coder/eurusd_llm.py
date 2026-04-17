@@ -362,11 +362,8 @@ if __name__ == "__main__":
 
     print("Konfigurierte Provider:")
     for provider in llm.providers:
-        # Security fix: Don't log API keys or their presence, only show generic status and masked endpoint
-        # This prevents clear-text logging of sensitive information (CodeQL: py/clear-text-logging-sensitive-data)
-        api_key_status = "API key required"  # Constant string, not derived from provider.api_key
         masked_endpoint = provider.endpoint[:30] + "..." if len(provider.endpoint) > 30 else provider.endpoint
-        print(f"  {provider.priority}. {provider.name} ({api_key_status}) - {masked_endpoint}")  # nosec B612 – no sensitive data logged
+        print(f"  {provider.priority}. {provider.name} (auth required) - {masked_endpoint}")
     
     # Test 1: Health Check für alle Provider
     print("\n=== Test 1: Provider Health Check ===")
