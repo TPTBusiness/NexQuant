@@ -1439,5 +1439,149 @@ def status():
         console.print(f"  Factors: {factors}")
 
 
+_STRATEGY_DIRS = (
+    Path(__file__).parent / "results" / "strategies_new",
+    Path(__file__).parent / "results" / "strategies",
+)
+_SAFE_KEYS = ("strategy_name", "factor_names", "description", "real_backtest", "metrics", "summary")
+
+
+def _load_strategies():
+    import json
+    items = []
+    seen = set()
+    for d in _STRATEGY_DIRS:
+        if not d.exists():
+            continue
+        for p in d.glob("*.json"):
+            try:
+                raw = json.loads(p.read_text())
+            except Exception:
+                continue
+            if not isinstance(raw, dict):
+                continue
+            name = raw.get("strategy_name") or p.stem
+            if name in seen:
+                continue
+            seen.add(name)
+            metrics = raw.get("summary") or raw.get("metrics") or raw.get("real_backtest") or {}
+            if metrics.get("status") and metrics.get("status") != "success":
+                if metrics.get("real_backtest_status") != "success":
+                    continue
+            items.append({
+                "file": p.name,
+                "name": name,
+                "factors": raw.get("factor_names") or [],
+                "description": raw.get("description") or "",
+                "sharpe": float(metrics.get("sharpe", 0) or 0),
+                "ic": float(metrics.get("ic", metrics.get("real_ic", 0)) or 0),
+                "max_drawdown": float(metrics.get("max_drawdown", 0) or 0),
+                "win_rate": float(metrics.get("win_rate", 0) or 0),
+                "n_trades": int(metrics.get("n_trades", metrics.get("real_n_trades", 0)) or 0),
+                "monthly_return_pct": float(metrics.get("monthly_return_pct", 0) or 0),
+                "annual_return_pct": float(metrics.get("annual_return_pct", 0) or 0),
+                "total_return": float(metrics.get("total_return", 0) or 0),
+            })
+    return items
+
+
+def _composite_score(s):
+    dd_penalty = max(0.1, 1.0 + min(s["max_drawdown"], 0))
+    trade_penalty = 1.0 if s["n_trades"] >= 30 else 0.5
+    return s["sharpe"] * dd_penalty * trade_penalty
+
+
+@app.command()
+def best(
+    n: int = typer.Option(10, "--num", "-n", help="Number of strategies to show"),
+    metric: str = typer.Option("composite", "--metric", "-m", help="sharpe|ic|composite|monthly_return|annual_return"),
+    min_trades: int = typer.Option(30, "--min-trades", help="Filter: minimum trade count"),
+    realistic: bool = typer.Option(True, "--realistic/--no-realistic", help="Exclude DD<-50%% or total_return>100x (suspected numerical bugs)"),
+    show: str = typer.Option(None, "--show", "-s", help="Show details for one strategy by name or file id"),
+    export: Path = typer.Option(None, "--export", "-e", help="Export top-N metadata (without source code) to JSON"),
+):
+    """Rank backtested strategies by performance — source code is never exposed.
+
+    Examples:
+        $ predix best                          # Top 10 by composite score
+        $ predix best -n 20 -m sharpe          # Top 20 by Sharpe
+        $ predix best --no-realistic           # Include numerically suspicious runs
+        $ predix best --show TrendMomentumHybrid
+        $ predix best -n 50 --export /tmp/top.json
+    """
+    import json
+    from rich.table import Table
+
+    items = _load_strategies()
+    if not items:
+        console.print("[red]No strategies found in results/strategies_new or results/strategies[/red]")
+        raise typer.Exit(1)
+
+    if show:
+        hit = next((s for s in items if s["name"] == show or s["file"].startswith(show)), None)
+        if not hit:
+            console.print(f"[red]Strategy not found: {show}[/red]")
+            raise typer.Exit(1)
+        console.print(f"\n[bold cyan]{hit['name']}[/bold cyan]  ({hit['file']})")
+        console.print(f"[dim]{hit['description']}[/dim]\n")
+        console.print(f"  Factors      : {', '.join(hit['factors'])}")
+        console.print(f"  Sharpe       : {hit['sharpe']:.3f}")
+        console.print(f"  Max Drawdown : {hit['max_drawdown']:.2%}")
+        console.print(f"  Win Rate     : {hit['win_rate']:.2%}")
+        console.print(f"  IC           : {hit['ic']:.4f}")
+        console.print(f"  Trades       : {hit['n_trades']}")
+        console.print(f"  Monthly Ret  : {hit['monthly_return_pct']:.2f}%")
+        console.print(f"  Annual Ret   : {hit['annual_return_pct']:.2f}%")
+        console.print(f"  Composite    : {_composite_score(hit):.3f}")
+        return
+
+    pool = [s for s in items if s["n_trades"] >= min_trades]
+    if realistic:
+        pool = [s for s in pool if s["max_drawdown"] > -0.5 and abs(s["total_return"]) < 100]
+
+    key_map = {
+        "sharpe": lambda s: s["sharpe"],
+        "ic": lambda s: abs(s["ic"]),
+        "composite": _composite_score,
+        "monthly_return": lambda s: s["monthly_return_pct"],
+        "annual_return": lambda s: s["annual_return_pct"],
+    }
+    if metric not in key_map:
+        console.print(f"[red]Unknown metric: {metric}. Use one of: {', '.join(key_map)}[/red]")
+        raise typer.Exit(1)
+    pool.sort(key=key_map[metric], reverse=True)
+    top = pool[:n]
+
+    if not top:
+        console.print("[yellow]No strategies match the filters.[/yellow]")
+        raise typer.Exit(0)
+
+    table = Table(title=f"Top {len(top)} Strategies (metric={metric}, min_trades={min_trades}, realistic={realistic})")
+    table.add_column("#", justify="right")
+    table.add_column("Name", style="cyan")
+    table.add_column("Sharpe", justify="right")
+    table.add_column("DD", justify="right")
+    table.add_column("WinRate", justify="right")
+    table.add_column("IC", justify="right")
+    table.add_column("Trades", justify="right")
+    table.add_column("Mon%", justify="right")
+    table.add_column("Factors", justify="right")
+    for i, s in enumerate(top, 1):
+        table.add_row(
+            str(i), s["name"], f"{s['sharpe']:.2f}", f"{s['max_drawdown']:.1%}",
+            f"{s['win_rate']:.1%}", f"{s['ic']:.3f}", str(s["n_trades"]),
+            f"{s['monthly_return_pct']:.2f}", str(len(s["factors"])),
+        )
+    console.print(table)
+    console.print(f"\n[dim]{len(pool)} strategies matched filters (of {len(items)} total). "
+                  f"Use [bold]predix best --show NAME[/bold] for details.[/dim]")
+
+    if export:
+        payload = [{k: v for k, v in s.items() if k != "code"} for s in top]
+        export.parent.mkdir(parents=True, exist_ok=True)
+        export.write_text(json.dumps(payload, indent=2, default=float))
+        console.print(f"[green]Exported {len(top)} strategies (code stripped) → {export}[/green]")
+
+
 if __name__ == "__main__":
     app()
