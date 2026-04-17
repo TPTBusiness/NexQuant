@@ -15,6 +15,9 @@ on:
       - 'README.md'
       - '**/*.rst'
 
+permissions:
+  contents: read
+
 jobs:
   docs:
     name: Build Documentation
