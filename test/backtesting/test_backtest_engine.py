@@ -86,20 +86,26 @@ class TestBacktestMetricsCalculateIC:
 class TestBacktestMetricsCalculateSharpe:
     """Tests für BacktestMetrics.calculate_sharpe()"""
 
-    def test_calculate_sharpe_normal_data(self, backtest_metrics, sample_returns_data):
-        """Sharpe Ratio mit normalen Daten sollte korrekt berechnet werden"""
-        returns, equity = sample_returns_data
-        sharpe = backtest_metrics.calculate_sharpe(returns)
-        
-        # Sharpe sollte im typischen Bereich liegen (-5 bis 5)
+    def test_calculate_sharpe_normal_data(self, sample_returns_data):
+        """Sharpe Ratio mit Daily-Daten sollte im typischen Bereich liegen."""
+        from rdagent.components.backtesting.backtest_engine import BacktestMetrics
+
+        returns, _ = sample_returns_data
+        # sample_returns_data is business-daily → use daily annualization.
+        bm_daily = BacktestMetrics(risk_free_rate=0.02, bars_per_year=252)
+        sharpe = bm_daily.calculate_sharpe(returns)
+
         assert -5 <= sharpe <= 5, f"Sharpe {sharpe} liegt außerhalb typischen Bereichs"
 
-    def test_calculate_sharpe_annualized_vs_raw(self, backtest_metrics, sample_returns_data):
-        """Annualisierte Sharpe sollte sqrt(252) * raw Sharpe sein"""
-        returns, equity = sample_returns_data
-        sharpe_raw = backtest_metrics.calculate_sharpe(returns, annualize=False)
-        sharpe_ann = backtest_metrics.calculate_sharpe(returns, annualize=True)
-        
+    def test_calculate_sharpe_annualized_vs_raw(self, sample_returns_data):
+        """Annualisierte Sharpe = √(bars_per_year) * raw Sharpe — convention-agnostic."""
+        from rdagent.components.backtesting.backtest_engine import BacktestMetrics
+
+        returns, _ = sample_returns_data
+        bm_daily = BacktestMetrics(risk_free_rate=0.02, bars_per_year=252)
+        sharpe_raw = bm_daily.calculate_sharpe(returns, annualize=False)
+        sharpe_ann = bm_daily.calculate_sharpe(returns, annualize=True)
+
         expected_ann = sharpe_raw * np.sqrt(252)
         assert abs(sharpe_ann - expected_ann) < 1e-10, \
             f"Annualisierte Sharpe {sharpe_ann} != erwartet {expected_ann}"
@@ -127,13 +133,16 @@ class TestBacktestMetricsCalculateSharpe:
         # Die Implementierung gibt keinen NaN zurück wenn std != 0
         assert np.isfinite(sharpe) or np.isnan(sharpe), "Sharpe sollte finite oder NaN sein"
 
-    def test_calculate_sharpe_negative_returns(self, backtest_metrics):
-        """Sharpe sollte mit negativen Returns korrekt umgehen"""
+    def test_calculate_sharpe_negative_returns(self):
+        """Sharpe sollte mit negativen Daily-Returns korrekt umgehen"""
+        from rdagent.components.backtesting.backtest_engine import BacktestMetrics
+
         n = 100
         dates = pd.date_range(start='2024-01-01', periods=n, freq='B')
         returns = pd.Series(np.random.randn(n) * 0.02 - 0.001, index=dates)
-        
-        sharpe = backtest_metrics.calculate_sharpe(returns)
+
+        bm_daily = BacktestMetrics(risk_free_rate=0.02, bars_per_year=252)
+        sharpe = bm_daily.calculate_sharpe(returns)
         assert -5 <= sharpe <= 5, f"Sharpe {sharpe} liegt außerhalb typischen Bereichs"
 
 

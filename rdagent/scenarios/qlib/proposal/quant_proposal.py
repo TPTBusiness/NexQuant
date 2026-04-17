@@ -1,4 +1,5 @@
 import json
+import os
 import random
 from typing import Tuple
 
@@ -59,9 +60,16 @@ class QlibQuantHypothesisGen(FactorAndModelHypothesisGen):
 
         # ========= Bandit ==========
         if QUANT_PROP_SETTING.action_selection == "bandit":
-            if len(trace.hist) > 0:
-                metric = extract_metrics_from_experiment(trace.hist[-1][0])
-                prev_action = trace.hist[-1][0].hypothesis.action
+            # Find the most recent hist entry that has a valid experiment+hypothesis.
+            # Entries can be None/corrupt when a loop was reset mid-way (LoopResumeError).
+            last_valid = next(
+                (entry for entry in reversed(trace.hist)
+                 if entry[0] is not None and getattr(entry[0], "hypothesis", None) is not None),
+                None,
+            )
+            if last_valid is not None:
+                metric = extract_metrics_from_experiment(last_valid[0])
+                prev_action = last_valid[0].hypothesis.action
                 trace.controller.record(metric, prev_action)
                 action = trace.controller.decide(metric)
             else:
@@ -108,12 +116,18 @@ class QlibQuantHypothesisGen(FactorAndModelHypothesisGen):
             hypothesis_and_feedback = "No previous hypothesis and feedback available since it's the first round."
         else:
             specific_trace = Trace(trace.scen)
+            # Limit history to avoid exceeding the LLM context window.
+            # With 2000+ experiments the prompt easily hits 76k+ tokens on an 80k ctx model.
+            MAX_FACTOR_HISTORY = int(os.environ.get("QLIB_QUANT_MAX_FACTOR_HISTORY", "20"))
+            MAX_MODEL_HISTORY = int(os.environ.get("QLIB_QUANT_MAX_MODEL_HISTORY", "10"))
             if action == "factor":
-                # all factor experiments and the SOTA model experiment
+                # Most-recent N factor experiments + best SOTA model experiment
                 model_inserted = False
+                factor_count = 0
                 for i in range(len(trace.hist) - 1, -1, -1):  # Reverse iteration
-                    if trace.hist[i][0].hypothesis.action == "factor":
+                    if trace.hist[i][0].hypothesis.action == "factor" and factor_count < MAX_FACTOR_HISTORY:
                         specific_trace.hist.insert(0, trace.hist[i])
+                        factor_count += 1
                     elif (
                         trace.hist[i][0].hypothesis.action == "model"
                         and trace.hist[i][1].decision is True
@@ -122,11 +136,13 @@ class QlibQuantHypothesisGen(FactorAndModelHypothesisGen):
                         specific_trace.hist.insert(0, trace.hist[i])
                         model_inserted = True
             elif action == "model":
-                # all model experiments and all SOTA factor experiments
+                # Most-recent N model experiments + best SOTA factor experiment
                 factor_inserted = False
+                model_count = 0
                 for i in range(len(trace.hist) - 1, -1, -1):  # Reverse iteration
-                    if trace.hist[i][0].hypothesis.action == "model":
+                    if trace.hist[i][0].hypothesis.action == "model" and model_count < MAX_MODEL_HISTORY:
                         specific_trace.hist.insert(0, trace.hist[i])
+                        model_count += 1
                     elif (
                         trace.hist[i][0].hypothesis.action == "factor"
                         and trace.hist[i][1].decision is True

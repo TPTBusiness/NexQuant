@@ -140,3 +140,4 @@ pickle_cache/
 RD-Agent_workspace_run*/
 AGENTS.md
 CLAUDE.md
+.claude/
