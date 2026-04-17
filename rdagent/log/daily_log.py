@@ -26,7 +26,9 @@ Usage:
 """
 from __future__ import annotations
 
+import json as _json
 import sys
+import threading
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -45,6 +47,7 @@ _FILE_FMT = (
 # ── internal state ─────────────────────────────────────────────────────────────
 _registered: set[str] = set()   # command keys that already have a file sink
 _all_added: bool = False         # whether the combined all.log sink is active
+_llm_log_lock = threading.Lock()  # guards concurrent writes to llm_calls.jsonl
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -77,6 +80,36 @@ def _banner(log, title: str, meta: dict[str, Any]) -> None:
 
 
 # ── public API ────────────────────────────────────────────────────────────────
+
+def log_llm_call(
+    system: str | None,
+    user: str,
+    response: str,
+    start_time: Any = None,
+    end_time: Any = None,
+) -> None:
+    """Append one complete LLM call to logs/YYYY-MM-DD/llm_calls.jsonl.
+
+    Each line is a self-contained JSON object so the file is grep/jq-friendly:
+      jq 'select(.duration_ms > 5000)' logs/2026-04-17/llm_calls.jsonl
+    """
+    entry: dict[str, Any] = {
+        "ts": datetime.now().isoformat(timespec="milliseconds"),
+        "system": system or "",
+        "user": user,
+        "response": response,
+    }
+    if start_time is not None and end_time is not None:
+        try:
+            entry["duration_ms"] = int((end_time - start_time).total_seconds() * 1000)
+        except Exception:
+            pass
+    line = _json.dumps(entry, ensure_ascii=False)
+    out_path = _today_dir() / "llm_calls.jsonl"
+    with _llm_log_lock:
+        with open(out_path, "a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+
 
 def setup(command: str, **context: Any):
     """
