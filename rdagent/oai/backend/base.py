@@ -20,6 +20,7 @@ from rdagent.core.exception import CodeBlockParseError, PolicyError
 from rdagent.core.utils import LLM_CACHE_SEED_GEN, SingletonBaseClass
 from rdagent.log import LogColors
 from rdagent.log import rdagent_logger as logger
+from rdagent.log.daily_log import log_llm_call
 from rdagent.log.timer import RD_Agent_TIMER_wrapper
 from rdagent.oai.llm_conf import LLM_SETTINGS
 from rdagent.oai.utils.embedding import truncate_content_list
@@ -332,6 +333,13 @@ class ChatSession:
                 },
                 tag="debug_llm",
             )
+            log_llm_call(
+                system=self.system_prompt,
+                user=user_prompt,
+                response=response,
+                start_time=start_time,
+                end_time=end_time,
+            )
 
         messages.append(
             {
@@ -488,6 +496,13 @@ class APIBackend(ABC):
             {"system": system_prompt, "user": user_prompt, "resp": resp, "start": start_time, "end": end_time},
             tag="debug_llm",
         )
+        log_llm_call(
+            system=system_prompt,
+            user=user_prompt,
+            response=resp,
+            start_time=start_time,
+            end_time=end_time,
+        )
         return resp
 
     def create_embedding(self, input_content: str | list[str], *args, **kwargs) -> list[float] | list[list[float]]:  # type: ignore[no-untyped-def]
@@ -545,9 +560,29 @@ class APIBackend(ABC):
                 ):
                     kwargs["add_json_in_prompt"] = True
 
-                too_long_error_message = hasattr(e, "message") and (
-                    "maximum context length" in e.message or "input must have less than" in e.message
+                # Detect context-length overflow from llama.cpp / OpenAI-compatible servers
+                _emsg = (e.message if hasattr(e, "message") else str(e)).lower()
+                too_long_error_message = (
+                    hasattr(e, "message") and (
+                        "maximum context length" in e.message or "input must have less than" in e.message
+                    )
+                ) or any(
+                    phrase in _emsg for phrase in (
+                        "prompt is too long",
+                        "context length exceeded",
+                        "exceeds the model's maximum",
+                        "tokens in context",
+                        "slot unavailable",
+                        "kv cache full",
+                    )
                 )
+                if too_long_error_message and not embedding:
+                    from rdagent.core.exception import LLMUnavailableError
+                    raise LLMUnavailableError(
+                        f"Context limit exceeded — prompt is too long for the LLM slot "
+                        f"(reduce QLIB_QUANT_MAX_FACTOR_HISTORY in .env or increase --ctx-size / reduce --parallel on llama-server). "
+                        f"Original error: {e}"
+                    ) from e
 
                 if embedding and too_long_error_message:
                     if not embedding_truncated:
@@ -610,7 +645,8 @@ class APIBackend(ABC):
                 logger.warning(str(e))
                 logger.warning(f"Retrying {i+1}th time...")
         error_message = f"Failed to create chat completion after {max_retry} retries."
-        raise RuntimeError(error_message)
+        from rdagent.core.exception import LLMUnavailableError
+        raise LLMUnavailableError(error_message)
 
     def _add_json_in_prompt(self, messages: list[dict[str, Any]]) -> None:
         """
