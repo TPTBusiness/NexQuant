@@ -70,7 +70,35 @@ else:
 
 TXN_COST_BPS = float(os.getenv('TXN_COST_BPS', '2.14'))  # 2.35 pip realistic EUR/USD costs
 
-console = Console()
+# ── Logging setup: everything printed goes to log file + stdout ───────────────
+_LOG_DIR = Path(__file__).parent.parent / "git_ignore_folder" / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+_log_file_path = _LOG_DIR / f"gen_strategies_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+_log_file = open(_log_file_path, "w", encoding="utf-8", buffering=1)  # line-buffered
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(_log_file_path, encoding="utf-8"),
+    ],
+)
+
+class _TeeFile:
+    """Writes to both stdout and log file — used as Rich Console file."""
+    def __init__(self, *files):
+        self._files = files
+    def write(self, data):
+        for f in self._files:
+            f.write(data)
+    def flush(self):
+        for f in self._files:
+            f.flush()
+    def fileno(self):
+        return self._files[0].fileno()
+
+console = Console(file=_TeeFile(sys.stdout, _log_file), highlight=False)
 
 # ============================================================================
 # LLM Configuration (Process-safe)
@@ -311,6 +339,7 @@ def main(target_count=10):
     )
 
     console.print(f"\n[bold cyan]{STYLE_EMOJI} Parallel Strategy Generation[/bold cyan]")
+    console.print(f"[dim]Log: {_log_file_path}[/dim]")
     console.print(f"   Style: {STYLE_DESC}")
     console.print(f"   Forward bars: {FORWARD_BARS}")
     console.print(f"   Target: {target_count} accepted strategies")
