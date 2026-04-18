@@ -20,6 +20,7 @@
 
 <p align="center">
   <a href="#installation">Installation</a> •
+  <a href="#no-gpu-use-openrouter">No GPU?</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#configuration">Configuration</a> •
   <a href="#features">Features</a>
@@ -118,6 +119,7 @@ All code in Predix is originally written and implemented independently. Predix e
 - **Conda** (Miniconda or Anaconda) — required for environment management
 - **Docker** — required for sandboxed factor/model code execution (`docker run hello-world` to verify)
 - **llama.cpp** — for local LLM inference (see [llama.cpp build guide](https://github.com/ggml-org/llama.cpp))
+- **Ollama** — for embeddings (`nomic-embed-text`); install from [ollama.com](https://ollama.com) and run `ollama pull nomic-embed-text`
 - **Linux** — officially supported; macOS/Windows may work with adjustments
 
 ### Quick Install
@@ -256,6 +258,42 @@ market_context:
   target_arr: 9.62
   max_drawdown: 20
 ```
+
+---
+
+## No GPU? Use OpenRouter
+
+If you don't have a CUDA-capable GPU, you can run Predix using [OpenRouter](https://openrouter.ai) for LLM inference — no local model download required.
+
+**1. Set up `.env` for OpenRouter:**
+
+```bash
+# Chat (OpenRouter)
+OPENAI_API_KEY=sk-or-v1-<your-openrouter-key>
+OPENAI_API_BASE=https://openrouter.ai/api/v1
+CHAT_MODEL=qwen/qwen3-235b-a22b
+
+# Embedding (Ollama — still required locally)
+LITELLM_PROXY_API_KEY=local
+LITELLM_PROXY_API_BASE=http://localhost:11434/v1
+EMBEDDING_MODEL=nomic-embed-text
+```
+
+**2. Skip the llama-server step** — no local LLM server needed.
+
+**3. Run with the OpenRouter backend:**
+
+```bash
+rdagent fin_quant --model openrouter
+```
+
+**4. Parallel runs** (uses API concurrency instead of GPU slots):
+
+```bash
+python predix_parallel.py --runs 5 --api-keys 1 -m openrouter
+```
+
+> Ollama is still required for embeddings even in the OpenRouter path. Install from [ollama.com](https://ollama.com) and run `ollama pull nomic-embed-text` once.
 
 ---
 
@@ -431,7 +469,7 @@ python predix.py kronos-eval
 
 Automated quality assurance:
 
-- **60 Integration Tests** — all features tested automatically on every commit
+- **134+ Tests** — all features tested automatically on every commit
 - **Bandit Security Scanner** — pre-commit security checks
 - **Weekly Dependency Audit** — automated vulnerability scan via GitHub Actions
 

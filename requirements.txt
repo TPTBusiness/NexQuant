@@ -5,6 +5,7 @@ python-Levenshtein
 scikit-learn
 filelock
 loguru
+psutil
 fire
 fuzzywuzzy
 openai
