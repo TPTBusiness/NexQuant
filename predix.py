@@ -1615,8 +1615,8 @@ def kronos_factor(
         predix kronos-eval  - Evaluate Kronos as model and compute IC vs LightGBM
         predix top          - Show top factors by IC
     """
-    import torch as _torch
-    _device = device or ("cuda" if _torch.cuda.is_available() else "cpu")
+    from rdagent.components.coder.kronos_adapter import _cuda_available
+    _device = device or ("cuda" if _cuda_available() else "cpu")
     _stride = stride or pred
 
     data_path = Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
@@ -1697,8 +1697,8 @@ def kronos_eval(
         predix kronos-factor  - Generate Kronos factor for the factor pipeline
         predix best           - Show top strategies
     """
-    import torch as _torch
-    _device = device or ("cuda" if _torch.cuda.is_available() else "cpu")
+    from rdagent.components.coder.kronos_adapter import _cuda_available
+    _device = device or ("cuda" if _cuda_available() else "cpu")
     _stride = stride or pred
 
     data_path = Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")

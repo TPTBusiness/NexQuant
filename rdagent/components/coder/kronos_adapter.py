@@ -18,9 +18,16 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import torch
 
 from rdagent.log import rdagent_logger as logger
+
+
+def _cuda_available() -> bool:
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except ImportError:
+        return False
 
 KRONOS_REPO = Path.home() / "Kronos"
 _KRONOS_AVAILABLE: Optional[bool] = None
@@ -67,8 +74,8 @@ class KronosAdapter:
     MODEL_ID = "NeoQuasar/Kronos-mini"
     TOKENIZER_ID = "NeoQuasar/Kronos-Tokenizer-2k"
 
-    def __init__(self, device: str = "cuda" if torch.cuda.is_available() else "cpu", max_context: int = 512):
-        self.device = device
+    def __init__(self, device: Optional[str] = None, max_context: int = 512):
+        self.device = device or ("cuda" if _cuda_available() else "cpu")
         self.max_context = max_context
         self._predictor = None
 
@@ -152,7 +159,7 @@ def build_kronos_factor(
     context_bars: int = 512,
     pred_bars: int = 96,
     stride_bars: int = 96,
-    device: str = "cuda" if torch.cuda.is_available() else "cpu",
+    device: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Generate the Kronos predicted-return factor for all EUR/USD 1-min bars.
@@ -165,6 +172,7 @@ def build_kronos_factor(
     Returns:
         MultiIndex (datetime, instrument) DataFrame with column "KronosPredReturn".
     """
+    device = device or ("cuda" if _cuda_available() else "cpu")
     logger.info(f"Loading data from {hdf5_path}...")
     raw = pd.read_hdf(hdf5_path, key="data")
 
@@ -217,7 +225,7 @@ def evaluate_kronos_model(
     context_bars: int = 512,
     pred_bars: int = 30,
     stride_bars: int = 30,
-    device: str = "cuda" if torch.cuda.is_available() else "cpu",
+    device: Optional[str] = None,
 ) -> dict:
     """
     Evaluate Kronos as a standalone model (Option B, alongside LightGBM).
@@ -228,6 +236,7 @@ def evaluate_kronos_model(
     Returns:
         dict with keys: IC_mean, IC_std, IC_IR (IC / std), hit_rate, n_predictions
     """
+    device = device or ("cuda" if _cuda_available() else "cpu")
     raw = pd.read_hdf(hdf5_path, key="data")
     instrument = raw.index.get_level_values("instrument").unique()[0]
     df = raw.xs(instrument, level="instrument")
