@@ -22,9 +22,11 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import logging
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -40,7 +42,35 @@ OHLCV_PATH = Path("/home/nico/Predix/git_ignore_folder/factor_implementation_sou
 FACTORS_VALUES_DIR = Path("/home/nico/Predix/results/factors/values")
 STRATEGIES_DIR = Path("/home/nico/Predix/results/strategies_new")
 
-console = Console()
+# ── Logging setup: everything printed goes to log file + stdout ───────────────
+_LOG_DIR = Path(__file__).resolve().parent.parent / "git_ignore_folder" / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+_log_file_path = _LOG_DIR / f"rebacktest_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+_log_file = open(_log_file_path, "w", encoding="utf-8", buffering=1)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(_log_file_path, encoding="utf-8"),
+    ],
+)
+
+class _TeeFile:
+    """Writes to both stdout and log file — used as Rich Console file."""
+    def __init__(self, *files):
+        self._files = files
+    def write(self, data):
+        for f in self._files:
+            f.write(data)
+    def flush(self):
+        for f in self._files:
+            f.flush()
+    def fileno(self):
+        return self._files[0].fileno()
+
+console = Console(file=_TeeFile(sys.stdout, _log_file), highlight=False)
 
 
 def load_close() -> pd.Series:
@@ -176,6 +206,7 @@ def main() -> None:
                         help="Transaction cost bps (default 2.14 ≈ 2.35 pip EUR/USD)")
     args = parser.parse_args()
 
+    console.print(f"[dim]Log: {_log_file_path}[/dim]")
     console.print(f"[cyan]Loading OHLCV close...[/cyan]")
     close = load_close()
     console.print(f"[green]✓[/green] {len(close):,} 1-min bars "
