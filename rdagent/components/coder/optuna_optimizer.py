@@ -294,6 +294,43 @@ class OptunaOptimizer:
             "max_hold_bars": trial.suggest_int("max_hold_bars", 5, 1000, step=5),
         }
 
+    # Parameters that are allowed to be negative (not clamped to 0).
+    _SIGNED_PARAMS = {"signal_bias"}
+    # Absolute lower bounds per parameter (applied after the center-half_width calc).
+    _PARAM_FLOOR: Dict[str, float] = {
+        "entry_threshold": 0.0,
+        "exit_threshold": 0.0,
+        "zscore_window": 1.0,
+        "signal_window": 1.0,
+        "position_size_pct": 0.01,
+        "stop_loss_mult": 0.1,
+        "take_profit_mult": 0.1,
+        "volatility_lookback": 1.0,
+        "signal_bias": -1.0,
+        "max_hold_bars": 1.0,
+    }
+
+    def _suggest_bounded(
+        self,
+        trial: optuna.Trial,
+        key: str,
+        center_val: float,
+        half_width: float,
+    ) -> Any:
+        """Suggest a parameter value with safe bounds that never invert."""
+        floor = self._PARAM_FLOOR.get(key, -float("inf"))
+        is_int = "window" in key or "lookback" in key or "bars" in key
+        if is_int:
+            low = max(int(floor), int(center_val - half_width))
+            high = max(low + 1, int(center_val + half_width))
+            return trial.suggest_int(key, low, high)
+        else:
+            low = max(floor, center_val - half_width)
+            high = center_val + half_width
+            if high <= low:
+                high = low + max(1e-4, half_width * 0.1)
+            return trial.suggest_float(key, low, high)
+
     def _sample_fine_params(self, trial: optuna.Trial) -> Dict[str, Any]:
         """
         Enge Bereiche zentriert um die besten Stage-1-Parameter (Stage 2).
@@ -309,7 +346,6 @@ class OptunaOptimizer:
             Sampled hyperparameters with narrow ranges around Stage 1 best
         """
         center = getattr(self, "_fine_search_center", {})
-        # (center_value, half_width) für jeden Parameter
         ranges: Dict[str, Tuple[float, float]] = {
             "entry_threshold": (center.get("entry_threshold", 1.0), 0.3),
             "exit_threshold": (center.get("exit_threshold", 0.3), 0.2),
@@ -322,19 +358,7 @@ class OptunaOptimizer:
             "signal_bias": (center.get("signal_bias", 0.0), 0.2),
             "max_hold_bars": (center.get("max_hold_bars", 100), 50),
         }
-
-        params: Dict[str, Any] = {}
-        for key, (center_val, half_width) in ranges.items():
-            if "window" in key or "lookback" in key or "bars" in key:
-                low = max(1, int(center_val - half_width))
-                high = int(center_val + half_width)
-                params[key] = trial.suggest_int(key, low, high)
-            else:
-                low = max(0.0, center_val - half_width)
-                high = center_val + half_width
-                step = half_width / 10
-                params[key] = trial.suggest_float(key, low, high, step=step)
-        return params
+        return {key: self._suggest_bounded(trial, key, c, hw) for key, (c, hw) in ranges.items()}
 
     def _sample_very_fine_params(self, trial: optuna.Trial) -> Dict[str, Any]:
         """
@@ -353,7 +377,6 @@ class OptunaOptimizer:
         center = getattr(
             self, "_very_fine_center", getattr(self, "_fine_search_center", {})
         )
-        # (center_value, half_width) — ein Drittel der Stage-2-Breite
         ranges: Dict[str, Tuple[float, float]] = {
             "entry_threshold": (center.get("entry_threshold", 1.0), 0.1),
             "exit_threshold": (center.get("exit_threshold", 0.3), 0.07),
@@ -366,19 +389,7 @@ class OptunaOptimizer:
             "signal_bias": (center.get("signal_bias", 0.0), 0.07),
             "max_hold_bars": (center.get("max_hold_bars", 100), 17),
         }
-
-        params: Dict[str, Any] = {}
-        for key, (center_val, half_width) in ranges.items():
-            if "window" in key or "lookback" in key or "bars" in key:
-                low = max(1, int(center_val - half_width))
-                high = int(center_val + half_width)
-                params[key] = trial.suggest_int(key, low, high)
-            else:
-                low = max(0.0, center_val - half_width)
-                high = center_val + half_width
-                step = half_width / 5
-                params[key] = trial.suggest_float(key, low, high, step=step)
-        return params
+        return {key: self._suggest_bounded(trial, key, c, hw) for key, (c, hw) in ranges.items()}
 
     def _objective_coarse(self, trial: optuna.Trial) -> float:
         """Objective-Funktion für Stage 1 (grobe Suche)."""
@@ -389,7 +400,7 @@ class OptunaOptimizer:
             )
             return self._extract_metric(metrics, self.optimization_metric)
         except Exception as e:
-            logger.debug(f"Stage 1 trial failed: {e}")
+            logger.warning(f"Stage 1 trial {trial.number} failed: {e}")
             return float("-inf")
 
     def _objective_fine(self, trial: optuna.Trial) -> float:
@@ -401,7 +412,7 @@ class OptunaOptimizer:
             )
             return self._extract_metric(metrics, self.optimization_metric)
         except Exception as e:
-            logger.debug(f"Stage 2 trial failed: {e}")
+            logger.warning(f"Stage 2 trial {trial.number} failed: {e}")
             return float("-inf")
 
     def _objective_very_fine(self, trial: optuna.Trial) -> float:
@@ -413,7 +424,7 @@ class OptunaOptimizer:
             )
             return self._extract_metric(metrics, self.optimization_metric)
         except Exception as e:
-            logger.debug(f"Stage 3 trial failed: {e}")
+            logger.warning(f"Stage 3 trial {trial.number} failed: {e}")
             return float("-inf")
 
     def _sample_hyperparameters(self, trial: optuna.Trial) -> Dict[str, Any]:
