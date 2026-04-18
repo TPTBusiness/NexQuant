@@ -328,6 +328,16 @@ done
 | `python predix_gen_strategies_real_bt.py` | Generate 10 strategies with LLM + real backtest |
 | `python predix_gen_strategies_real_bt.py 20` | Generate 20 strategies |
 
+### Kronos Foundation Model
+
+| Command | Description |
+|---------|-------------|
+| `python predix.py kronos-factor` | Generate Kronos predicted-return factor (daily stride, ~15 min GPU) |
+| `python predix.py kronos-factor --pred 30` | 30-bar prediction horizon |
+| `python predix.py kronos-factor --device cpu` | CPU inference (slower) |
+| `python predix.py kronos-eval` | Evaluate Kronos IC / hit rate vs LightGBM baseline |
+| `python predix.py kronos-eval --pred 96` | Daily horizon evaluation |
+
 ### Factor Evaluation
 
 | Command | Description |
@@ -397,6 +407,25 @@ Real-time dashboard for monitoring:
 - Model architecture evolution
 - Cumulative returns and drawdowns
 - Code diffs and implementation history
+
+### 🤖 Kronos Foundation Model Integration
+
+Predix integrates [Kronos-mini](https://github.com/shiyu-coder/Kronos) — a 4.1M parameter OHLCV foundation model pretrained on 12+ billion K-lines from 45 global exchanges (AAAI 2026, MIT):
+
+- **Option A — Alpha Factor**: Rolling daily inference generates a `KronosPredReturn` factor. Every 96 bars (one trading day), Kronos predicts the next day's return from the previous 512 bars of EUR/USD OHLCV data. The factor is forward-filled to 1-min frequency and plugs directly into Predix's factor evaluation pipeline.
+
+- **Option B — Model Evaluation**: Kronos runs alongside LightGBM as a standalone predictor. IC (Information Coefficient), IC IR, and directional hit rate are computed over the full dataset for direct comparison with LightGBM-generated models.
+
+```bash
+# One-time setup
+git clone https://github.com/shiyu-coder/Kronos ~/Kronos
+
+# Generate factor (Option A) — saves to results/factors/
+python predix.py kronos-factor
+
+# Evaluate as model (Option B) — prints IC vs LightGBM reference
+python predix.py kronos-eval
+```
 
 ### 🔒 Security & Quality
 
