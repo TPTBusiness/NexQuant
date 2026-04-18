@@ -1,4 +1,4 @@
-azure-identity==1.17.1
+azure-identity==1.25.3
 dill==0.4.1
 pillow==10.4.0
 psutil==6.1.0
