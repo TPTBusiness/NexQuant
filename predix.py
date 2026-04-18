@@ -22,6 +22,98 @@ app = typer.Typer(help="Predix - AI Quantitative Trading Agent")
 console = Console()
 
 
+def _ensure_kronos_factor_in_pool(con) -> None:
+    """Auto-generate Kronos factor and register it in the StrategyOrchestrator pool.
+
+    Runs before fin_quant starts. If the Kronos parquet already exists in
+    results/factors/values/ and has a matching JSON with ic, it's a no-op.
+    Otherwise, generates the factor (stride=500 for speed) and computes IC.
+    """
+    import json as _json
+    from datetime import datetime as _dt
+
+    data_path = Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
+    if not data_path.exists():
+        return  # No data — skip silently
+
+    factor_name = "KronosPredReturn_p96"
+    factors_dir = Path("results/factors")
+    values_dir = factors_dir / "values"
+    json_path = factors_dir / f"{factor_name}.json"
+    parquet_path = values_dir / f"{factor_name}.parquet"
+
+    # Already in pool with IC — nothing to do
+    if json_path.exists() and parquet_path.exists():
+        try:
+            existing = _json.loads(json_path.read_text())
+            if existing.get("ic") is not None:
+                return
+        except Exception:
+            pass
+
+    con.print("\n[bold yellow]Kronos Factor[/bold yellow] not in pool — generating automatically...")
+    con.print("  [dim]stride=500 (~4500 windows), batch=32 — ~5-10 min on GPU[/dim]")
+
+    try:
+        from rdagent.components.coder.kronos_adapter import _cuda_available, build_kronos_factor, evaluate_kronos_model
+
+        _device = "cuda" if _cuda_available() else "cpu"
+
+        # Generate factor values
+        factor_df = build_kronos_factor(
+            hdf5_path=data_path,
+            context_bars=100,
+            pred_bars=96,
+            stride_bars=500,
+            device=_device,
+            batch_size=32,
+        )
+
+        # Save parquet to values/ directory (where StrategyOrchestrator looks)
+        values_dir.mkdir(parents=True, exist_ok=True)
+        factor_df.to_parquet(parquet_path)
+
+        # Quick IC evaluation (stride=2000 → ~1100 windows, fast)
+        con.print("  [dim]Computing IC...[/dim]")
+        metrics = evaluate_kronos_model(
+            hdf5_path=data_path,
+            context_bars=100,
+            pred_bars=96,
+            stride_bars=2000,
+            device=_device,
+            batch_size=32,
+        )
+        ic = metrics.get("IC_mean", 0.0) or 0.0
+        hit_rate = metrics.get("hit_rate", 0.5)
+
+        # Write JSON metadata compatible with StrategyOrchestrator
+        factors_dir.mkdir(parents=True, exist_ok=True)
+        meta = {
+            "factor_name": factor_name,
+            "status": "success",
+            "ic": ic,
+            "hit_rate": hit_rate,
+            "model": "NeoQuasar/Kronos-mini",
+            "context_bars": 100,
+            "pred_bars": 96,
+            "stride_bars": 500,
+            "device": _device,
+            "generated_at": _dt.now().isoformat(),
+            "n_bars": len(factor_df),
+            "n_non_nan": int(factor_df["KronosPredReturn"].notna().sum()),
+        }
+        json_path.write_text(_json.dumps(meta, indent=2))
+
+        color = "green" if abs(ic) > 0.01 else "yellow"
+        con.print(
+            f"  [bold {color}]Kronos Factor ready:[/bold {color}] IC={ic:.4f}, "
+            f"Hit-Rate={hit_rate:.1%} — added to strategy pool"
+        )
+
+    except Exception as e:
+        con.print(f"  [yellow]Kronos Factor generation failed ({e}) — continuing without it[/yellow]")
+
+
 @app.command()
 def quant(
     model: str = typer.Option(
@@ -225,6 +317,9 @@ def quant(
 
         threading.Thread(target=start_cli_dash, daemon=True).start()
         time.sleep(1)
+
+    # ---- Kronos Factor: auto-generate if not in pool ----
+    _ensure_kronos_factor_in_pool(console)
 
     # ---- Start fin_quant ----
     from rdagent.app.qlib_rd_loop.quant import main as fin_quant
