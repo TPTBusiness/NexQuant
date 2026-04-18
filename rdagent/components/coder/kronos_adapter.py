@@ -19,7 +19,8 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from rdagent.log import rdagent_logger as logger
+import logging
+logger = logging.getLogger(__name__)
 
 
 def _cuda_available() -> bool:
