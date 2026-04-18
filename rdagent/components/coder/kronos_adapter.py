@@ -117,13 +117,15 @@ class KronosAdapter:
         if len(ohlcv_df) < context_bars:
             raise ValueError(f"Need at least {context_bars} bars, got {len(ohlcv_df)}")
 
-        ctx = ohlcv_df.iloc[-context_bars:].copy().reset_index(drop=True)
         freq = ohlcv_df.index.freq or pd.infer_freq(ohlcv_df.index[:100])
         last_ts = ohlcv_df.index[-1]
         future_idx = pd.date_range(start=last_ts, periods=pred_bars + 1, freq=freq or "1min")[1:]
 
-        x_timestamp = pd.Series(ctx.index)
-        y_timestamp = pd.Series(range(len(ctx), len(ctx) + pred_bars))
+        # Kronos requires actual datetime Series for both timestamps (not integer ranges)
+        x_timestamp = pd.Series(ohlcv_df.index[-context_bars:].values)
+        y_timestamp = pd.Series(future_idx)
+
+        ctx = ohlcv_df.iloc[-context_bars:].copy().reset_index(drop=True)
 
         pred_df = self._predictor.predict(
             df=ctx,
