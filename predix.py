@@ -1589,6 +1589,7 @@ def kronos_factor(
     pred: int = typer.Option(96, "--pred", "-p", help="Prediction horizon in bars (default 96 = 1 trading day at 1-min)"),
     stride: int = typer.Option(None, "--stride", "-s", help="Stride between windows (default: same as --pred)"),
     device: str = typer.Option(None, "--device", "-d", help="Device: cuda or cpu (default: auto-detect)"),
+    batch_size: int = typer.Option(32, "--batch-size", "-b", help="Windows per GPU batch (higher = faster on GPU, more VRAM)"),
     output: str = typer.Option(None, "--output", "-o", help="Output parquet path (default: results/factors/kronos_pred_return_p<pred>.parquet)"),
 ):
     """Generate Kronos-mini predicted-return alpha factor (Option A).
@@ -1598,9 +1599,9 @@ def kronos_factor(
     standard MultiIndex (datetime, instrument) format.
 
     Strategy: every STRIDE bars, use the previous CONTEXT bars as input and
-    predict the next PRED bars. The predicted log-return is forward-filled across
-    the predicted window. Default (--pred 96) = one trading day at 1-min frequency,
-    yielding ~2 000 Kronos inference calls total (~15-20 min on GPU).
+    predict the next PRED bars. Windows are processed in GPU batches of BATCH_SIZE
+    for full GPU utilization (5-20x faster than sequential). Default (--pred 96) =
+    one trading day at 1-min frequency, ~2 000 windows total.
 
     Requires:
         ~/Kronos repo (git clone https://github.com/shiyu-coder/Kronos ~/Kronos)
@@ -1636,6 +1637,7 @@ def kronos_factor(
         pred_bars=pred,
         stride_bars=_stride,
         device=_device,
+        batch_size=batch_size,
     )
 
     out_dir = Path("results/factors")
@@ -1673,6 +1675,7 @@ def kronos_eval(
     pred: int = typer.Option(30, "--pred", "-p", help="Prediction horizon in bars"),
     stride: int = typer.Option(None, "--stride", "-s", help="Stride between evaluations (default: same as --pred)"),
     device: str = typer.Option(None, "--device", "-d", help="Device: cuda or cpu (default: auto-detect)"),
+    batch_size: int = typer.Option(32, "--batch-size", "-b", help="Windows per GPU batch (higher = faster on GPU, more VRAM)"),
 ):
     """Evaluate Kronos-mini as standalone model — IC and hit rate vs LightGBM (Option B).
 
@@ -1718,6 +1721,7 @@ def kronos_eval(
         pred_bars=pred,
         stride_bars=_stride,
         device=_device,
+        batch_size=batch_size,
     )
 
     console.print(f"\n[bold]Kronos-mini Results[/bold]")
