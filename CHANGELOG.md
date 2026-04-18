@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.2.0](https://github.com/TPTBusiness/Predix/compare/v2.1.0...v2.2.0) (2026-04-18)
+
+
+### Features
+
+* add Kronos CLI commands, expand tests, document in README ([f911081](https://github.com/TPTBusiness/Predix/commit/f911081d1763d0dc4dd790b57dd97aae2dc62679))
+* **fin_quant:** auto-generate Kronos factor before loop start ([277063f](https://github.com/TPTBusiness/Predix/commit/277063f3e36cd071db859cdc77f69135c1f0763b))
+* integrate Kronos-mini OHLCV foundation model (Option A + B) ([4ae3b99](https://github.com/TPTBusiness/Predix/commit/4ae3b99f2450930f72e202a1a470c407bfde3328))
+
+
+### Bug Fixes
+
+* **kronos:** lazy torch import to fix CI ModuleNotFoundError ([ccc1d27](https://github.com/TPTBusiness/Predix/commit/ccc1d27dbe5ab06a57085a589d456ac7bf49cc08))
+* **kronos:** pass actual datetime Series to Kronos predictor timestamps ([dc6e7ce](https://github.com/TPTBusiness/Predix/commit/dc6e7ce207d21fbc21976f2af7691058530fac2f))
+* **kronos:** replace rdagent_logger with stdlib logging for CI compatibility ([b4558f2](https://github.com/TPTBusiness/Predix/commit/b4558f2456659c6109bd1b3cf100510491cd3e6c))
+
+
+### Performance Improvements
+
+* **kronos:** batch GPU inference via predict_batch — 75x faster ([74611d0](https://github.com/TPTBusiness/Predix/commit/74611d071ac123a655eb15d0737bb73b8c1bd2b0))
+* **kronos:** batch GPU inference via predict_batch — 75x faster ([2babeb9](https://github.com/TPTBusiness/Predix/commit/2babeb95f42828e13a37dc16166c75538f33fd4b))
+
+
+### Documentation
+
+* fix duplicate sections, add hardware requirements and data setup guide ([6c771b3](https://github.com/TPTBusiness/Predix/commit/6c771b37e6f88526a896499e86929cfca2c199eb))
+
 ## [2.1.0](https://github.com/TPTBusiness/Predix/compare/v2.0.0...v2.1.0) (2026-04-18)
 
 
