@@ -605,16 +605,15 @@ class OptunaOptimizer:
             synthetic_close = (1 + combined_ret).cumprod() * 100.0
 
             from rdagent.components.backtesting.vbt_backtest import (
-                backtest_signal,
+                backtest_signal_ftmo,
                 DEFAULT_TXN_COST_BPS,
             )
             import os as _os
 
-            bt = backtest_signal(
+            bt = backtest_signal_ftmo(
                 close=synthetic_close,
                 signal=signal,
                 txn_cost_bps=float(_os.getenv("TXN_COST_BPS", DEFAULT_TXN_COST_BPS)),
-                freq="1min",
             )
             if bt.get("status") != "success":
                 return self._default_metrics()
