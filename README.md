@@ -27,13 +27,19 @@
 
 <p align="center">
   <a href="https://github.com/TPTBusiness/Predix/actions/workflows/ci.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/TPTBusiness/Predix/ci.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI Status">
+    <img src="https://img.shields.io/github/actions/workflow/status/TPTBusiness/Predix/ci.yml?branch=master&label=CI&logo=github&style=flat-square" alt="CI Status">
+  </a>
+  <a href="https://github.com/TPTBusiness/Predix/actions/workflows/codacy.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/TPTBusiness/Predix/codacy.yml?branch=master&label=Security&logo=shield&style=flat-square" alt="Security Scan">
   </a>
   <a href="https://codecov.io/gh/TPTBusiness/Predix">
     <img src="https://img.shields.io/codecov/c/github/TPTBusiness/Predix?style=flat-square&logo=codecov" alt="Coverage">
   </a>
   <a href="https://github.com/TPTBusiness/Predix/blob/master/LICENSE">
     <img src="https://img.shields.io/github/license/TPTBusiness/Predix?style=flat-square" alt="License">
+  </a>
+  <a href="https://www.conventionalcommits.org/">
+    <img src="https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow?style=flat-square" alt="Conventional Commits">
   </a>
   <a href="https://github.com/astral-sh/ruff">
     <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=flat-square" alt="Ruff">
@@ -47,14 +53,8 @@
   <a href="https://github.com/TPTBusiness/Predix/issues">
     <img src="https://img.shields.io/github/issues/TPTBusiness/Predix?style=flat-square" alt="Issues">
   </a>
-  <a href="https://github.com/TPTBusiness/Predix/pulls">
-    <img src="https://img.shields.io/github/issues-pr/TPTBusiness/Predix?style=flat-square" alt="Pull Requests">
-  </a>
-  <a href="https://github.com/TPTBusiness/Predix/commits/main">
+  <a href="https://github.com/TPTBusiness/Predix/commits/master">
     <img src="https://img.shields.io/github/last-commit/TPTBusiness/Predix?style=flat-square" alt="Last Commit">
-  </a>
-  <a href="https://github.com/TPTBusiness/Predix/contributors">
-    <img src="https://img.shields.io/github/contributors/TPTBusiness/Predix?style=flat-square" alt="Contributors">
   </a>
 </p>
 
@@ -147,20 +147,19 @@ QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
 ```bash
 ~/llama.cpp/build/bin/llama-server \
   --model ~/models/qwen3.6/Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf \
-  --n-gpu-layers 26 \
+  --n-gpu-layers 24 \
   --no-mmap \
   --port 8081 \
   --ctx-size 240000 \
-  --parallel 3 \
+  --parallel 2 \
   --batch-size 512 --ubatch-size 512 \
   --host 0.0.0.0 \
   -ctk q4_0 -ctv q4_0 \
-  --reasoning-budget 0 \
-  --chat-template-kwargs '{"enable_thinking":false}'
+  --reasoning off
 ```
 
 > **Important flags and token budget:**
-> - `--ctx-size 240000 --parallel 3` — allocates **3 slots × 80,000 tokens each**. This is required because `fin_quant` hypothesis prompts include up to `MAX_FACTOR_HISTORY` past experiments and can reach **25,000–35,000 tokens**. With less context per slot (e.g. 33 k from `--ctx-size 100000 --parallel 3`) prompts overflow silently and produce empty/invalid responses.
+> - `--ctx-size 240000 --parallel 2` — allocates **2 slots × 120,000 tokens each**. `fin_quant` prompts can reach 80k+ tokens with full factor history; a smaller slot causes silent overflow and empty/invalid responses.
 >
 >   **Token budget breakdown per fin_quant request:**
 >   | Component | Approx. tokens |
@@ -168,13 +167,13 @@ QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
 >   | System prompt + scenario description | ~3,000 |
 >   | `MAX_FACTOR_HISTORY=5` past experiments × ~2,500 | ~12,500 |
 >   | RAG context + instructions | ~2,000 |
->   | **Total** | **~17,500** (safe under 80k slot) |
+>   | **Total** | **~17,500** (well within 120k slot) |
 >
->   Formula: `ctx_size / parallel` must be at least `MAX_FACTOR_HISTORY × 2500 + 8000`.
+>   Formula: `ctx_size / parallel` must satisfy `n_ctx_slot > MAX_FACTOR_HISTORY × 2500 + 5000`.
 >
-> - `--reasoning-budget 0` — disables chain-of-thought. Without this, Qwen3 spends 15–22 s per request, causing rdagent to time out after 10 retries.
-> - `--n-gpu-layers 26` — use 26 on RTX 5060 Ti (16 GB) when Ollama is also running. Frees ~500 MB VRAM needed for the larger KV cache (1.3 GB at 240k ctx Q4_0).
-> - `-ctk q4_0 -ctv q4_0` — quantise the KV cache to 4-bit, reducing VRAM from ~5 GB to ~1.3 GB at 240k context.
+> - `--reasoning off` — **critical**: completely disables Qwen3 chain-of-thought. `--reasoning-budget 0` is not sufficient — it still starts and immediately aborts reasoning, producing empty JSON responses. Only `--reasoning off` prevents this entirely.
+> - `--n-gpu-layers 24` — 4 fewer than maximum on RTX 5060 Ti (16 GB), freeing ~500 MB VRAM for the larger KV cache.
+> - `-ctk q4_0 -ctv q4_0` — quantises the KV cache to 4-bit, reducing VRAM from ~5 GB to ~1.3 GB at 240k context.
 
 ---
 
@@ -247,6 +246,9 @@ done
 
 | Command | Description |
 |---------|-------------|
+| `python predix.py best` | Show top strategies by composite score (Sharpe × DD × trade penalty) |
+| `python predix.py best -n 20 -m sharpe` | Top 20 by Sharpe ratio |
+| `python predix.py best --show NAME` | Full metadata for one strategy |
 | `python predix_strategy_report.py` | Generate reports for ALL strategies |
 | `python predix_strategy_report.py results/strategies_new/123_MyStrategy.json` | Report for single strategy |
 
@@ -276,17 +278,6 @@ done
 | `CHAT_MODEL` | LLM model | `openrouter/qwen/qwen3.6-plus:free` |
 | `OPENROUTER_MODEL` | Specific OpenRouter model | `openrouter/qwen/qwen3.6-plus:free` |
 | `NO_COLOR` | Disable ANSI colors | `1` |
-
----
-
-## Configuration
-
-```bash
-# Start the UI dashboard
-rdagent ui --port 19899 --log-dir log/ --data-science
-```
-
-Then open `http://127.0.0.1:19899` in your browser.
 
 ---
 
@@ -535,10 +526,10 @@ See [`ATTRIBUTION.md`](ATTRIBUTION.md) for detailed guidelines and examples.
 Contributions are welcome! Please:
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch (`git checkout -b feat/my-feature`)
+3. Commit using [Conventional Commits](https://www.conventionalcommits.org/) (`git commit -m 'feat: add my feature'`)
+4. Push to the branch (`git push origin feat/my-feature`)
+5. Open a Pull Request with a conventional commit title
 
 For major changes, please open an issue first to discuss your approach.
 
