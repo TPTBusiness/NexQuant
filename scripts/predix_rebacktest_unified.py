@@ -34,7 +34,7 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from rdagent.components.backtesting.vbt_backtest import backtest_signal  # noqa: E402
+from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo  # noqa: E402
 
 OHLCV_PATH = Path("/home/nico/Predix/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
 FACTORS_VALUES_DIR = Path("/home/nico/Predix/results/factors/values")
@@ -154,11 +154,10 @@ def rebacktest_one(
     # Signal can arrive on either the factor index or the close index.
     signal = signal.reindex(close_a.index).ffill().fillna(0)
 
-    result = backtest_signal(
+    result = backtest_signal_ftmo(
         close=close_a,
         signal=signal,
         txn_cost_bps=txn_cost_bps,
-        freq="1min",
     )
     result["status_detail"] = result.pop("status")
     result["status"] = "ok"
@@ -173,7 +172,8 @@ def main() -> None:
                         help="Strategy directory to re-backtest")
     parser.add_argument("--csv", type=Path, default=None,
                         help="Write a CSV report to this path")
-    parser.add_argument("--txn-cost-bps", type=float, default=1.5)
+    parser.add_argument("--txn-cost-bps", type=float, default=2.14,
+                        help="Transaction cost bps (default 2.14 ≈ 2.35 pip EUR/USD)")
     args = parser.parse_args()
 
     console.print(f"[cyan]Loading OHLCV close...[/cyan]")
