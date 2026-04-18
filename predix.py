@@ -1583,5 +1583,157 @@ def best(
         console.print(f"[green]Exported {len(top)} strategies (code stripped) → {export}[/green]")
 
 
+@app.command("kronos-factor")
+def kronos_factor(
+    context: int = typer.Option(512, "--context", "-c", help="Context window in bars (max 512 for Kronos-mini)"),
+    pred: int = typer.Option(96, "--pred", "-p", help="Prediction horizon in bars (default 96 = 1 trading day at 1-min)"),
+    stride: int = typer.Option(None, "--stride", "-s", help="Stride between windows (default: same as --pred)"),
+    device: str = typer.Option(None, "--device", "-d", help="Device: cuda or cpu (default: auto-detect)"),
+    output: str = typer.Option(None, "--output", "-o", help="Output parquet path (default: results/factors/kronos_pred_return_p<pred>.parquet)"),
+):
+    """Generate Kronos-mini predicted-return alpha factor (Option A).
+
+    Runs Kronos-mini (4.1M params OHLCV foundation model, AAAI 2026) on rolling
+    windows of EUR/USD 1-min data and saves a predicted-return factor in Predix's
+    standard MultiIndex (datetime, instrument) format.
+
+    Strategy: every STRIDE bars, use the previous CONTEXT bars as input and
+    predict the next PRED bars. The predicted log-return is forward-filled across
+    the predicted window. Default (--pred 96) = one trading day at 1-min frequency,
+    yielding ~2 000 Kronos inference calls total (~15-20 min on GPU).
+
+    Requires:
+        ~/Kronos repo (git clone https://github.com/shiyu-coder/Kronos ~/Kronos)
+        git_ignore_folder/factor_implementation_source_data/intraday_pv.h5
+
+    Examples:
+        $ predix kronos-factor                        # Default: daily stride, GPU
+        $ predix kronos-factor --pred 30 --device cpu # 30-bar horizon, CPU
+        $ predix kronos-factor --context 256 --pred 48
+
+    See Also:
+        predix kronos-eval  - Evaluate Kronos as model and compute IC vs LightGBM
+        predix top          - Show top factors by IC
+    """
+    import torch as _torch
+    _device = device or ("cuda" if _torch.cuda.is_available() else "cpu")
+    _stride = stride or pred
+
+    data_path = Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
+    if not data_path.exists():
+        console.print(f"[red]ERROR: Data not found at {data_path}[/red]")
+        console.print("Run data conversion first — see README Data Setup section.")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]Kronos Factor Generator[/bold]")
+    console.print(f"  Context: [cyan]{context}[/cyan] bars  |  Pred: [cyan]{pred}[/cyan] bars  |  Device: [cyan]{_device}[/cyan]")
+
+    from rdagent.components.coder.kronos_adapter import build_kronos_factor
+
+    factor_df = build_kronos_factor(
+        hdf5_path=data_path,
+        context_bars=context,
+        pred_bars=pred,
+        stride_bars=_stride,
+        device=_device,
+    )
+
+    out_dir = Path("results/factors")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = Path(output) if output else out_dir / f"kronos_pred_return_p{pred}.parquet"
+    factor_df.to_parquet(out_path)
+
+    import json as _json
+    from datetime import datetime as _dt
+    meta = {
+        "factor_name": f"KronosPredReturn_p{pred}",
+        "description": f"Kronos-mini predicted return, {pred}-bar horizon",
+        "model": "NeoQuasar/Kronos-mini",
+        "context_bars": context,
+        "pred_bars": pred,
+        "stride_bars": _stride,
+        "device": _device,
+        "generated_at": _dt.now().isoformat(),
+        "n_bars": len(factor_df),
+        "n_non_nan": int(factor_df["KronosPredReturn"].notna().sum()),
+        "parquet_path": str(out_path),
+    }
+    meta_path = out_path.with_suffix(".json")
+    meta_path.write_text(_json.dumps(meta, indent=2))
+
+    console.print(f"\n[green]Factor saved:[/green] {out_path}")
+    console.print(f"  Shape: {factor_df.shape}  |  Non-NaN: {meta['n_non_nan']}")
+    console.print(f"  Metadata: {meta_path}")
+    console.print("\n[dim]Use 'predix top' to compare with other factors.[/dim]")
+
+
+@app.command("kronos-eval")
+def kronos_eval(
+    context: int = typer.Option(512, "--context", "-c", help="Context window in bars"),
+    pred: int = typer.Option(30, "--pred", "-p", help="Prediction horizon in bars"),
+    stride: int = typer.Option(None, "--stride", "-s", help="Stride between evaluations (default: same as --pred)"),
+    device: str = typer.Option(None, "--device", "-d", help="Device: cuda or cpu (default: auto-detect)"),
+):
+    """Evaluate Kronos-mini as standalone model — IC and hit rate vs LightGBM (Option B).
+
+    Runs Kronos inference on the full EUR/USD dataset and computes:
+      - IC (Information Coefficient): correlation between predicted and actual returns
+      - IC IR: IC / std — risk-adjusted signal strength (>0.5 = good)
+      - Hit Rate: directional accuracy (>50% = useful signal)
+
+    Results are printed and saved to results/kronos/ for comparison with LightGBM
+    models generated by fin_quant.
+
+    Requires:
+        ~/Kronos repo (git clone https://github.com/shiyu-coder/Kronos ~/Kronos)
+        git_ignore_folder/factor_implementation_source_data/intraday_pv.h5
+
+    Examples:
+        $ predix kronos-eval                          # Default: 30-bar horizon
+        $ predix kronos-eval --pred 96 --device cuda  # Daily horizon, GPU
+        $ predix kronos-eval --context 256 --pred 15  # Shorter horizon
+
+    See Also:
+        predix kronos-factor  - Generate Kronos factor for the factor pipeline
+        predix best           - Show top strategies
+    """
+    import torch as _torch
+    _device = device or ("cuda" if _torch.cuda.is_available() else "cpu")
+    _stride = stride or pred
+
+    data_path = Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
+    if not data_path.exists():
+        console.print(f"[red]ERROR: Data not found at {data_path}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]Kronos Model Evaluator[/bold] (alongside LightGBM)")
+    console.print(f"  Context: [cyan]{context}[/cyan] bars  |  Pred: [cyan]{pred}[/cyan] bars  |  Device: [cyan]{_device}[/cyan]")
+    console.print("  Running evaluation...")
+
+    from rdagent.components.coder.kronos_adapter import evaluate_kronos_model
+
+    metrics = evaluate_kronos_model(
+        hdf5_path=data_path,
+        context_bars=context,
+        pred_bars=pred,
+        stride_bars=_stride,
+        device=_device,
+    )
+
+    console.print(f"\n[bold]Kronos-mini Results[/bold]")
+    console.print(f"  Predictions: [cyan]{metrics['n_predictions']}[/cyan]")
+    console.print(f"  IC (mean):   [{'green' if metrics['IC_mean'] > 0.02 else 'yellow'}]{metrics['IC_mean']:.4f}[/]")
+    console.print(f"  IC IR:       [{'green' if metrics['IC_IR'] > 0.5 else 'yellow'}]{metrics['IC_IR']:.4f}[/]  (>0.5 = strong signal)")
+    console.print(f"  Hit Rate:    [{'green' if metrics['hit_rate'] > 0.52 else 'yellow'}]{metrics['hit_rate']:.2%}[/]  (>50% = directionally useful)")
+    console.print(f"\n[dim]Reference: LightGBM baseline IC typically 0.01–0.05 on 1-min EUR/USD[/dim]")
+
+    import json as _json
+    out_dir = Path("results/kronos")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"kronos_eval_ctx{context}_pred{pred}.json"
+    out_path.write_text(_json.dumps({**metrics, "context_bars": context, "pred_bars": pred}, indent=2))
+    console.print(f"\n[green]Results saved:[/green] {out_path}")
+
+
 if __name__ == "__main__":
     app()
