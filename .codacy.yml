@@ -1,0 +1,33 @@
+---
+engines:
+  # Disable ESLint — no .eslintrc in web/ frontend directory
+  eslint:
+    enabled: false
+  # Disable PMD — no Java code, no ruleset configured
+  pmd:
+    enabled: false
+  # Disable Prospector — redundant with pylint
+  prospector:
+    enabled: false
+  # Keep bandit for security scanning
+  bandit:
+    enabled: true
+  # Keep pylint but limit scope via exclude_paths below
+  pylint:
+    enabled: true
+
+# Global path exclusions — keeps pylint result count manageable
+# to avoid Codacy SARIF formatter IndexOutOfBoundsException (Sarif.scala:185)
+exclude_paths:
+  - "web/**"
+  - "git_ignore_folder/**"
+  - "workspace/**"
+  - "scripts/**"
+  - "test/**"
+  - "*.md"
+  - "*.txt"
+  - "*.yaml"
+  - "*.yml"
+  - "*.json"
+  - "*.toml"
+  - ".git/**"
