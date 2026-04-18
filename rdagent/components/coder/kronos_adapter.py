@@ -29,6 +29,7 @@ def _cuda_available() -> bool:
     except ImportError:
         return False
 
+
 KRONOS_REPO = Path.home() / "Kronos"
 _KRONOS_AVAILABLE: Optional[bool] = None
 
@@ -59,6 +60,20 @@ def _ohlcv_from_predix(df: pd.DataFrame) -> pd.DataFrame:
     renamed = df.rename(columns=col_map)
     cols = [c for c in ["open", "high", "low", "close", "volume"] if c in renamed.columns]
     return renamed[cols].astype(float)
+
+
+def _build_window_inputs(
+    ohlcv_df: pd.DataFrame,
+    pred_bars: int,
+    freq: str,
+) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    """Prepare (ctx_df, x_timestamp, y_timestamp) for one Kronos window."""
+    last_ts = ohlcv_df.index[-1]
+    future_idx = pd.date_range(start=last_ts, periods=pred_bars + 1, freq=freq)[1:]
+    x_timestamp = pd.Series(ohlcv_df.index.values)
+    y_timestamp = pd.Series(future_idx)
+    ctx = ohlcv_df.copy().reset_index(drop=True)
+    return ctx, x_timestamp, y_timestamp
 
 
 class KronosAdapter:
@@ -117,15 +132,9 @@ class KronosAdapter:
         if len(ohlcv_df) < context_bars:
             raise ValueError(f"Need at least {context_bars} bars, got {len(ohlcv_df)}")
 
-        freq = ohlcv_df.index.freq or pd.infer_freq(ohlcv_df.index[:100])
-        last_ts = ohlcv_df.index[-1]
-        future_idx = pd.date_range(start=last_ts, periods=pred_bars + 1, freq=freq or "1min")[1:]
-
-        # Kronos requires actual datetime Series for both timestamps (not integer ranges)
-        x_timestamp = pd.Series(ohlcv_df.index[-context_bars:].values)
-        y_timestamp = pd.Series(future_idx)
-
-        ctx = ohlcv_df.iloc[-context_bars:].copy().reset_index(drop=True)
+        freq = ohlcv_df.index.freq or pd.infer_freq(ohlcv_df.index[:100]) or "1min"
+        ctx, x_timestamp, y_timestamp = _build_window_inputs(ohlcv_df.iloc[-context_bars:], pred_bars, freq)
+        future_idx = pd.DatetimeIndex(y_timestamp)
 
         pred_df = self._predictor.predict(
             df=ctx,
@@ -139,6 +148,56 @@ class KronosAdapter:
         )
         pred_df.index = future_idx
         return pred_df
+
+    def predict_next_bars_batch(
+        self,
+        ohlcv_windows: list,
+        pred_bars: int,
+        temperature: float = 1.0,
+        top_p: float = 0.9,
+    ) -> list:
+        """
+        Batch inference: run Kronos on multiple context windows simultaneously.
+
+        All windows must have the same number of bars. Processing them together
+        saturates the GPU and is typically 5-20x faster than sequential calls.
+
+        Args:
+            ohlcv_windows: List of OHLCV DataFrames, each with a DatetimeIndex.
+            pred_bars: Number of future bars to predict per window.
+
+        Returns:
+            List of prediction DataFrames (one per input window), same order.
+        """
+        if self._predictor is None:
+            raise RuntimeError("Call .load() first.")
+        if not ohlcv_windows:
+            return []
+
+        freq = ohlcv_windows[0].index.freq or pd.infer_freq(ohlcv_windows[0].index[:100]) or "1min"
+
+        df_list, x_ts_list, y_ts_list, future_idxs = [], [], [], []
+        for win in ohlcv_windows:
+            ctx, x_ts, y_ts = _build_window_inputs(win, pred_bars, freq)
+            df_list.append(ctx)
+            x_ts_list.append(x_ts)
+            y_ts_list.append(y_ts)
+            future_idxs.append(pd.DatetimeIndex(y_ts))
+
+        pred_dfs = self._predictor.predict_batch(
+            df_list=df_list,
+            x_timestamp_list=x_ts_list,
+            y_timestamp_list=y_ts_list,
+            pred_len=pred_bars,
+            T=temperature,
+            top_p=top_p,
+            sample_count=1,
+            verbose=False,
+        )
+
+        for pred_df, future_idx in zip(pred_dfs, future_idxs):
+            pred_df.index = future_idx
+        return pred_dfs
 
     def predict_return(
         self,
@@ -157,19 +216,21 @@ class KronosAdapter:
 
 
 def build_kronos_factor(
-    hdf5_path: str | Path,
+    hdf5_path,
     context_bars: int = 512,
     pred_bars: int = 96,
     stride_bars: int = 96,
     device: Optional[str] = None,
+    batch_size: int = 32,
 ) -> pd.DataFrame:
     """
     Generate the Kronos predicted-return factor for all EUR/USD 1-min bars.
 
     Strategy:
         Every `stride_bars` bars, run Kronos on the previous `context_bars` and
-        predict the next `pred_bars`. The predicted log-return is forward-filled
-        across the predicted window. Default: daily stride (96 bars/day at 1-min).
+        predict the next `pred_bars`. Windows are processed in GPU batches of
+        `batch_size` for full GPU utilization. The predicted log-return is
+        forward-filled across the predicted window.
 
     Returns:
         MultiIndex (datetime, instrument) DataFrame with column "KronosPredReturn".
@@ -178,7 +239,6 @@ def build_kronos_factor(
     logger.info(f"Loading data from {hdf5_path}...")
     raw = pd.read_hdf(hdf5_path, key="data")
 
-    # Flatten to single-instrument 1-min series
     instrument = raw.index.get_level_values("instrument").unique()[0]
     df = raw.xs(instrument, level="instrument")
     ohlcv = _ohlcv_from_predix(df)
@@ -186,26 +246,38 @@ def build_kronos_factor(
     adapter = KronosAdapter(device=device, max_context=min(context_bars, 512))
     adapter.load()
 
-    factor_values: dict[pd.Timestamp, float] = {}
-    n = len(ohlcv)
-    starts = range(context_bars, n, stride_bars)
+    bar_indices = list(range(context_bars, len(ohlcv), stride_bars))
+    n_windows = len(bar_indices)
+    logger.info(
+        f"Running Kronos batch inference: {n_windows} windows "
+        f"(batch={batch_size}, stride={stride_bars}, ctx={context_bars}, pred={pred_bars}, device={device})"
+    )
 
-    logger.info(f"Running Kronos inference: {len(starts)} windows (stride={stride_bars}, ctx={context_bars}, pred={pred_bars})")
-    for i, bar_idx in enumerate(starts):
-        ctx_df = ohlcv.iloc[bar_idx - context_bars:bar_idx]
+    factor_values: dict = {}
+
+    for batch_start in range(0, n_windows, batch_size):
+        batch_idx = bar_indices[batch_start : batch_start + batch_size]
+        windows = [ohlcv.iloc[i - context_bars : i] for i in batch_idx]
+        last_closes = [float(ohlcv["close"].iloc[i - 1]) for i in batch_idx]
+
         try:
-            pred = adapter.predict_next_bars(ctx_df, context_bars=context_bars, pred_bars=pred_bars)
-            last_close = float(ctx_df["close"].iloc[-1])
-            # Store predicted return for each predicted bar's timestamp
-            for ts, row in pred.iterrows():
-                ret = float(row["close"]) / last_close - 1.0
-                factor_values[ts] = ret
+            pred_dfs = adapter.predict_next_bars_batch(windows, pred_bars=pred_bars)
+            for pred_df, last_close in zip(pred_dfs, last_closes):
+                for ts, row in pred_df.iterrows():
+                    factor_values[ts] = float(row["close"]) / last_close - 1.0
         except Exception as e:
-            logger.warning(f"Kronos inference failed at bar {bar_idx}: {e}")
-            continue
+            logger.warning(f"Batch {batch_start // batch_size + 1} failed ({e}), retrying individually...")
+            for bar_idx, win, last_close in zip(batch_idx, windows, last_closes):
+                try:
+                    pred = adapter.predict_next_bars(win, context_bars=context_bars, pred_bars=pred_bars)
+                    for ts, row in pred.iterrows():
+                        factor_values[ts] = float(row["close"]) / last_close - 1.0
+                except Exception as e2:
+                    logger.warning(f"  Single inference failed at bar {bar_idx}: {e2}")
 
-        if (i + 1) % 100 == 0:
-            logger.info(f"  {i+1}/{len(starts)} windows done")
+        done = min(batch_start + batch_size, n_windows)
+        if done % max(batch_size, 100) < batch_size or done == n_windows:
+            logger.info(f"  {done}/{n_windows} windows done")
 
     if not factor_values:
         raise RuntimeError("No Kronos predictions were generated.")
@@ -223,11 +295,12 @@ def build_kronos_factor(
 
 
 def evaluate_kronos_model(
-    hdf5_path: str | Path,
+    hdf5_path,
     context_bars: int = 512,
     pred_bars: int = 30,
     stride_bars: int = 30,
     device: Optional[str] = None,
+    batch_size: int = 32,
 ) -> dict:
     """
     Evaluate Kronos as a standalone model (Option B, alongside LightGBM).
@@ -247,33 +320,52 @@ def evaluate_kronos_model(
     adapter = KronosAdapter(device=device, max_context=min(context_bars, 512))
     adapter.load()
 
+    n = len(ohlcv)
+    bar_indices = list(range(context_bars, n - pred_bars, stride_bars))
+    logger.info(
+        f"Evaluating Kronos: {len(bar_indices)} windows "
+        f"(batch={batch_size}, ctx={context_bars}, pred={pred_bars}, device={device})"
+    )
+
     predicted_returns = []
     actual_returns = []
-    n = len(ohlcv)
 
-    for bar_idx in range(context_bars, n - pred_bars, stride_bars):
-        ctx_df = ohlcv.iloc[bar_idx - context_bars:bar_idx]
+    for batch_start in range(0, len(bar_indices), batch_size):
+        batch_idx = bar_indices[batch_start : batch_start + batch_size]
+        windows = [ohlcv.iloc[i - context_bars : i] for i in batch_idx]
+        last_closes = [float(ohlcv["close"].iloc[i - 1]) for i in batch_idx]
+        actuals = [
+            float(ohlcv["close"].iloc[i + pred_bars - 1]) / float(ohlcv["close"].iloc[i - 1]) - 1.0
+            for i in batch_idx
+        ]
+
         try:
-            pred = adapter.predict_next_bars(ctx_df, context_bars=context_bars, pred_bars=pred_bars)
-            last_close = float(ctx_df["close"].iloc[-1])
-            pred_ret = float(pred["close"].iloc[-1]) / last_close - 1.0
-
-            actual_future = ohlcv.iloc[bar_idx:bar_idx + pred_bars]
-            actual_ret = float(actual_future["close"].iloc[-1]) / last_close - 1.0
-
-            predicted_returns.append(pred_ret)
-            actual_returns.append(actual_ret)
-        except Exception:
-            continue
+            pred_dfs = adapter.predict_next_bars_batch(windows, pred_bars=pred_bars)
+            for pred_df, last_close, actual_ret in zip(pred_dfs, last_closes, actuals):
+                pred_ret = float(pred_df["close"].iloc[-1]) / last_close - 1.0
+                predicted_returns.append(pred_ret)
+                actual_returns.append(actual_ret)
+        except Exception as e:
+            logger.warning(f"Batch {batch_start // batch_size + 1} failed ({e}), retrying individually...")
+            for bar_idx, win, last_close, actual_ret in zip(batch_idx, windows, last_closes, actuals):
+                try:
+                    pred = adapter.predict_next_bars(win, context_bars=context_bars, pred_bars=pred_bars)
+                    pred_ret = float(pred["close"].iloc[-1]) / last_close - 1.0
+                    predicted_returns.append(pred_ret)
+                    actual_returns.append(actual_ret)
+                except Exception:
+                    pass
 
     pred_arr = np.array(predicted_returns)
     actual_arr = np.array(actual_returns)
 
     ic = np.corrcoef(pred_arr, actual_arr)[0, 1] if len(pred_arr) > 1 else float("nan")
-    ic_std = float(np.std([
-        np.corrcoef(pred_arr[i:i+50], actual_arr[i:i+50])[0, 1]
-        for i in range(0, len(pred_arr) - 50, 10)
-    ])) if len(pred_arr) > 60 else float("nan")
+    ic_std = float(
+        np.std([
+            np.corrcoef(pred_arr[i : i + 50], actual_arr[i : i + 50])[0, 1]
+            for i in range(0, len(pred_arr) - 50, 10)
+        ])
+    ) if len(pred_arr) > 60 else float("nan")
     hit_rate = float(np.mean(np.sign(pred_arr) == np.sign(actual_arr)))
 
     return {
@@ -283,3 +375,5 @@ def evaluate_kronos_model(
         "hit_rate": hit_rate,
         "n_predictions": len(pred_arr),
     }
+
+# BATCH_INFERENCE_v2
