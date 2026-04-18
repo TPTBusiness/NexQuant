@@ -854,7 +854,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             # Delegate all metric computation to the single source of truth.
             # Same formulas as every other backtest path in the repo.
             from rdagent.components.backtesting.vbt_backtest import (
-                backtest_signal,
+                backtest_signal_ftmo,
                 DEFAULT_TXN_COST_BPS,
             )
 
@@ -868,11 +868,10 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 close_for_bt = close.reindex(signal.index).ffill()
 
             txn_cost_bps = float(os.getenv("TXN_COST_BPS", DEFAULT_TXN_COST_BPS))
-            bt = backtest_signal(
+            bt = backtest_signal_ftmo(
                 close=close_for_bt,
                 signal=signal,
                 txn_cost_bps=txn_cost_bps,
-                freq="1min",
             )
 
             if bt.get("status") != "success":
@@ -1265,7 +1264,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             signal = local_vars["signal"]
 
             from rdagent.components.backtesting.vbt_backtest import (
-                backtest_signal,
+                backtest_signal_ftmo,
                 DEFAULT_TXN_COST_BPS,
             )
 
@@ -1273,11 +1272,10 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             if close_for_bt is None:
                 return {"sharpe_ratio": float('-inf'), "status": "rejected"}
 
-            bt = backtest_signal(
+            bt = backtest_signal_ftmo(
                 close=close_for_bt,
                 signal=signal,
                 txn_cost_bps=float(os.getenv("TXN_COST_BPS", DEFAULT_TXN_COST_BPS)),
-                freq="1min",
             )
             if bt.get("status") != "success":
                 return {"sharpe_ratio": float('-inf'), "status": "rejected"}
