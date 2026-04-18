@@ -101,11 +101,24 @@ All code in Predix is originally written and implemented independently. Predix e
 
 ## Installation
 
+### System Requirements
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **GPU VRAM** | 8 GB | 16 GB (RTX 4080 / 5060 Ti) |
+| **RAM** | 16 GB | 32 GB |
+| **Storage** | 20 GB | 50 GB (models + data) |
+| **OS** | Linux (Ubuntu 22.04+) | Linux |
+| **CUDA** | 12.0+ | 12.4+ |
+
+> Local LLMs require a CUDA-capable GPU. The default model (Qwen3.6-35B Q3) uses ~13.6 GB VRAM. CPU-only inference is possible but very slow (not recommended for production use).
+
 ### Prerequisites
 
-- **Conda** (Miniconda or Anaconda) - Required for environment management
-- **Docker** (required for sandboxed code execution)
-- **Linux** (officially supported; macOS/Windows may work with adjustments)
+- **Conda** (Miniconda or Anaconda) — required for environment management
+- **Docker** — required for sandboxed factor/model code execution (`docker run hello-world` to verify)
+- **llama.cpp** — for local LLM inference (see [llama.cpp build guide](https://github.com/ggml-org/llama.cpp))
+- **Linux** — officially supported; macOS/Windows may work with adjustments
 
 ### Quick Install
 
@@ -120,14 +133,71 @@ conda activate predix
 
 # Install in editable mode
 pip install -e .
+
+# Verify Docker is accessible
+docker run --rm hello-world
 ```
 
 > **Important:** Predix requires a conda environment to manage dependencies properly.
 > Using plain Python or other environment managers may cause conflicts.
 
-### Configuration
+---
 
-1. **Create `.env` file:**
+## Data Setup
+
+Predix requires **1-minute EUR/USD OHLCV data** in HDF5 format. This is a hard prerequisite — the system cannot run without it.
+
+### Step 1: Get the data
+
+Download 1-minute EUR/USD data (2020–present) from any of these free sources:
+
+| Source | Cost | Notes |
+|--------|------|-------|
+| **[Dukascopy](https://www.dukascopy.com/swiss/english/marketfeed/historical/)** | Free | Best quality free EUR/USD tick data |
+| **[OANDA API](https://developer.oanda.com/)** | Free (demo) | Requires API key, programmatic access |
+| **[TrueFX](https://truefx.com/)** | Free | Institutional-quality tick data |
+| **[Kaggle](https://www.kaggle.com/datasets?search=EURUSD+1min)** | Free | Search "EURUSD 1 minute" |
+| **MetaTrader 5** | Free | Export via `copy_rates_range()` |
+
+### Step 2: Convert to HDF5
+
+```python
+import pandas as pd
+
+df = pd.read_csv('eurusd_1min.csv', parse_dates=['datetime'])
+df = df.rename(columns={'open': '$open', 'close': '$close',
+                        'high': '$high', 'low': '$low', 'volume': '$volume'})
+df['instrument'] = 'EURUSD'
+df = df.set_index(['datetime', 'instrument'])
+for col in ['$open', '$close', '$high', '$low', '$volume']:
+    df[col] = df[col].astype('float32')
+
+import os
+os.makedirs('git_ignore_folder/factor_implementation_source_data', exist_ok=True)
+df.to_hdf('git_ignore_folder/factor_implementation_source_data/intraday_pv.h5', key='data', mode='w')
+```
+
+### Required HDF5 format
+
+| Field | Type | Description |
+|-------|------|-------------|
+| **Index** | MultiIndex `(datetime, instrument)` | Timestamp + currency pair |
+| **`$open`** | float32 | Open price |
+| **`$close`** | float32 | Close price |
+| **`$high`** | float32 | High price |
+| **`$low`** | float32 | Low price |
+| **`$volume`** | float32 | Tick volume |
+
+**Save location:** `git_ignore_folder/factor_implementation_source_data/intraday_pv.h5`
+
+---
+
+## Configuration
+
+### Environment Setup
+
+Create a `.env` file in the project root:
+
 ```bash
 # Local LLM (llama.cpp)
 OPENAI_API_KEY=local
@@ -143,7 +213,8 @@ EMBEDDING_MODEL=nomic-embed-text
 QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
 ```
 
-2. **Start LLM server (llama.cpp):**
+### LLM Server (llama.cpp)
+
 ```bash
 ~/llama.cpp/build/bin/llama-server \
   --model ~/models/qwen3.6/Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf \
@@ -158,56 +229,74 @@ QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
   --reasoning off
 ```
 
-> **Important flags and token budget:**
-> - `--ctx-size 240000 --parallel 2` — allocates **2 slots × 120,000 tokens each**. `fin_quant` prompts can reach 80k+ tokens with full factor history; a smaller slot causes silent overflow and empty/invalid responses.
->
->   **Token budget breakdown per fin_quant request:**
->   | Component | Approx. tokens |
->   |---|---|
->   | System prompt + scenario description | ~3,000 |
->   | `MAX_FACTOR_HISTORY=5` past experiments × ~2,500 | ~12,500 |
->   | RAG context + instructions | ~2,000 |
->   | **Total** | **~17,500** (well within 120k slot) |
->
->   Formula: `ctx_size / parallel` must satisfy `n_ctx_slot > MAX_FACTOR_HISTORY × 2500 + 5000`.
->
-> - `--reasoning off` — **critical**: completely disables Qwen3 chain-of-thought. `--reasoning-budget 0` is not sufficient — it still starts and immediately aborts reasoning, producing empty JSON responses. Only `--reasoning off` prevents this entirely.
+> **Important flags:**
+> - `--ctx-size 240000 --parallel 2` — allocates **2 slots × 120,000 tokens each**. `fin_quant` prompts can reach 80k+ tokens with full factor history; a smaller slot causes silent overflow and empty responses.
+> - `--reasoning off` — **critical**: completely disables Qwen3 chain-of-thought. `--reasoning-budget 0` is not sufficient and produces empty JSON responses.
 > - `--n-gpu-layers 24` — 4 fewer than maximum on RTX 5060 Ti (16 GB), freeing ~500 MB VRAM for the larger KV cache.
 > - `-ctk q4_0 -ctv q4_0` — quantises the KV cache to 4-bit, reducing VRAM from ~5 GB to ~1.3 GB at 240k context.
+
+### Data Configuration
+
+Edit [`data_config.yaml`](data_config.yaml) to customize walk-forward splits:
+
+```yaml
+instrument: EURUSD
+frequency: 1min
+data_path: ~/.qlib/qlib_data/eurusd_1min_data
+
+train_start: "2022-03-14"
+train_end:   "2024-06-30"
+valid_start: "2024-07-01"
+valid_end:   "2024-12-31"
+test_start:  "2025-01-01"
+test_end:    "2026-03-20"
+
+market_context:
+  spread_bps: 1.5
+  target_arr: 9.62
+  max_drawdown: 20
+```
 
 ---
 
 ## Quick Start
 
+### Prerequisites checklist
+
+```bash
+# 1. Docker running?
+docker run --rm hello-world
+
+# 2. Data in place?
+ls git_ignore_folder/factor_implementation_source_data/intraday_pv.h5
+
+# 3. LLM server running?
+curl http://localhost:8081/health
+```
+
 ### 1. Run Trading Loop
 
 ```bash
-# Activate conda environment
 conda activate predix
-
-# Start EURUSD trading loop
 rdagent fin_quant
-
-# With options
+# or with explicit options:
 rdagent fin_quant --loop-n 5 --step-n 2
 ```
 
 ### 2. Monitor Results
 
 ```bash
-# Start the UI dashboard
+# Web dashboard
 rdagent server_ui --port 19899 --log-dir git_ignore_folder/RD-Agent_workspace/
+# then open http://127.0.0.1:19899
 
-# Or open in browser
-# http://127.0.0.1:19899
+# Best strategies so far
+python predix.py best
 ```
 
-### 3. Loop Continuously
-
-To run the trading loop continuously with auto-restart:
+### 3. Run Continuously
 
 ```bash
-# Simple loop
 while true; do
     rdagent fin_quant
     sleep 5
@@ -218,39 +307,26 @@ done
 
 ## CLI Commands
 
-### Trading Loop
+### Factor & Strategy Loop
 
 | Command | Description |
 |---------|-------------|
-| `rdagent fin_quant` | Start factor evolution loop |
-| `rdagent fin_quant --loop-n 5` | Run 5 evolution loops |
+| `rdagent fin_quant` | Start autonomous factor + model evolution loop |
+| `rdagent fin_quant --loop-n 5` | Run exactly 5 evolution loops |
 | `rdagent fin_quant --with-dashboard` | Start with web dashboard |
 | `rdagent fin_quant --cli-dashboard` | Start with CLI Rich dashboard |
-
-### Parallel Execution
-
-| Command | Description |
-|---------|-------------|
-| `python predix_parallel.py --runs 5 --api-keys 1 -m openrouter` | Run 5 parallel factor evolutions |
-| `python predix_parallel.py --runs 20 --api-keys 2 -m openrouter` | Run 20 runs with 2 API keys |
-
-### AI Strategy Generation (with REAL OHLCV Backtest)
-
-| Command | Description |
-|---------|-------------|
-| `python predix_gen_strategies_real_bt.py` | Generate 10 strategies with LLM + real backtest |
-| `python predix_gen_strategies_real_bt.py 20` | Generate 20 strategies |
-| `python predix_gen_strategies_real_bt.py 5` | Generate 5 strategies (faster) |
+| `rdagent fin_factor` | Factor-only evolution |
+| `rdagent fin_model` | Model-only evolution |
 
 ### Strategy Reports
 
 | Command | Description |
 |---------|-------------|
-| `python predix.py best` | Show top strategies by composite score (Sharpe × DD × trade penalty) |
+| `python predix.py best` | Show top strategies by composite score |
 | `python predix.py best -n 20 -m sharpe` | Top 20 by Sharpe ratio |
 | `python predix.py best --show NAME` | Full metadata for one strategy |
-| `python predix_strategy_report.py` | Generate reports for ALL strategies |
-| `python predix_strategy_report.py results/strategies_new/123_MyStrategy.json` | Report for single strategy |
+| `python predix_gen_strategies_real_bt.py` | Generate 10 strategies with LLM + real backtest |
+| `python predix_gen_strategies_real_bt.py 20` | Generate 20 strategies |
 
 ### Factor Evaluation
 
@@ -260,62 +336,21 @@ done
 | `python predix.py top -n 20` | Show top 20 factors by IC |
 | `python predix.py portfolio-simple` | Simple portfolio optimization |
 
-### Other Utilities
+### Parallel Execution
 
 | Command | Description |
 |---------|-------------|
+| `python predix_parallel.py --runs 5 --api-keys 1 -m openrouter` | Run 5 parallel factor evolutions |
+| `python predix_parallel.py --runs 20 --api-keys 2 -m openrouter` | Run 20 runs with 2 API keys |
+
+### Monitoring & Debug
+
+| Command | Description |
+|---------|-------------|
+| `rdagent server_ui --port 19899 --log-dir <path>` | Start web dashboard |
+| `rdagent health_check` | Validate environment setup |
 | `python predix_batch_backtest.py` | Batch backtest multiple factors |
-| `python predix_parallel.py` | Parallel factor evolution |
 | `python predix_rebacktest_strategies.py` | Re-backtest existing strategies |
-| `python debug_backtest.py` | Debug backtest alignment & IC |
-
-### Environment Options
-
-| Env Variable | Description | Example |
-|--------------|-------------|---------|
-| `OPENROUTER_API_KEY` | OpenRouter API key | `sk-or-v1-...` |
-| `OPENAI_API_KEY` | Alternative: OpenAI key | `sk-...` |
-| `CHAT_MODEL` | LLM model | `openrouter/qwen/qwen3.6-plus:free` |
-| `OPENROUTER_MODEL` | Specific OpenRouter model | `openrouter/qwen/qwen3.6-plus:free` |
-| `NO_COLOR` | Disable ANSI colors | `1` |
-
----
-
-## Configuration
-
-### Data Configuration
-
-Edit [`data_config.yaml`](data_config.yaml) to customize:
-
-```yaml
-instrument: EURUSD
-frequency: 1min
-data_path: ~/.qlib/qlib_data/eurusd_1min_data
-
-# Walk-forward split
-train_start: "2022-03-14"
-train_end:   "2024-06-30"
-valid_start: "2024-07-01"
-valid_end:   "2024-12-31"
-test_start:  "2025-01-01"
-test_end:    "2026-03-20"
-
-# Market context for LLM prompts
-market_context:
-  spread_bps: 1.5
-  target_arr: 9.62          # Target annual return (%)
-  max_drawdown: 20          # Max drawdown (%)
-```
-
-### Environment Variables
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `CHAT_MODEL` | LLM for reasoning | `gpt-4o`, `deepseek-chat` |
-| `EMBEDDING_MODEL` | Embedding model | `text-embedding-3-small` |
-| `OPENAI_API_KEY` | API key for OpenAI | `sk-...` |
-| `DEEPSEEK_API_KEY` | API key for DeepSeek | `sk-...` |
-| `DS_LOCAL_DATA_PATH` | Local data directory | `./data` |
 
 ---
 
@@ -367,9 +402,9 @@ Real-time dashboard for monitoring:
 
 Automated quality assurance:
 
-- **60 Integration Tests** - All features tested automatically
-- **Bandit Security Scanner** - Pre-commit security checks
-- **Pre-commit Hooks** - Tests run before EVERY commit
+- **60 Integration Tests** — all features tested automatically on every commit
+- **Bandit Security Scanner** — pre-commit security checks
+- **Weekly Dependency Audit** — automated vulnerability scan via GitHub Actions
 
 ---
 
@@ -382,115 +417,20 @@ predix/
 │   ├── components/          # Reusable agent components
 │   │   ├── backtesting/     # Backtest engine & protections
 │   │   │   ├── backtest_engine.py
+│   │   │   ├── vbt_backtest.py  # Unified backtest engine
 │   │   │   ├── results_db.py
-│   │   │   ├── risk_management.py
-│   │   │   └── protections/ # Trading protection system (NEW)
-│   │   │       ├── base.py
-│   │   │       ├── max_drawdown.py
-│   │   │       ├── cooldown.py
-│   │   │       ├── stoploss_guard.py
-│   │   │       ├── low_performance.py
-│   │   │       └── protection_manager.py
-│   │   ├── coder/           # Factor & model coding
-│   │   └── loader.py        # Prompt & model loaders
+│   │   │   └── protections/ # Trading protection system
+│   │   └── coder/           # Factor & model coding (CoSTEER + Optuna)
 │   ├── core/                # Core abstractions
 │   ├── scenarios/           # Domain-specific scenarios
 │   └── utils/               # Utilities
-├── test/                    # Test suite
-│   ├── integration/         # Integration tests (60 tests)
-│   │   └── test_all_features.py
-│   └── backtesting/         # Unit tests
-│       └── test_protections.py
-├── constraints/             # Constraint definitions
-├── docs/                    # Documentation
+├── test/                    # Test suite (134 tests)
+│   └── backtesting/         # Backtest unit tests
 ├── web/                     # Web UI frontend
-├── data_config.yaml         # Data configuration
+├── data_config.yaml         # Walk-forward split configuration
 ├── pyproject.toml           # Project metadata
 └── requirements.txt         # Dependencies
 ```
-
----
-
-## Data Setup
-
-Predix requires **1-minute EUR/USD OHLCV data** in HDF5 format.
-
-### Required Format
-
-The data file must be saved as `intraday_pv.h5` with the following structure:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| **Index** | MultiIndex `(datetime, instrument)` | Timestamp + currency pair |
-| **`$open`** | float32 | Open price |
-| **`$close`** | float32 | Close price |
-| **`$high`** | float32 | High price |
-| **`$low`** | float32 | Low price |
-| **`$volume`** | float32 | Tick volume |
-
-**Save location:** `git_ignore_folder/factor_implementation_source_data/intraday_pv.h5`
-
-### Where to Get Data
-
-| Source | Cost | Notes |
-|--------|------|-------|
-| **[Dukascopy](https://www.dukascopy.com/swiss/english/marketfeed/historical/)** | Free | Best free EUR/USD tick data |
-| **[OANDA API](https://developer.oanda.com/)** | Free (demo) | Requires API key |
-| **[TrueFX](https://truefx.com/)** | Free | Institutional-quality data |
-| **[Kaggle](https://www.kaggle.com/datasets?search=EURUSD+1min)** | Free | Search "EURUSD 1 minute" |
-| **MetaTrader 5** | Free | Export via `copy_rates_range()` |
-
-### Quick CSV Conversion
-
-```python
-import pandas as pd
-
-df = pd.read_csv('eurusd_1min.csv', parse_dates=['datetime'])
-df = df.rename(columns={'open': '$open', 'close': '$close', 
-                        'high': '$high', 'low': '$low', 'volume': '$volume'})
-df['instrument'] = 'EURUSD'
-df = df.set_index(['datetime', 'instrument'])
-for col in ['$open', '$close', '$high', '$low', '$volume']:
-    df[col] = df[col].astype('float32')
-df.to_hdf('intraday_pv.h5', key='data', mode='w')
-```
-
-Expected data columns: `$open`, `$close`, `$high`, `$low`, `$volume`
-
----
-
-## CLI Commands
-
-| Command | Description |
-|---------|-------------|
-| `rdagent fin_quant` | Full factor & model co-evolution |
-| `rdagent fin_factor` | Factor-only evolution |
-| `rdagent fin_model` | Model-only evolution |
-| `rdagent fin_factor_report --report-folder=<path>` | Extract factors from financial reports |
-| `rdagent general_model <paper-url>` | Extract model from research paper |
-| `rdagent rl_trading --mode train --algorithm PPO` | Train RL trading agent |
-| `rdagent rl_trading --mode backtest --model-path <path>` | Backtest with trained RL model |
-| `rdagent data_science --competition <name>` | Kaggle/data science competition mode |
-| `rdagent ui --port 19899 --log-dir <path>` | Start monitoring dashboard |
-| `rdagent health_check` | Validate environment setup |
-
-### RL Trading Examples
-
-```bash
-# Train new RL agent with PPO
-rdagent rl_trading --mode train --algorithm PPO --total-timesteps 100000
-
-# Backtest with trained model
-rdagent rl_trading --mode backtest --model-path models/rl_trader.zip
-
-# Disable trading protections (not recommended)
-rdagent rl_trading --mode backtest --no-with-protections
-
-# Get help
-rdagent rl_trading --help
-```
-
-**Note:** RL Trading works without `stable-baselines3` (uses simple fallback strategy). For full RL features, install: `pip install -r requirements/rl.txt`
 
 ---
 
