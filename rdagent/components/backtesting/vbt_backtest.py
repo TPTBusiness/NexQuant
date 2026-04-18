@@ -32,9 +32,21 @@ except ImportError:
     VBT_AVAILABLE = False
 
 
-DEFAULT_TXN_COST_BPS = 1.5
+# 2.35 pip realistic EUR/USD cost: 1.5 spread + 0.5 slippage + 0.35 commission
+# At EUR/USD ≈ 1.10:  2.35 pip * (0.0001/1.10) ≈ 2.14 bps of notional.
+DEFAULT_TXN_COST_BPS = 2.14
 DEFAULT_BARS_PER_YEAR = 252 * 1440  # 252 trading days * 1440 min/day = 362,880
 EXTREME_BAR_THRESHOLD = 0.05  # |ret| > 5% on a single 1-min bar → suspicious
+
+# FTMO 100k account rules (enforced in backtest_signal when ftmo=True)
+FTMO_INITIAL_CAPITAL   = 100_000.0
+FTMO_MAX_DAILY_LOSS    = 0.05   # 5%  of initial → block new trades rest of day
+FTMO_MAX_TOTAL_LOSS    = 0.10   # 10% of initial → simulation ends
+# Risk-based position sizing: 0.5% equity risk per trade, 10-pip stop, max 1:30 leverage
+FTMO_RISK_PER_TRADE    = 0.005
+FTMO_STOP_PIPS         = 10
+FTMO_PIP               = 0.0001
+FTMO_MAX_LEVERAGE      = 30
 
 
 def _compute_trade_pnl(position: pd.Series, strategy_returns: pd.Series) -> pd.Series:
@@ -255,6 +267,140 @@ def backtest_signal(
             manual_total_return=total_return,
             freq=freq,
         )
+
+    return result
+
+
+def _apply_ftmo_mask(
+    signal: pd.Series,
+    close: pd.Series,
+    leverage: float,
+    txn_cost_bps: float,
+) -> tuple[pd.Series, dict]:
+    """
+    Apply FTMO daily/total loss rules to a signal series.
+
+    Returns a masked signal (positions zeroed after each limit breach) and
+    a dict of FTMO compliance metrics.
+    """
+    txn_cost = txn_cost_bps / 10_000.0
+    position = signal.shift(1).fillna(0) * leverage
+    bar_ret  = close.pct_change().fillna(0)
+
+    equity   = FTMO_INITIAL_CAPITAL
+    peak_day = FTMO_INITIAL_CAPITAL
+    masked   = signal.copy()
+
+    daily_breaches = 0
+    total_breached = False
+    total_breach_ts: Optional[pd.Timestamp] = None
+    current_day    = None
+    day_start_eq   = FTMO_INITIAL_CAPITAL
+
+    pos_prev = 0.0
+    for ts, sig_i in signal.items():
+        day = ts.date() if hasattr(ts, "date") else ts
+
+        if day != current_day:
+            current_day  = day
+            day_start_eq = equity
+
+        pos_i  = float(signal.at[ts]) * leverage
+        ret_i  = float(bar_ret.get(ts, 0.0))
+        cost_i = abs(pos_i - pos_prev) * txn_cost
+        ret_net = pos_prev * ret_i - cost_i
+        equity  = equity * (1.0 + ret_net / FTMO_INITIAL_CAPITAL * FTMO_INITIAL_CAPITAL / equity
+                            if equity > 0 else 1.0)
+        # Simpler: track as fraction
+        equity += FTMO_INITIAL_CAPITAL * ret_net
+        pos_prev = pos_i
+
+        if total_breached:
+            masked.at[ts] = 0
+            continue
+
+        daily_loss = (equity - day_start_eq) / FTMO_INITIAL_CAPITAL
+        total_loss = (equity - FTMO_INITIAL_CAPITAL) / FTMO_INITIAL_CAPITAL
+
+        if daily_loss < -FTMO_MAX_DAILY_LOSS:
+            daily_breaches += 1
+            day_start_eq = -999  # block rest of day
+            masked.at[ts] = 0
+
+        if total_loss < -FTMO_MAX_TOTAL_LOSS:
+            total_breached = True
+            total_breach_ts = ts
+            masked.at[ts] = 0
+
+    return masked, {
+        "ftmo_daily_breaches": daily_breaches,
+        "ftmo_total_breached": total_breached,
+        "ftmo_total_breach_ts": str(total_breach_ts) if total_breach_ts else None,
+        "ftmo_compliant": not total_breached and daily_breaches == 0,
+    }
+
+
+def backtest_signal_ftmo(
+    close: pd.Series,
+    signal: pd.Series,
+    txn_cost_bps: float = DEFAULT_TXN_COST_BPS,
+    eurusd_price: float = 1.10,
+    risk_pct: float = FTMO_RISK_PER_TRADE,
+    stop_pips: float = FTMO_STOP_PIPS,
+    max_leverage: float = FTMO_MAX_LEVERAGE,
+    bars_per_year: int = DEFAULT_BARS_PER_YEAR,
+    forward_returns: Optional[pd.Series] = None,
+) -> Dict[str, Any]:
+    """
+    FTMO-compliant backtest of a strategy signal on EUR/USD.
+
+    Applies on top of ``backtest_signal``:
+      - Realistic costs: default 2.14 bps (≈ 2.35 pip spread+slippage+commission)
+      - Risk-based position sizing: risk_pct equity per trade, stop_pips hard stop
+      - Max leverage cap: max_leverage (default 1:30, FTMO standard)
+      - FTMO daily loss limit (5%): positions zeroed rest of day after breach
+      - FTMO total loss limit (10%): all positions zeroed after breach
+      - FTMO-specific metrics added to result dict
+
+    Parameters
+    ----------
+    close : pd.Series
+        1-min EUR/USD close prices.
+    signal : pd.Series
+        Raw strategy signal in {-1, 0, +1}.
+    txn_cost_bps : float
+        Transaction cost in bps (default 2.14 ≈ 2.35 pip on EUR/USD).
+    eurusd_price : float
+        Representative EUR/USD price for pip→bps conversion (default 1.10).
+    risk_pct : float
+        Fraction of equity risked per trade (default 0.005 = 0.5%).
+    stop_pips : float
+        Hard stop-loss distance in pips (default 10).
+    max_leverage : float
+        Maximum leverage (default 30 = FTMO 1:30).
+    """
+    stop_price = stop_pips * FTMO_PIP
+    leverage_by_risk = risk_pct / (stop_price / eurusd_price)
+    leverage = min(leverage_by_risk, max_leverage)
+
+    masked_signal, ftmo_metrics = _apply_ftmo_mask(signal, close, leverage, txn_cost_bps)
+
+    result = backtest_signal(
+        close=close,
+        signal=masked_signal,
+        txn_cost_bps=txn_cost_bps,
+        bars_per_year=bars_per_year,
+        forward_returns=forward_returns,
+    )
+
+    result.update(ftmo_metrics)
+    result["ftmo_leverage"] = round(leverage, 2)
+    result["ftmo_risk_pct"] = risk_pct
+    result["ftmo_stop_pips"] = stop_pips
+
+    # Re-scale reported equity metrics to FTMO_INITIAL_CAPITAL
+    result["ftmo_end_equity"] = FTMO_INITIAL_CAPITAL * (1 + result.get("total_return", 0))
+    result["ftmo_monthly_profit"] = FTMO_INITIAL_CAPITAL * result.get("monthly_return", 0)
 
     return result
 
