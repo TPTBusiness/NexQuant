@@ -1,0 +1,78 @@
+name: Conventional Commits
+
+on:
+  pull_request:
+    branches: [master, main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title follows Conventional Commits
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "PR title: $PR_TITLE"
+
+          # Conventional Commits pattern: type(scope)!: description
+          # Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+          PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?(!)?: .{1,100}$'
+
+          if echo "$PR_TITLE" | grep -qE "$PATTERN"; then
+            echo "✓ PR title follows Conventional Commits format"
+          else
+            echo "::error::PR title does not follow Conventional Commits format."
+            echo ""
+            echo "Expected format:  type(scope): description"
+            echo "Examples:"
+            echo "  feat: add volatility factor"
+            echo "  fix(optuna): fix inverted range in stage 2"
+            echo "  ci: add dependabot config"
+            echo "  chore(deps): pin aiohttp>=3.13.4"
+            echo ""
+            echo "Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+            echo ""
+            echo "This is required for release-please to generate correct changelogs."
+            exit 1
+          fi
+
+  check-commits:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commits in PR follow Conventional Commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?(!)?: .+'
+
+          FAILED=0
+          while IFS= read -r msg; do
+            # Skip merge commits
+            if echo "$msg" | grep -qE "^Merge (pull request|branch|remote)"; then
+              continue
+            fi
+            if ! echo "$msg" | grep -qE "$PATTERN"; then
+              echo "::warning::Non-conventional commit: $msg"
+              FAILED=1
+            fi
+          done < <(git log "$BASE_SHA..$HEAD_SHA" --format="%s")
+
+          if [ $FAILED -eq 1 ]; then
+            echo ""
+            echo "::warning::Some commits don't follow Conventional Commits."
+            echo "This won't block the PR but may affect changelog generation."
+          else
+            echo "✓ All commits follow Conventional Commits format"
+          fi
