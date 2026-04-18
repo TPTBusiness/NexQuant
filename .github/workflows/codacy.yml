@@ -50,6 +50,9 @@ jobs:
           format: sarif
           gh-code-scanning-compat: true
           max-allowed-issues: 2147483647
+          # Limit to bandit only — avoids ESLint (no .eslintrc), PMD (no ruleset),
+          # and pylint 14k-result SARIF crash (IndexOutOfBoundsException Sarif.scala:185)
+          tool: bandit
 
       # Upload the SARIF file generated in the previous step
       - name: Upload SARIF results file
