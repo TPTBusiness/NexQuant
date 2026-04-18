@@ -68,7 +68,7 @@ else:
     STYLE_EMOJI = '📈 Swing'
     STYLE_DESC = 'medium-term intraday'
 
-TXN_COST_BPS = float(os.getenv('TXN_COST_BPS', '1.0'))
+TXN_COST_BPS = float(os.getenv('TXN_COST_BPS', '2.14'))  # 2.35 pip realistic EUR/USD costs
 
 console = Console()
 
@@ -276,24 +276,21 @@ signal.fillna(0).to_pickle('signal.pkl')
         except Exception as e:
             return {'status': 'failed', 'reason': str(e)[:200]}
 
-    # Main process: unified backtest (identical formulas everywhere).
-    from rdagent.components.backtesting.vbt_backtest import backtest_signal
+    # Main process: FTMO-realistic backtest (leverage + daily/total loss limits).
+    from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
 
     common = close.index.intersection(signal.index)
     if len(common) < 100:
         return {'status': 'failed', 'reason': f'Not enough aligned data ({len(common)} bars)'}
 
-    close_a = close.loc[common]
+    close_a  = close.loc[common]
     signal_a = signal.reindex(common).fillna(0)
-
-    # Forward returns at the configured horizon feed IC computation.
     fwd_returns = close_a.pct_change(FORWARD_BARS).shift(-FORWARD_BARS)
 
-    return backtest_signal(
+    return backtest_signal_ftmo(
         close=close_a,
         signal=signal_a,
         txn_cost_bps=TXN_COST_BPS,
-        freq='1min',
         forward_returns=fwd_returns,
     )
 
