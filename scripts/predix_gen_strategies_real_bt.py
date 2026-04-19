@@ -371,6 +371,8 @@ signal.fillna(0).to_pickle('signal.pkl')
         txn_cost_bps=TXN_COST_BPS,
         forward_returns=fwd_returns,
         oos_start=OOS_START_DEFAULT,
+        wf_rolling=True,
+        mc_n_permutations=200,
     )
 
 # ============================================================================
@@ -567,9 +569,18 @@ def main(target_count=10):
                     progress.update(task, advance=1)
                     continue
 
-                # Check acceptance criteria — OOS must be profitable (primary filter)
+                # Monte Carlo p-value (edge significance)
+                mc_pvalue = bt_result.get('mc_pvalue')
+
+                # Rolling walk-forward metrics
+                wf_consistency = bt_result.get('wf_oos_consistency')
+                wf_sharpe_mean = bt_result.get('wf_oos_sharpe_mean')
+
+                # Check acceptance criteria — OOS must be profitable + statistically significant
+                mc_ok = mc_pvalue is None or mc_pvalue < 0.20  # lenient: top 20% non-random
+                wf_ok = wf_consistency is None or wf_consistency >= 0.5  # ≥50% of WF windows profitable
                 if (abs(ic) > MIN_IC and sharpe > MIN_SHARPE and trades > MIN_TRADES and dd > MAX_DRAWDOWN
-                        and oos_sharpe > 0.0 and oos_monthly > 0.0):
+                        and oos_sharpe > 0.0 and oos_monthly > 0.0 and mc_ok and wf_ok):
                     # ACCEPT
                     strategy['real_backtest'] = bt_result
                     strategy['metrics'] = bt_result
@@ -583,7 +594,7 @@ def main(target_count=10):
                         'ohlcv_only': OHLCV_ONLY,
                         'engine': 'ftmo_v2',
                         'txn_cost_bps': TXN_COST_BPS,
-                        # Walk-forward OOS metrics
+                        # Walk-forward OOS split
                         'oos_sharpe': bt_result.get('oos_sharpe'),
                         'oos_monthly_return_pct': bt_result.get('oos_monthly_return_pct'),
                         'oos_max_drawdown': bt_result.get('oos_max_drawdown'),
@@ -592,6 +603,15 @@ def main(target_count=10):
                         'is_sharpe': bt_result.get('is_sharpe'),
                         'is_monthly_return_pct': bt_result.get('is_monthly_return_pct'),
                         'oos_start': bt_result.get('oos_start'),
+                        # Rolling walk-forward
+                        'wf_n_windows': bt_result.get('wf_n_windows'),
+                        'wf_oos_sharpe_mean': wf_sharpe_mean,
+                        'wf_oos_sharpe_std': bt_result.get('wf_oos_sharpe_std'),
+                        'wf_oos_monthly_return_mean': bt_result.get('wf_oos_monthly_return_mean'),
+                        'wf_oos_consistency': wf_consistency,
+                        # Monte Carlo significance
+                        'mc_pvalue': mc_pvalue,
+                        'mc_n_permutations': bt_result.get('mc_n_permutations'),
                     }
                     
                     fname = f"{int(time.time())}_{strategy['strategy_name']}.json"
@@ -614,12 +634,16 @@ def main(target_count=10):
                                           f"IC={ic:.4f}, Sharpe={sharpe:.3f}, Trades={trades}, DD={dd:.1%}")
                 else:
                     oos_info = f"OOS_Sharpe={oos_sharpe:+.2f} OOS_Mon={oos_monthly:+.2f}%" if oos_sharpe is not None else ""
-                    _log.info(f"REJECTED  IC={ic:.4f}  Sharpe={sharpe:.2f}  Trades={trades}  DD={dd:.1%}  {oos_info}")
+                    mc_info  = f" MC_p={mc_pvalue:.2f}" if mc_pvalue is not None else ""
+                    wf_info  = f" WF_consistency={wf_consistency:.0%}" if wf_consistency is not None else ""
+                    _log.info(f"REJECTED  IC={ic:.4f}  Sharpe={sharpe:.2f}  Trades={trades}  DD={dd:.1%}  {oos_info}{mc_info}{wf_info}")
                     feedback_history.append(
                         f"Failed: IC={ic:.4f}, Sharpe={sharpe:.2f}, Trades={trades}, DD={dd:.1%}, "
-                        f"OOS_Sharpe={oos_sharpe:+.2f}, OOS_Monthly={oos_monthly:+.2f}%. "
-                        f"Need |IC|>{MIN_IC}, Sharpe>{MIN_SHARPE}, Trades>{MIN_TRADES}, "
-                        f"OOS_Sharpe>0 AND OOS_Monthly>0 — strategy must generalise to unseen data (2024+)."
+                        f"OOS_Sharpe={oos_sharpe:+.2f}, OOS_Monthly={oos_monthly:+.2f}%"
+                        + (f", MC_p={mc_pvalue:.2f}" if mc_pvalue is not None else "")
+                        + (f", WF_consistency={wf_consistency:.0%}" if wf_consistency is not None else "")
+                        + f". Need |IC|>{MIN_IC}, Sharpe>{MIN_SHARPE}, Trades>{MIN_TRADES}, "
+                        f"OOS_Sharpe>0, OOS_Monthly>0, MC_p<0.20, WF_consistency≥50%."
                     )
             
             progress.update(task, advance=1)

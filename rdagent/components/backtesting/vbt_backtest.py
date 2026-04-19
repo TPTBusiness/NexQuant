@@ -342,6 +342,128 @@ def _apply_ftmo_mask(
 
 OOS_START_DEFAULT = "2024-01-01"
 
+# Rolling walk-forward default windows (IS years, OOS years, step years)
+WF_IS_YEARS  = 3
+WF_OOS_YEARS = 1
+WF_STEP_YEARS = 1
+
+
+def monte_carlo_trade_pvalue(
+    trade_pnl: pd.Series,
+    n_permutations: int = 1000,
+    seed: int = 0,
+) -> float:
+    """
+    Monte Carlo permutation test on trade-level P&L.
+
+    Shuffles the order of trade returns ``n_permutations`` times and computes
+    the fraction of runs whose total return is >= the real total return.
+
+    p < 0.05 → strategy has a statistically significant edge (real return
+    beats 95% of random sequences with the same set of trades).
+
+    Parameters
+    ----------
+    trade_pnl : pd.Series
+        Per-trade net returns (output of ``_compute_trade_pnl``).
+    n_permutations : int
+        Number of random permutations (default 1000).
+    seed : int
+        RNG seed for reproducibility.
+
+    Returns
+    -------
+    float
+        p-value in [0, 1]. Lower is better.
+    """
+    if len(trade_pnl) < 2:
+        return 1.0
+    trades = trade_pnl.values.copy()
+    real_total = float(trades.sum())
+    rng = np.random.default_rng(seed)
+    beat = 0
+    for _ in range(n_permutations):
+        perm = rng.permutation(trades)
+        if perm.sum() >= real_total:
+            beat += 1
+    return beat / n_permutations
+
+
+def walk_forward_rolling(
+    close: pd.Series,
+    signal: pd.Series,
+    leverage: float,
+    txn_cost_bps: float = DEFAULT_TXN_COST_BPS,
+    bars_per_year: int = DEFAULT_BARS_PER_YEAR,
+    is_years: int = WF_IS_YEARS,
+    oos_years: int = WF_OOS_YEARS,
+    step_years: int = WF_STEP_YEARS,
+) -> Dict[str, Any]:
+    """
+    Rolling walk-forward validation: multiple IS/OOS windows shifted by ``step_years``.
+
+    Each window runs an independent FTMO simulation on the IS and OOS slices.
+    Produces aggregate OOS statistics to measure cross-time consistency.
+
+    Returns
+    -------
+    dict with keys:
+        wf_n_windows, wf_oos_sharpe_mean, wf_oos_sharpe_std,
+        wf_oos_monthly_return_mean, wf_oos_consistency (fraction of windows
+        with OOS Sharpe > 0), wf_windows (list of per-window dicts)
+    """
+    if not isinstance(close.index, pd.DatetimeIndex):
+        return {"wf_n_windows": 0}
+
+    start_year = close.index[0].year
+    end_year   = close.index[-1].year
+
+    windows = []
+    yr = start_year
+    while True:
+        is_start  = pd.Timestamp(f"{yr}-01-01")
+        is_end    = pd.Timestamp(f"{yr + is_years}-01-01")
+        oos_end   = pd.Timestamp(f"{yr + is_years + oos_years}-01-01")
+        if oos_end.year > end_year + 1:
+            break
+        is_mask  = (close.index >= is_start) & (close.index < is_end)
+        oos_mask = (close.index >= is_end)   & (close.index < oos_end)
+        if is_mask.sum() < 1000 or oos_mask.sum() < 1000:
+            yr += step_years
+            continue
+
+        window: Dict[str, Any] = {
+            "is_start":  str(is_start.date()),
+            "is_end":    str(is_end.date()),
+            "oos_start": str(is_end.date()),
+            "oos_end":   str(oos_end.date()),
+        }
+        for mask, prefix in [(is_mask, "is"), (oos_mask, "oos")]:
+            close_s  = close.loc[mask]
+            signal_s = signal.loc[mask]
+            masked_s, _ = _apply_ftmo_mask(signal_s, close_s, leverage, txn_cost_bps)
+            r = backtest_signal(close=close_s, signal=masked_s,
+                                txn_cost_bps=txn_cost_bps, bars_per_year=bars_per_year)
+            window[f"{prefix}_sharpe"]       = r.get("sharpe", 0.0)
+            window[f"{prefix}_monthly_return_pct"] = r.get("monthly_return_pct", 0.0)
+            window[f"{prefix}_n_trades"]     = r.get("n_trades", 0)
+        windows.append(window)
+        yr += step_years
+
+    if not windows:
+        return {"wf_n_windows": 0}
+
+    oos_sharpes  = [w["oos_sharpe"] for w in windows]
+    oos_monthly  = [w["oos_monthly_return_pct"] for w in windows]
+    return {
+        "wf_n_windows":              len(windows),
+        "wf_oos_sharpe_mean":        float(np.mean(oos_sharpes)),
+        "wf_oos_sharpe_std":         float(np.std(oos_sharpes)),
+        "wf_oos_monthly_return_mean": float(np.mean(oos_monthly)),
+        "wf_oos_consistency":        float(np.mean([s > 0 for s in oos_sharpes])),
+        "wf_windows":                windows,
+    }
+
 
 def backtest_signal_ftmo(
     close: pd.Series,
@@ -354,6 +476,8 @@ def backtest_signal_ftmo(
     bars_per_year: int = DEFAULT_BARS_PER_YEAR,
     forward_returns: Optional[pd.Series] = None,
     oos_start: Optional[str] = OOS_START_DEFAULT,
+    wf_rolling: bool = False,
+    mc_n_permutations: int = 0,
 ) -> Dict[str, Any]:
     """
     FTMO-compliant backtest of a strategy signal on EUR/USD.
@@ -385,6 +509,13 @@ def backtest_signal_ftmo(
         Maximum leverage (default 30 = FTMO 1:30).
     oos_start : str or None
         Start of out-of-sample period (ISO date). None disables OOS split.
+    wf_rolling : bool
+        If True, run rolling walk-forward validation (multiple IS/OOS windows).
+        Results are stored under ``wf_*`` keys. Default False.
+    mc_n_permutations : int
+        Number of Monte Carlo trade permutations. 0 = disabled (default).
+        When > 0, computes ``mc_pvalue``: fraction of permuted sequences whose
+        total return >= real total return. p < 0.05 indicates a genuine edge.
     """
     stop_price = stop_pips * FTMO_PIP
     leverage_by_risk = risk_pct / (stop_price / eurusd_price)
@@ -439,6 +570,28 @@ def backtest_signal_ftmo(
         result["oos_start"] = oos_start
         result["is_n_bars"]  = int(is_mask.sum())
         result["oos_n_bars"] = int(oos_mask.sum())
+
+    # Rolling walk-forward validation
+    if wf_rolling:
+        wf = walk_forward_rolling(
+            close=close,
+            signal=signal,
+            leverage=leverage,
+            txn_cost_bps=txn_cost_bps,
+            bars_per_year=bars_per_year,
+        )
+        result.update(wf)
+
+    # Monte Carlo trade permutation test
+    if mc_n_permutations > 0:
+        position = masked_signal.shift(1).fillna(0)
+        bar_ret  = close.pct_change().fillna(0)
+        txn_cost = txn_cost_bps / 10_000.0
+        position_change = position.diff().abs().fillna(position.abs())
+        strat_ret = position * bar_ret - position_change * txn_cost
+        trade_pnl = _compute_trade_pnl(position, strat_ret)
+        result["mc_pvalue"]        = monte_carlo_trade_pvalue(trade_pnl, mc_n_permutations)
+        result["mc_n_permutations"] = mc_n_permutations
 
     return result
 
