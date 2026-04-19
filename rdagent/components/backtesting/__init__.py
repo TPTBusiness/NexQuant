@@ -10,6 +10,7 @@ from .vbt_backtest import (
     FTMO_MAX_TOTAL_LOSS,
     FTMO_MAX_LEVERAGE,
     FTMO_RISK_PER_TRADE,
+    OOS_START_DEFAULT,
     backtest_from_forward_returns,
     backtest_signal,
     backtest_signal_ftmo,
@@ -21,5 +22,5 @@ __all__ = [
     'backtest_signal', 'backtest_signal_ftmo', 'backtest_from_forward_returns',
     'DEFAULT_BARS_PER_YEAR', 'DEFAULT_TXN_COST_BPS',
     'FTMO_INITIAL_CAPITAL', 'FTMO_MAX_DAILY_LOSS', 'FTMO_MAX_TOTAL_LOSS',
-    'FTMO_MAX_LEVERAGE', 'FTMO_RISK_PER_TRADE',
+    'FTMO_MAX_LEVERAGE', 'FTMO_RISK_PER_TRADE', 'OOS_START_DEFAULT',
 ]
