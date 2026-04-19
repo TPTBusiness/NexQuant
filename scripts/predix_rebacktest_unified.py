@@ -188,6 +188,8 @@ def rebacktest_one(
         close=close_a,
         signal=signal,
         txn_cost_bps=txn_cost_bps,
+        wf_rolling=True,
+        mc_n_permutations=200,
     )
     result["status_detail"] = result.pop("status")
     result["status"] = "ok"
@@ -264,6 +266,15 @@ def main() -> None:
                     "oos_win_rate": bt.get("oos_win_rate"),
                     "oos_n_trades": bt.get("oos_n_trades"),
                     "oos_start": bt.get("oos_start"),
+                    # Rolling walk-forward
+                    "wf_n_windows": bt.get("wf_n_windows"),
+                    "wf_oos_sharpe_mean": bt.get("wf_oos_sharpe_mean"),
+                    "wf_oos_sharpe_std": bt.get("wf_oos_sharpe_std"),
+                    "wf_oos_monthly_return_mean": bt.get("wf_oos_monthly_return_mean"),
+                    "wf_oos_consistency": bt.get("wf_oos_consistency"),
+                    # Monte Carlo significance
+                    "mc_pvalue": bt.get("mc_pvalue"),
+                    "mc_n_permutations": bt.get("mc_n_permutations"),
                 }
                 data["sharpe_ratio"] = bt.get("sharpe")
                 data["max_drawdown"] = bt.get("max_drawdown")
@@ -299,6 +310,12 @@ def main() -> None:
                 "oos_monthly_pct": bt.get("oos_monthly_return_pct"),
                 "oos_dd": bt.get("oos_max_drawdown"),
                 "oos_trades": bt.get("oos_n_trades"),
+                # Rolling walk-forward
+                "wf_n_windows": bt.get("wf_n_windows"),
+                "wf_oos_sharpe_mean": bt.get("wf_oos_sharpe_mean"),
+                "wf_oos_consistency": bt.get("wf_oos_consistency"),
+                # Monte Carlo
+                "mc_pvalue": bt.get("mc_pvalue"),
             }
             if "annualized_return" in bt:
                 row["new_annual_return_cagr"] = bt["annualized_return"]
