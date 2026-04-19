@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.3.0](https://github.com/TPTBusiness/Predix/compare/v2.2.0...v2.3.0) (2026-04-19)
+
+
+### Features
+
+* **backtest:** add FTMO-realistic backtest mode with leverage, daily/total loss limits and realistic EUR/USD costs ([f6f9f87](https://github.com/TPTBusiness/Predix/commit/f6f9f871f28579e8a5f7e57799f28fd6ad9b3214))
+* **backtest:** add walk-forward OOS validation to backtest_signal_ftmo ([1147971](https://github.com/TPTBusiness/Predix/commit/1147971540dd295ecc9872d8ee284ec17298be9d))
+* **backtest:** use backtest_signal_ftmo in strategy orchestrator and optuna optimizer ([2e223a3](https://github.com/TPTBusiness/Predix/commit/2e223a3e2e8dcbbf66925425f0b2396ea2e79e22))
+* **scripts:** add full file logging to strategy generation and rebacktest scripts ([8d810bc](https://github.com/TPTBusiness/Predix/commit/8d810bcd6892657a95397efb54015dd907ace29f))
+* **strategies:** make OOS validation mandatory in strategy generator ([bb32a6b](https://github.com/TPTBusiness/Predix/commit/bb32a6be507de3c94ce6a398d6c6802ce36c19dc))
+
+
+### Documentation
+
+* **claude:** add release cadence policy — manual on request, patch bumps ([bbc89e1](https://github.com/TPTBusiness/Predix/commit/bbc89e1e9ece4954f45ebdd76be10008990d3b5d))
+
 ## [2.2.0](https://github.com/TPTBusiness/Predix/compare/v2.1.0...v2.2.0) (2026-04-18)
 
 
