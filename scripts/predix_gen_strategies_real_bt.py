@@ -364,11 +364,13 @@ signal.fillna(0).to_pickle('signal.pkl')
     signal_a = signal.reindex(common).fillna(0)
     fwd_returns = close_a.pct_change(FORWARD_BARS).shift(-FORWARD_BARS)
 
+    from rdagent.components.backtesting.vbt_backtest import OOS_START_DEFAULT
     return backtest_signal_ftmo(
         close=close_a,
         signal=signal_a,
         txn_cost_bps=TXN_COST_BPS,
         forward_returns=fwd_returns,
+        oos_start=OOS_START_DEFAULT,
     )
 
 # ============================================================================
@@ -553,12 +555,19 @@ def main(target_count=10):
                         dd = bt_result.get('max_drawdown', 0)
                         _log.info(f"TUNED   Sharpe={sharpe:.2f}  Trades={trades}")
 
-                # OOS metrics for acceptance (primary filter — avoids overfitting)
-                oos_sharpe = bt_result.get('oos_sharpe', sharpe)
-                oos_monthly = bt_result.get('oos_monthly_return_pct', bt_result.get('monthly_return_pct', 0))
-                oos_trades  = bt_result.get('oos_n_trades', trades)
+                # OOS metrics — mandatory, no fallback to IS values
+                oos_sharpe  = bt_result.get('oos_sharpe')
+                oos_monthly = bt_result.get('oos_monthly_return_pct')
+                oos_trades  = bt_result.get('oos_n_trades', 0)
 
-                # Check acceptance criteria — OOS must be profitable
+                # Reject if OOS data is missing (strategy trained on data without OOS period)
+                if oos_sharpe is None or oos_monthly is None:
+                    _log.info(f"REJECTED  no OOS data (data ends before {OOS_START_DEFAULT}?)")
+                    feedback_history.append(f"Rejected: no out-of-sample data after {OOS_START_DEFAULT}.")
+                    progress.update(task, advance=1)
+                    continue
+
+                # Check acceptance criteria — OOS must be profitable (primary filter)
                 if (abs(ic) > MIN_IC and sharpe > MIN_SHARPE and trades > MIN_TRADES and dd > MAX_DRAWDOWN
                         and oos_sharpe > 0.0 and oos_monthly > 0.0):
                     # ACCEPT
@@ -604,8 +613,14 @@ def main(target_count=10):
                     progress.console.print(f"[green]✓ Strategy #{len(accepted)}:[/green] {strategy['strategy_name']} "
                                           f"IC={ic:.4f}, Sharpe={sharpe:.3f}, Trades={trades}, DD={dd:.1%}")
                 else:
-                    _log.info(f"REJECTED  IC={ic:.4f}  Sharpe={sharpe:.2f}  Trades={trades}  DD={dd:.1%}")
-                    feedback_history.append(f"Failed: IC={ic:.4f}, Sharpe={sharpe:.2f}, Trades={trades}, DD={dd:.1%}. Need |IC|>{MIN_IC}, Sharpe>{MIN_SHARPE}, Trades>{MIN_TRADES}")
+                    oos_info = f"OOS_Sharpe={oos_sharpe:+.2f} OOS_Mon={oos_monthly:+.2f}%" if oos_sharpe is not None else ""
+                    _log.info(f"REJECTED  IC={ic:.4f}  Sharpe={sharpe:.2f}  Trades={trades}  DD={dd:.1%}  {oos_info}")
+                    feedback_history.append(
+                        f"Failed: IC={ic:.4f}, Sharpe={sharpe:.2f}, Trades={trades}, DD={dd:.1%}, "
+                        f"OOS_Sharpe={oos_sharpe:+.2f}, OOS_Monthly={oos_monthly:+.2f}%. "
+                        f"Need |IC|>{MIN_IC}, Sharpe>{MIN_SHARPE}, Trades>{MIN_TRADES}, "
+                        f"OOS_Sharpe>0 AND OOS_Monthly>0 — strategy must generalise to unseen data (2024+)."
+                    )
             
             progress.update(task, advance=1)
     
