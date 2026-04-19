@@ -19,6 +19,8 @@ from rdagent.components.backtesting.vbt_backtest import (
     backtest_signal_ftmo,
     FTMO_MAX_DAILY_LOSS,
     FTMO_MAX_TOTAL_LOSS,
+    monte_carlo_trade_pvalue,
+    walk_forward_rolling,
 )
 
 
@@ -188,3 +190,51 @@ def test_ftmo_result_has_equity_and_profit(close_2yr):
     assert "ftmo_end_equity" in r
     assert "ftmo_monthly_profit" in r
     assert r["ftmo_end_equity"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Monte Carlo trade permutation tests
+# ---------------------------------------------------------------------------
+def test_mc_pvalue_in_result(close_2yr):
+    signal = _random_signal(close_2yr.index)
+    r = backtest_signal_ftmo(close_2yr, signal, oos_start=None, mc_n_permutations=50)
+    assert "mc_pvalue" in r
+    assert 0.0 <= r["mc_pvalue"] <= 1.0
+    assert r["mc_n_permutations"] == 50
+
+
+def test_mc_pvalue_disabled_by_default(close_2yr):
+    signal = _random_signal(close_2yr.index)
+    r = backtest_signal_ftmo(close_2yr, signal, oos_start=None)
+    assert "mc_pvalue" not in r
+
+
+def test_mc_zero_trades_returns_one(close_2yr):
+    """Zero-signal → no trades → p-value must be 1.0 (no edge)."""
+    trade_pnl = pd.Series([], dtype=float)
+    assert monte_carlo_trade_pvalue(trade_pnl, n_permutations=10) == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Rolling walk-forward tests
+# ---------------------------------------------------------------------------
+def test_wf_rolling_keys_in_result(close_6yr):
+    signal = _random_signal(close_6yr.index)
+    r = backtest_signal_ftmo(close_6yr, signal, oos_start="2024-01-01", wf_rolling=True)
+    # With only ~150 days of data, windows may be 0 — just check key presence
+    assert "wf_n_windows" in r
+
+
+def test_wf_rolling_disabled_by_default(close_6yr):
+    signal = _random_signal(close_6yr.index)
+    r = backtest_signal_ftmo(close_6yr, signal, oos_start="2024-01-01")
+    assert "wf_n_windows" not in r
+
+
+def test_wf_consistency_range(close_6yr):
+    """wf_oos_consistency must be in [0, 1] when windows exist."""
+    signal = _random_signal(close_6yr.index)
+    r = backtest_signal_ftmo(close_6yr, signal, oos_start="2024-01-01", wf_rolling=True)
+    c = r.get("wf_oos_consistency")
+    if c is not None:
+        assert 0.0 <= c <= 1.0
