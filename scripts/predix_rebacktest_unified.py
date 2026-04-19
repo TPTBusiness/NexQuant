@@ -204,6 +204,8 @@ def main() -> None:
                         help="Write a CSV report to this path")
     parser.add_argument("--txn-cost-bps", type=float, default=2.14,
                         help="Transaction cost bps (default 2.14 ≈ 2.35 pip EUR/USD)")
+    parser.add_argument("--write-back", action="store_true",
+                        help="Overwrite summary field in strategy JSON files with new results")
     args = parser.parse_args()
 
     console.print(f"[dim]Log: {_log_file_path}[/dim]")
@@ -238,6 +240,42 @@ def main() -> None:
 
             bt = rebacktest_one(data, close, args.txn_cost_bps)
 
+            if args.write_back and bt.get("status") == "ok":
+                data["summary"] = {
+                    "sharpe": bt.get("sharpe"),
+                    "max_drawdown": bt.get("max_drawdown"),
+                    "win_rate": bt.get("win_rate"),
+                    "monthly_return_pct": bt.get("monthly_return_pct"),
+                    "real_ic": data.get("summary", {}).get("real_ic"),
+                    "real_n_trades": bt.get("n_trades"),
+                    "total_return": bt.get("total_return"),
+                    "annualized_return": bt.get("annualized_return"),
+                    "ftmo_daily_loss_hit": bt.get("ftmo_daily_loss_hit"),
+                    "ftmo_total_loss_hit": bt.get("ftmo_total_loss_hit"),
+                    "trading_style": data.get("summary", {}).get("trading_style"),
+                    "engine": "ftmo_v2",
+                    "txn_cost_bps": args.txn_cost_bps,
+                    # Walk-forward OOS
+                    "is_sharpe": bt.get("is_sharpe"),
+                    "is_monthly_return_pct": bt.get("is_monthly_return_pct"),
+                    "oos_sharpe": bt.get("oos_sharpe"),
+                    "oos_monthly_return_pct": bt.get("oos_monthly_return_pct"),
+                    "oos_max_drawdown": bt.get("oos_max_drawdown"),
+                    "oos_win_rate": bt.get("oos_win_rate"),
+                    "oos_n_trades": bt.get("oos_n_trades"),
+                    "oos_start": bt.get("oos_start"),
+                }
+                data["sharpe_ratio"] = bt.get("sharpe")
+                data["max_drawdown"] = bt.get("max_drawdown")
+                data["win_rate"] = bt.get("win_rate")
+                data["total_return"] = bt.get("total_return")
+                data["reevaluation_status"] = "ftmo_v2"
+                try:
+                    import json as _json
+                    f.write_text(_json.dumps(data, indent=2, ensure_ascii=False))
+                except Exception as _e:
+                    logging.warning(f"write-back failed for {f.name}: {_e}")
+
             row = {
                 "file": f.name,
                 "name": name,
@@ -251,10 +289,17 @@ def main() -> None:
                 "new_dd": bt.get("max_drawdown"),
                 "new_trades": bt.get("n_trades"),
                 "new_total_return": bt.get("total_return"),
+                "new_monthly_pct": bt.get("monthly_return_pct"),
                 "new_annual_return_cagr": None,
                 "data_quality": bt.get("data_quality_flag"),
+                # OOS walk-forward
+                "is_sharpe": bt.get("is_sharpe"),
+                "is_monthly_pct": bt.get("is_monthly_return_pct"),
+                "oos_sharpe": bt.get("oos_sharpe"),
+                "oos_monthly_pct": bt.get("oos_monthly_return_pct"),
+                "oos_dd": bt.get("oos_max_drawdown"),
+                "oos_trades": bt.get("oos_n_trades"),
             }
-            # annualized CAGR is not in forward_returns wrapper; use annual_return_pct/100 proxy
             if "annualized_return" in bt:
                 row["new_annual_return_cagr"] = bt["annualized_return"]
             rows.append(row)
