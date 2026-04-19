@@ -55,7 +55,7 @@ if TRADING_STYLE == 'daytrading':
     FORWARD_BARS = int(os.getenv('FORWARD_BARS', '12'))
     MIN_IC = 0.02
     MIN_SHARPE = 0.5
-    MIN_TRADES = 20
+    MIN_TRADES = 300
     MAX_DRAWDOWN = -0.10
     STYLE_EMOJI = '🎯 Daytrading'
     STYLE_DESC = 'short-term intraday with FTMO compliance'
@@ -67,6 +67,9 @@ else:
     MAX_DRAWDOWN = -0.30
     STYLE_EMOJI = '📈 Swing'
     STYLE_DESC = 'medium-term intraday'
+
+# Whether to use raw OHLCV-only strategies (no daily factors)
+OHLCV_ONLY = os.getenv('OHLCV_ONLY', '0') == '1'
 
 TXN_COST_BPS = float(os.getenv('TXN_COST_BPS', '2.14'))  # 2.35 pip realistic EUR/USD costs
 
@@ -181,7 +184,44 @@ def generate_single_strategy(args):
         factor_list = "\n".join([f"- {f['name']} (IC={f['ic']:.4f})" for f in factor_subset])
         
         # Optimized prompts for daytrading vs swing
-        if TRADING_STYLE == 'daytrading':
+        if TRADING_STYLE == 'daytrading' and OHLCV_ONLY:
+            system_prompt = """You are an expert EUR/USD intraday quant. You build strategies that work ONLY on raw price data (OHLCV), computing all indicators directly from the 1-minute close series.
+
+CRITICAL RULES:
+1. The code receives ONLY a pandas Series called 'close' (1-minute EUR/USD close prices, UTC timestamps).
+2. 'factors' is NOT available — compute everything from 'close' directly.
+3. Create a pandas Series called 'signal' with values: 1 (long), -1 (short), 0 (neutral).
+4. signal.index MUST match close.index exactly.
+5. signal.name must be 'signal'.
+6. Use ONLY pandas/numpy — no external libraries.
+7. MANDATORY: The signal MUST flip at least 300 times across the full dataset. Use low thresholds.
+
+Allowed intraday techniques (pick 2-3 and combine):
+- Session timing: London open (07:00-09:00 UTC), NY open (13:00-15:00 UTC), session overlap
+- Short-window RSI (7-14 bars) on 1-min close
+- EMA crossovers (fast=5-15 bars, slow=20-60 bars)
+- Bollinger Bands (20-bar, 1.5σ) for mean reversion
+- ATR-based volatility breakouts
+- VWAP deviation (approximate with rolling mean)
+- Time-of-day filters combined with momentum
+
+Output ONLY valid JSON:
+{"strategy_name": "short_name", "factor_names": [], "description": "one sentence", "code": "python code"}"""
+
+            user_prompt = f"""Create a EUR/USD 1-minute intraday strategy using ONLY the raw close price series.
+
+{f'Previous feedback: {feedback}' if feedback else 'First attempt — be creative and combine session timing with a momentum or mean-reversion indicator!'}
+
+Hard requirements:
+- Signal must change direction at least 300 times total (~4-8 trades per trading day)
+- NEVER use ffill() or forward-fill on the signal — recompute fresh at every bar
+- Use RSI thresholds between 35-45 (long) and 55-65 (short) — NOT extreme values like 10/90
+- Use EMA crossover thresholds of 0 (cross above/below) for maximum trade frequency
+- Use causal indicators only: rolling windows, shift(1) — NO look-ahead bias
+- No factor data — compute everything from 'close'
+- Keep it simple: 2-3 indicators max"""
+
+        elif TRADING_STYLE == 'daytrading':
             system_prompt = f"""You are an expert daytrading quant specializing in EUR/USD scalping and intraday strategies.
 
 CRITICAL RULES for {STYLE_DESC} (forward horizon: {FORWARD_BARS} bars = ~{FORWARD_BARS} minutes):
@@ -190,25 +230,25 @@ CRITICAL RULES for {STYLE_DESC} (forward horizon: {FORWARD_BARS} bars = ~{FORWAR
 3. Create a pandas Series called 'signal' with values: 1 (long), -1 (short), 0 (neutral)
 4. signal.index MUST match close.index
 5. signal.name must be 'signal'
-6. Optimize for FREQUENT signals (many trades) since the horizon is only {FORWARD_BARS} minutes
-7. Use LOWER thresholds (0.2-0.5) to generate more trades for daytrading
+6. MANDATORY: signal must flip direction at least 300 times total — use low thresholds (0.1-0.3)
+7. Use rolling z-scores with SHORT windows (5-20 bars) and TIGHT thresholds
 
 Output ONLY valid JSON with these fields:
 {{"strategy_name": "short_name", "factor_names": ["f1", "f2"], "description": "one sentence", "code": "python code"}}"""
-            
+
             user_prompt = f"""Create a EUR/USD DAYTRADING strategy ({FORWARD_BARS}-minute horizon) using these factors:
 
 {factor_list}
 
 {f'Previous feedback: {feedback}' if feedback else 'First attempt - be creative!'}
 
-Requirements for daytrading:
-- Use {FORWARD_BARS}-minute forward returns (not daily)
-- Generate frequent signals (aim for 20+ trades in the dataset)
-- Use rolling z-scores with short windows (10-30 bars)
-- Apply tight thresholds (0.2-0.5) for more trades
-- Combine momentum + mean-reversion effectively"""
-        
+Hard requirements:
+- signal must change at least 300 times total (~4 trades/day) — use thresholds of 0.1-0.3
+- NEVER use ffill() or forward-fill on the signal — recompute fresh at every bar
+- Use rolling z-scores with windows of 5-20 bars (not 50-100), thresholds ±0.2 to ±0.5
+- Combine 2 factors: one momentum, one mean-reversion
+- NO global mean/std — always use rolling(window).mean() with shift(1) to avoid look-ahead bias"""
+
         else:
             system_prompt = f"""You are a quantitative trading expert specializing in EUR/USD intraday strategies.
 
@@ -221,7 +261,7 @@ CRITICAL RULES for {STYLE_DESC} (forward horizon: {FORWARD_BARS} bars = ~{FORWAR
 
 Output ONLY valid JSON with these fields:
 {{"strategy_name": "short_name", "factor_names": ["f1", "f2"], "description": "one sentence", "code": "python code"}}"""
-            
+
             user_prompt = f"""Create a EUR/USD trading strategy using these factors:
 
 {factor_list}
@@ -256,19 +296,27 @@ def run_backtest(close, factors_df, strategy_code):
     the signal, then delegate all metric computation to the unified
     ``backtest_signal`` engine in the main process.
     """
-    if close is None or factors_df is None or len(factors_df.columns) < 2:
+    if close is None:
         return None
+    if not OHLCV_ONLY and (factors_df is None or len(factors_df.columns) < 2):
+        return None
+
+    # Flatten MultiIndex — strategy code expects a plain DatetimeIndex
+    if isinstance(close.index, pd.MultiIndex):
+        close = close.droplevel(-1)
+    close = close.sort_index()
 
     import tempfile
 
     # Subprocess stays minimal: it only runs the untrusted strategy code
     # and pickles the resulting signal. All numbers come from the shared engine.
+    factors_line = "" if OHLCV_ONLY else "factors = pd.read_pickle('factors.pkl')"
     script = f"""
 import pandas as pd
 import numpy as np
 
 close = pd.read_pickle('close.pkl')
-factors = pd.read_pickle('factors.pkl')
+{factors_line}
 
 try:
 {chr(10).join('    ' + l for l in strategy_code.split(chr(10)))}
@@ -286,7 +334,8 @@ signal.fillna(0).to_pickle('signal.pkl')
     with tempfile.TemporaryDirectory() as td:
         tdp = Path(td)
         close.to_pickle(str(tdp / 'close.pkl'))
-        factors_df.to_pickle(str(tdp / 'factors.pkl'))
+        if not OHLCV_ONLY and factors_df is not None:
+            factors_df.to_pickle(str(tdp / 'factors.pkl'))
         (tdp / 'run.py').write_text(script)
 
         try:
@@ -321,6 +370,58 @@ signal.fillna(0).to_pickle('signal.pkl')
         txn_cost_bps=TXN_COST_BPS,
         forward_returns=fwd_returns,
     )
+
+# ============================================================================
+# Threshold Tuner — relax numeric thresholds until MIN_TRADES is reached
+# ============================================================================
+def _rescale_thresholds(code: str, scale: float) -> str:
+    """
+    Scale numeric literals in the strategy code that look like signal thresholds.
+    RSI thresholds (30-70 range) are moved toward 50.
+    Z-score / ratio thresholds (0.0–3.0 range) are multiplied by scale.
+    """
+    import re
+
+    def replace_rsi(m):
+        val = float(m.group(0))
+        # Pull toward 50 by (1-scale) fraction
+        new_val = 50 + (val - 50) * scale
+        return f"{new_val:.1f}"
+
+    def replace_small(m):
+        val = float(m.group(0))
+        return f"{val * scale:.3f}"
+
+    # RSI-style thresholds: integers/floats between 10 and 90
+    code = re.sub(r'\b([1-9]\d(?:\.\d+)?)\b', replace_rsi, code)
+    # Small float thresholds: 0.05 – 2.99
+    code = re.sub(r'\b(0\.\d+|[12]\.\d+)\b', replace_small, code)
+    return code
+
+
+def tune_thresholds(close, factors_df, code: str) -> tuple:
+    """
+    Binary-search scale factor (1.0 → 0.05) until n_trades >= MIN_TRADES.
+    Returns (best_bt_result, tuned_code) where best_bt_result has max Sharpe
+    among all runs that hit MIN_TRADES.
+    """
+    best_bt, best_code = None, code
+
+    for scale in [1.0, 0.7, 0.5, 0.35, 0.2, 0.1, 0.05]:
+        tuned = _rescale_thresholds(code, scale) if scale < 1.0 else code
+        bt = run_backtest(close, factors_df, tuned)
+        if bt is None or bt.get('status') != 'success':
+            continue
+        trades = bt.get('n_trades', 0)
+        sharpe = bt.get('sharpe', -999)
+        if trades >= MIN_TRADES:
+            if best_bt is None or sharpe > best_bt.get('sharpe', -999):
+                best_bt = bt
+                best_code = tuned
+            break  # first scale that hits MIN_TRADES wins (they get looser after this)
+
+    return best_bt, best_code
+
 
 # ============================================================================
 # Main Parallel Strategy Generation
@@ -399,38 +500,67 @@ def main(target_count=10):
             if len(accepted) >= target_count:
                 break
             
-            # Select random factor subset (2-5 factors)
-            n_factors = random.randint(2, min(5, len(factors)))
-            factor_subset = random.sample(factors, n_factors)
-            
+            # Select random factor subset (2-5 factors) — empty for OHLCV-only mode
+            if OHLCV_ONLY:
+                factor_subset = []
+            else:
+                n_factors = random.randint(2, min(5, len(factors)))
+                factor_subset = random.sample(factors, n_factors)
+
             feedback = feedback_history[-1] if feedback_history and random.random() < 0.7 else None
-            
+
             # Generate in main process (LLM doesn't parallelize well)
             gen_result = generate_single_strategy((attempt, factor_subset, feedback, attempt))
-            
+
             if gen_result['status'] != 'generated':
                 progress.update(task, advance=1)
                 continue
-            
+
             strategy = gen_result['strategy']
-            
+
             # Backtest (main process - needs data access)
-            # Build factors DataFrame for this strategy
-            strat_factors = df_aligned[[f for f in strategy.get('factor_names', []) if f in df_aligned.columns]]
-            if len(strat_factors.columns) < 2:
-                progress.update(task, advance=1)
-                continue
-            
-            bt_result = run_backtest(close_aligned, strat_factors, strategy.get('code', ''))
+            if OHLCV_ONLY:
+                strat_factors = None
+                bt_result = run_backtest(close, None, strategy.get('code', ''))
+            else:
+                strat_factors = df_aligned[[f for f in strategy.get('factor_names', []) if f in df_aligned.columns]]
+                if len(strat_factors.columns) < 2:
+                    progress.update(task, advance=1)
+                    continue
+                bt_result = run_backtest(close_aligned, strat_factors, strategy.get('code', ''))
             
             if bt_result and bt_result.get('status') == 'success':
                 ic = bt_result.get('ic', 0)
                 sharpe = bt_result.get('sharpe', 0)
                 trades = bt_result.get('n_trades', 0)
                 dd = bt_result.get('max_drawdown', 0)
-                
-                # Check acceptance criteria
-                if abs(ic) > MIN_IC and sharpe > MIN_SHARPE and trades > MIN_TRADES and dd > MAX_DRAWDOWN:
+
+                # If too few trades, auto-tune thresholds before giving up
+                original_code = strategy.get('code', '')
+                if trades < MIN_TRADES and bt_result.get('status') == 'success':
+                    _log.info(f"TUNING  trades={trades}<{MIN_TRADES} — trying looser thresholds")
+                    tuned_bt, tuned_code = tune_thresholds(
+                        close if OHLCV_ONLY else close_aligned,
+                        None if OHLCV_ONLY else strat_factors,
+                        original_code,
+                    )
+                    if tuned_bt and tuned_bt.get('n_trades', 0) >= MIN_TRADES:
+                        bt_result = tuned_bt
+                        strategy['code'] = tuned_code
+                        ic = bt_result.get('ic', 0)
+                        sharpe = bt_result.get('sharpe', 0)
+                        trades = bt_result.get('n_trades', 0)
+                        dd = bt_result.get('max_drawdown', 0)
+                        _log.info(f"TUNED   Sharpe={sharpe:.2f}  Trades={trades}")
+
+                # OOS metrics for acceptance (primary filter — avoids overfitting)
+                oos_sharpe = bt_result.get('oos_sharpe', sharpe)
+                oos_monthly = bt_result.get('oos_monthly_return_pct', bt_result.get('monthly_return_pct', 0))
+                oos_trades  = bt_result.get('oos_n_trades', trades)
+
+                # Check acceptance criteria — OOS must be profitable
+                if (abs(ic) > MIN_IC and sharpe > MIN_SHARPE and trades > MIN_TRADES and dd > MAX_DRAWDOWN
+                        and oos_sharpe > 0.0 and oos_monthly > 0.0):
                     # ACCEPT
                     strategy['real_backtest'] = bt_result
                     strategy['metrics'] = bt_result
@@ -440,6 +570,19 @@ def main(target_count=10):
                         'annual_return_pct': bt_result.get('annual_return_pct', 0),
                         'real_ic': ic, 'real_n_trades': trades, 'real_backtest_status': 'success',
                         'n_bars': bt_result.get('n_bars', 0), 'n_months': bt_result.get('n_months', 0),
+                        'trading_style': TRADING_STYLE,
+                        'ohlcv_only': OHLCV_ONLY,
+                        'engine': 'ftmo_v2',
+                        'txn_cost_bps': TXN_COST_BPS,
+                        # Walk-forward OOS metrics
+                        'oos_sharpe': bt_result.get('oos_sharpe'),
+                        'oos_monthly_return_pct': bt_result.get('oos_monthly_return_pct'),
+                        'oos_max_drawdown': bt_result.get('oos_max_drawdown'),
+                        'oos_win_rate': bt_result.get('oos_win_rate'),
+                        'oos_n_trades': bt_result.get('oos_n_trades'),
+                        'is_sharpe': bt_result.get('is_sharpe'),
+                        'is_monthly_return_pct': bt_result.get('is_monthly_return_pct'),
+                        'oos_start': bt_result.get('oos_start'),
                     }
                     
                     fname = f"{int(time.time())}_{strategy['strategy_name']}.json"
