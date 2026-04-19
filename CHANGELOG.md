@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/TPTBusiness/Predix/compare/v1.2.1...v1.2.2) (2026-04-19)
+
+
+### Documentation
+
+* **claude:** auto-merge release-please PR after every push ([f500917](https://github.com/TPTBusiness/Predix/commit/f500917b699ee78dc676e84e01574d49bdc8e796))
+
 ## [2.2.0](https://github.com/TPTBusiness/Predix/compare/v2.1.0...v2.2.0) (2026-04-18)
 
 
