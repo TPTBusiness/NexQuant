@@ -99,14 +99,22 @@ gh api repos/TPTBusiness/Predix/code-scanning/alerts  # CodeQL/Bandit alerts
 
 ### PR Merge Policy
 - **Dependabot / dependency PRs**: merge autonomously after `pytest test/backtesting/ -v` passes — no user confirmation needed
-- **release-please PRs**: do NOT merge autonomously — user decides when to cut a release (weekly cadence preferred). When asked to release, merge the open release-please PR with `gh pr merge <n> --squash`.
+- **release-please PRs**: merge autonomously after every push if CI is green — `gh pr merge <n> --squash`. This cuts a release automatically with each batch of commits.
 - **Feature/fix PRs**: run relevant tests, then merge if green
 - Always use `gh pr merge <n> --squash` for clean history
 
+### Auto-merge after commits
+After every `git push`, check for open PRs that are ready to merge:
+```bash
+unset GITHUB_TOKEN && gh pr list --state open
+```
+- **Dependabot PRs**: merge immediately if CI is green — `gh pr merge <n> --squash --auto`
+- **release-please PRs**: only merge when user explicitly asks for a release
+- **Other PRs**: merge if tests pass and change is clearly ready
+
 ### Release Cadence
-- Releases are cut **manually on request** ("release machen" / "make a release")
-- release-please accumulates commits into one PR — merge it when the user asks
-- Version bumps: `fix:` and `feat:` → patch (2.2.x), `feat!:` / BREAKING CHANGE → minor (2.x.0)
+- Releases are cut **automatically** — merge the open release-please PR after every push
+- Version bumps: `fix:` and `feat:` → patch (1.2.x), `feat!:` / BREAKING CHANGE → minor (1.x.0)
 - Only mention open-source changes in release notes — never closed-source strategies/models/prompts
 - After merging the release PR: verify the GitHub Release and tag were created (`gh release list`)
 
