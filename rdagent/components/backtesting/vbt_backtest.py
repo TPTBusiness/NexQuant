@@ -340,6 +340,9 @@ def _apply_ftmo_mask(
     }
 
 
+OOS_START_DEFAULT = "2024-01-01"
+
+
 def backtest_signal_ftmo(
     close: pd.Series,
     signal: pd.Series,
@@ -350,6 +353,7 @@ def backtest_signal_ftmo(
     max_leverage: float = FTMO_MAX_LEVERAGE,
     bars_per_year: int = DEFAULT_BARS_PER_YEAR,
     forward_returns: Optional[pd.Series] = None,
+    oos_start: Optional[str] = OOS_START_DEFAULT,
 ) -> Dict[str, Any]:
     """
     FTMO-compliant backtest of a strategy signal on EUR/USD.
@@ -361,6 +365,7 @@ def backtest_signal_ftmo(
       - FTMO daily loss limit (5%): positions zeroed rest of day after breach
       - FTMO total loss limit (10%): all positions zeroed after breach
       - FTMO-specific metrics added to result dict
+      - Walk-forward OOS split: IS metrics (before oos_start) + OOS metrics (after)
 
     Parameters
     ----------
@@ -378,6 +383,8 @@ def backtest_signal_ftmo(
         Hard stop-loss distance in pips (default 10).
     max_leverage : float
         Maximum leverage (default 30 = FTMO 1:30).
+    oos_start : str or None
+        Start of out-of-sample period (ISO date). None disables OOS split.
     """
     stop_price = stop_pips * FTMO_PIP
     leverage_by_risk = risk_pct / (stop_price / eurusd_price)
@@ -401,6 +408,37 @@ def backtest_signal_ftmo(
     # Re-scale reported equity metrics to FTMO_INITIAL_CAPITAL
     result["ftmo_end_equity"] = FTMO_INITIAL_CAPITAL * (1 + result.get("total_return", 0))
     result["ftmo_monthly_profit"] = FTMO_INITIAL_CAPITAL * result.get("monthly_return", 0)
+
+    # Walk-forward OOS split
+    if oos_start is not None:
+        oos_ts = pd.Timestamp(oos_start)
+        is_mask  = close.index < oos_ts
+        oos_mask = close.index >= oos_ts
+
+        def _split_bt(mask: "pd.Series[bool]", prefix: str) -> None:
+            if mask.sum() < 100:
+                return
+            close_s  = close.loc[mask]
+            signal_s = signal.loc[mask]  # raw signal, not masked — fresh FTMO sim per period
+            fwd_split = forward_returns.loc[mask] if forward_returns is not None else None
+            masked_s, _ = _apply_ftmo_mask(signal_s, close_s, leverage, txn_cost_bps)
+            split_result = backtest_signal(
+                close=close_s,
+                signal=masked_s,
+                txn_cost_bps=txn_cost_bps,
+                bars_per_year=bars_per_year,
+                forward_returns=fwd_split,
+            )
+            for k, v in split_result.items():
+                if k not in ("equity_curve", "status"):
+                    result[f"{prefix}_{k}"] = v
+
+        _split_bt(is_mask,  "is")
+        _split_bt(oos_mask, "oos")
+
+        result["oos_start"] = oos_start
+        result["is_n_bars"]  = int(is_mask.sum())
+        result["oos_n_bars"] = int(oos_mask.sum())
 
     return result
 
