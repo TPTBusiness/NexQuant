@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/TPTBusiness/Predix/compare/v1.2.2...v1.3.0) (2026-04-21)
+
+
+### Features
+
+* **backtest:** add rolling walk-forward validation and Monte Carlo trade permutation test ([637a94c](https://github.com/TPTBusiness/Predix/commit/637a94c1d987da763869f4f9b73372a3f37d873c))
+
+
+### Bug Fixes
+
+* **security:** resolve all 30 Bandit security alerts (B301, B614, B104) ([ce5983d](https://github.com/TPTBusiness/Predix/commit/ce5983d9d59c4c34341fb1ec749e44bbcfc4a1c4))
+
 ## [1.2.2](https://github.com/TPTBusiness/Predix/compare/v1.2.1...v1.2.2) (2026-04-19)
 
 
