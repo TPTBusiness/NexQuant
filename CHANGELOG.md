@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/TPTBusiness/Predix/compare/v1.3.0...v1.3.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* **deps:** bump python-dotenv to &gt;=1.2.2 (CVE symlink overwrite) ([126ae7d](https://github.com/TPTBusiness/Predix/commit/126ae7d5fb556b677d09d10221862a0d648d697a))
+
 ## [1.3.0](https://github.com/TPTBusiness/Predix/compare/v1.2.2...v1.3.0) (2026-04-21)
 
 
