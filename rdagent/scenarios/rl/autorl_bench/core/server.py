@@ -391,7 +391,7 @@ def set_baseline():
     return jsonify({"baseline_score": score, "status": "set"})
 
 
-def run_server(task: str, base_model: str, workspace: str, host: str = "0.0.0.0", port: int = 5000):
+def run_server(task: str, base_model: str, workspace: str, host: str = "127.0.0.1", port: int = 5000):
     """启动服务器"""
     init_server(task, base_model, workspace)
     logger.info(f"Grading Server | task={task} | {host}:{port}")
@@ -435,7 +435,7 @@ class LocalServerContext(GradingServerContext):
         logger.info(f"[Local Mode] Starting evaluation server on port {self.port}...")
         self.server = init_server(self.task, self.base_model, self.workspace)
 
-        self._http_server = make_server("0.0.0.0", self.port, app, threaded=True)
+        self._http_server = make_server("0.0.0.0", self.port, app, threaded=True)  # nosec B104 — intentional: Docker sandbox requires all-interface binding
         self._thread = threading.Thread(target=self._http_server.serve_forever, daemon=True)
         self._thread.start()
 
@@ -488,7 +488,7 @@ if __name__ == "__main__":
     parser.add_argument("--base-model", type=str, default="")
     parser.add_argument("--workspace", type=str, default=".")
     parser.add_argument("--port", type=int, default=5000)
-    parser.add_argument("--host", type=str, default="0.0.0.0")
+    parser.add_argument("--host", type=str, default="127.0.0.1")
     args = parser.parse_args()
 
     run_server(args.task, args.base_model, args.workspace, args.host, args.port)
