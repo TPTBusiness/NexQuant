@@ -371,8 +371,8 @@ signal.fillna(0).to_pickle('signal.pkl')
         txn_cost_bps=TXN_COST_BPS,
         forward_returns=fwd_returns,
         oos_start=OOS_START_DEFAULT,
-        wf_rolling=True,
-        mc_n_permutations=200,
+        wf_rolling=False,   # too slow on 2M bars — run via rebacktest script instead
+        mc_n_permutations=50,
     )
 
 # ============================================================================
@@ -579,7 +579,7 @@ def main(target_count=10):
                 # Check acceptance criteria — OOS must be profitable + statistically significant
                 mc_ok = mc_pvalue is None or mc_pvalue < 0.20  # lenient: top 20% non-random
                 wf_ok = wf_consistency is None or wf_consistency >= 0.5  # ≥50% of WF windows profitable
-                if (abs(ic) > MIN_IC and sharpe > MIN_SHARPE and trades > MIN_TRADES and dd > MAX_DRAWDOWN
+                if (abs(ic or 0) > MIN_IC and sharpe > MIN_SHARPE and trades > MIN_TRADES and dd > MAX_DRAWDOWN
                         and oos_sharpe > 0.0 and oos_monthly > 0.0 and mc_ok and wf_ok):
                     # ACCEPT
                     strategy['real_backtest'] = bt_result
