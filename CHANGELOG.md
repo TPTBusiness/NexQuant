@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.2](https://github.com/TPTBusiness/Predix/compare/v1.3.1...v1.3.2) (2026-04-23)
+
+
+### Bug Fixes
+
+* **strategies:** guard against None IC in acceptance check, disable slow wf_rolling ([2197f52](https://github.com/TPTBusiness/Predix/commit/2197f52150a50ef38d9e70991d7e48c8c30caec4))
+* **strategies:** handle None ic/sharpe/dd in rejected strategy log output ([ad2ad3a](https://github.com/TPTBusiness/Predix/commit/ad2ad3ab3360ea75ed3bbc90c12098b9c5cc0114))
+
 ## [1.3.1](https://github.com/TPTBusiness/Predix/compare/v1.3.0...v1.3.1) (2026-04-21)
 
 
