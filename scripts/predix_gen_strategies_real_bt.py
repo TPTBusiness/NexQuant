@@ -636,9 +636,10 @@ def main(target_count=10):
                     oos_info = f"OOS_Sharpe={oos_sharpe:+.2f} OOS_Mon={oos_monthly:+.2f}%" if oos_sharpe is not None else ""
                     mc_info  = f" MC_p={mc_pvalue:.2f}" if mc_pvalue is not None else ""
                     wf_info  = f" WF_consistency={wf_consistency:.0%}" if wf_consistency is not None else ""
-                    _log.info(f"REJECTED  IC={ic:.4f}  Sharpe={sharpe:.2f}  Trades={trades}  DD={dd:.1%}  {oos_info}{mc_info}{wf_info}")
+                    _ic = ic or 0; _sh = sharpe or 0; _dd = dd or 0
+                    _log.info(f"REJECTED  IC={_ic:.4f}  Sharpe={_sh:.2f}  Trades={trades}  DD={_dd:.1%}  {oos_info}{mc_info}{wf_info}")
                     feedback_history.append(
-                        f"Failed: IC={ic:.4f}, Sharpe={sharpe:.2f}, Trades={trades}, DD={dd:.1%}, "
+                        f"Failed: IC={_ic:.4f}, Sharpe={_sh:.2f}, Trades={trades}, DD={_dd:.1%}, "
                         f"OOS_Sharpe={oos_sharpe:+.2f}, OOS_Monthly={oos_monthly:+.2f}%"
                         + (f", MC_p={mc_pvalue:.2f}" if mc_pvalue is not None else "")
                         + (f", WF_consistency={wf_consistency:.0%}" if wf_consistency is not None else "")
