@@ -199,6 +199,55 @@ def scan_factors(workspace_dir: Path, skip_evaluated: bool = True) -> List[Facto
 
 
 # ---------------------------------------------------------------------------
+# Look-ahead bias detection for daily-constant factors
+# ---------------------------------------------------------------------------
+def _shift_daily_constant_factor_if_needed(factor_col: "pd.Series", factor_name: str) -> "pd.Series":
+    """Detect daily-constant factors (look-ahead bias) and shift by 1 trading day."""
+    sample_days = factor_col.index.get_level_values("datetime").normalize().unique()
+    if len(sample_days) < 10:
+        return factor_col
+    rng = np.random.default_rng(42)
+    days_to_check = rng.choice(sample_days, size=min(50, len(sample_days)), replace=False)
+    constant_count = 0
+    for day in days_to_check:
+        day_mask = factor_col.index.get_level_values("datetime").normalize() == day
+        day_vals = factor_col[day_mask].dropna()
+        if len(day_vals) == 0:
+            continue
+        if day_vals.nunique() == 1:
+            constant_count += 1
+    fraction_constant = constant_count / len(days_to_check)
+    if fraction_constant < 0.90:
+        return factor_col
+    # Shift by 1 trading day per instrument
+    import logging
+    logging.getLogger(__name__).info(
+        "Factor '%s' is %.0f%% daily-constant — shifting 1 trading day to fix look-ahead bias",
+        factor_name, fraction_constant * 100,
+    )
+    instruments = factor_col.index.get_level_values("instrument").unique() if "instrument" in factor_col.index.names else [None]
+    shifted_parts = []
+    for instr in instruments:
+        if instr is not None:
+            mask = factor_col.index.get_level_values("instrument") == instr
+            col_instr = factor_col[mask]
+        else:
+            col_instr = factor_col
+        dates = col_instr.index.get_level_values("datetime").normalize()
+        trading_days = dates.unique().sort_values()
+        day_first = col_instr.groupby(dates).first()
+        day_first_shifted = day_first.shift(1)
+        day_first_shifted.index = pd.to_datetime(day_first_shifted.index)
+        day_map = day_first_shifted.reindex(pd.to_datetime(trading_days)).values
+        new_vals = pd.Series(
+            day_map[np.searchsorted(trading_days.values, dates.values)],
+            index=col_instr.index,
+        )
+        shifted_parts.append(new_vals)
+    return pd.concat(shifted_parts).sort_index()
+
+
+# ---------------------------------------------------------------------------
 # Factor evaluator
 # ---------------------------------------------------------------------------
 def evaluate_factor_full(factor: FactorInfo, full_data: pd.DataFrame,
@@ -263,6 +312,7 @@ def evaluate_factor_full(factor: FactorInfo, full_data: pd.DataFrame,
             result = pd.read_hdf(str(result_file), key="data")
             total_count = len(result)
             factor_val = result.iloc[:, 0]
+            factor_val = _shift_daily_constant_factor_if_needed(factor_val, factor.factor_name)
             non_null_count = factor_val.notna().sum()
 
             if non_null_count < 1000:
