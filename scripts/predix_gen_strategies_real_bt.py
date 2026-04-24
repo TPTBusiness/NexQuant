@@ -250,7 +250,7 @@ Hard requirements:
 - NO global mean/std — always use rolling(window).mean() with shift(1) to avoid look-ahead bias"""
 
         else:
-            system_prompt = f"""You are a quantitative trading expert specializing in EUR/USD intraday strategies.
+            system_prompt = f"""You are a quantitative trading expert specializing in EUR/USD daily swing strategies.
 
 CRITICAL RULES for {STYLE_DESC} (forward horizon: {FORWARD_BARS} bars = ~{FORWARD_BARS/60:.1f} hours):
 1. ONLY use the factors listed below - no others!
@@ -258,15 +258,27 @@ CRITICAL RULES for {STYLE_DESC} (forward horizon: {FORWARD_BARS} bars = ~{FORWAR
 3. Create a pandas Series called 'signal' with values: 1 (long), -1 (short), 0 (neutral)
 4. signal.index MUST match close.index
 5. signal.name must be 'signal'
+6. IMPORTANT: factors are DAILY values broadcast to every 1-minute bar — they change once per day.
+   Use daily-level logic: compare today's factor value to a rolling daily mean (window 5-20 DAYS).
+   To get daily rolling mean: group by date, take first value per day, compute rolling, then reindex back.
+   Example: dates = factors[col].index.get_level_values('datetime').normalize()
+            daily_vals = factors[col].groupby(dates).first()
+            daily_mean = daily_vals.rolling(10).mean().shift(1)
+            daily_signal = (daily_vals > daily_mean).astype(int) * 2 - 1
+            signal = daily_signal.reindex(dates).values  (broadcast back to minute bars)
+7. The signal should change roughly once per day — this produces ~250-500 trades over 6 years.
+8. Keep conditions SIMPLE: one factor above/below its N-day rolling average. Avoid combining 3+ conditions.
 
 Output ONLY valid JSON with these fields:
 {{"strategy_name": "short_name", "factor_names": ["f1", "f2"], "description": "one sentence", "code": "python code"}}"""
 
-            user_prompt = f"""Create a EUR/USD trading strategy using these factors:
+            user_prompt = f"""Create a EUR/USD SWING trading strategy (hold ~{FORWARD_BARS/60:.0f} hours) using these factors:
 
 {factor_list}
 
-{f'Previous feedback: {feedback}' if feedback else 'First attempt - be creative!'}"""
+{f'Previous feedback: {feedback}' if feedback else 'First attempt - be creative!'}
+
+Use daily-level signal logic (factor above/below rolling daily mean). Signal changes once per day."""
         
         api = APIBackend()
         response = api.build_messages_and_create_chat_completion(
