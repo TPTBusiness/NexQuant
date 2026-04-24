@@ -356,11 +356,12 @@ def monte_carlo_trade_pvalue(
     """
     Monte Carlo permutation test on trade-level P&L.
 
-    Shuffles the order of trade returns ``n_permutations`` times and computes
-    the fraction of runs whose total return is >= the real total return.
+    Runs a one-sided binomial test on trade-level win rate.
 
-    p < 0.05 → strategy has a statistically significant edge (real return
-    beats 95% of random sequences with the same set of trades).
+    Tests H0: win_rate = 0.5 (random trading) against H1: win_rate > 0.5.
+    The ``n_permutations`` parameter is kept for API compatibility but is unused.
+
+    p < 0.05 → win rate is significantly above 50%, indicating a genuine per-trade edge.
 
     Parameters
     ----------
@@ -379,14 +380,14 @@ def monte_carlo_trade_pvalue(
     if len(trade_pnl) < 2:
         return 1.0
     trades = trade_pnl.values.copy()
-    real_total = float(trades.sum())
-    rng = np.random.default_rng(seed)
-    beat = 0
-    for _ in range(n_permutations):
-        perm = rng.permutation(trades)
-        if perm.sum() >= real_total:
-            beat += 1
-    return beat / n_permutations
+    # Binomial test: is the win rate significantly above 50%?
+    # p = probability of observing >= n_wins out of n_trades under null (win_rate=0.5).
+    # Low p → strategy has a significant positive edge per trade.
+    from scipy.stats import binomtest
+    n_wins = int((trades > 0).sum())
+    n_total = len(trades)
+    result = binomtest(n_wins, n_total, p=0.5, alternative="greater")
+    return float(result.pvalue)
 
 
 def walk_forward_rolling(
