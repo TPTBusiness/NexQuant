@@ -134,7 +134,20 @@ qlib_factor_strategy: |-
      # then map back to minute bars via ffill
      ```
      This rule applies to ALL daily aggregations: returns, OHLC stats, volume, momentum, slopes, etc.
-     Intraday rolling factors (e.g. 30-min rolling std) do NOT need this shift — only daily aggregations do.
+     **Session-based aggregations (London, NY, Asian session returns) are also daily aggregations** — the London
+     session (08:00-16:00 UTC) ends at 16:00, so its return must be shifted by 1 day before use.
+     Intraday rolling factors (e.g. 30-min rolling std computed at bar t using only bars t-N..t-1) do NOT need this shift.
+
+  8. **PREFER pure intraday rolling factors**: Factors that use only a trailing window of recent bars (e.g.
+     rolling(30).mean() of returns, RSI(14), Bollinger Band z-score) have NO look-ahead risk and vary every
+     minute. These are the best candidates for short-horizon (96-bar) prediction. Examples:
+     - Rolling 15-min / 30-min / 60-min return momentum
+     - Rolling volatility (std of returns over 20-60 bars)
+     - Distance of close from N-bar moving average (z-score)
+     - RSI or similar oscillators computed on 1-min bars
+     - VWAP deviation (requires volume — use $volume column)
+     Always use `.shift(1)` on the lagged window (e.g. `rolling(N).mean().shift(1)`) to avoid using the
+     current bar's own price in its own feature value.
 
 qlib_factor_output_format: |-
   Your output should be a pandas dataframe similar to the following example information:
