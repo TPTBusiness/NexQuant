@@ -121,6 +121,21 @@ qlib_factor_strategy: |-
      assert result_df.index.names == ['datetime', 'instrument'], f"Index names must be ['datetime', 'instrument'], got {result_df.index.names}"
      ```
 
+  7. **NEVER use same-day aggregations as the factor value — always shift by 1 day**: If your factor computes a daily aggregate (e.g. daily close return, daily OHLC range, daily volume), that aggregate is only known at end-of-day. Using it at the start of the same day is look-ahead bias. You MUST shift the daily aggregate by 1 day before forward-filling to minute bars:
+     ```python
+     # WRONG: look-ahead bias! Today's close return is not known at 00:00
+     daily_ret = df['$close'].groupby(level='instrument').resample('1D', level='datetime').last().pct_change()
+     result_df['my_factor'] = daily_ret.groupby(level='instrument').transform(lambda x: x.reindex(df.index.get_level_values('datetime'), method='ffill'))
+
+     # CORRECT: shift by 1 trading day so factor value at day T = aggregate of day T-1
+     daily_close = df.groupby([df.index.get_level_values('datetime').normalize(), df.index.get_level_values('instrument')])['$close'].last()
+     daily_close.index.names = ['date', 'instrument']
+     daily_ret = daily_close.groupby(level='instrument').pct_change().shift(1)  # <-- shift(1) is MANDATORY
+     # then map back to minute bars via ffill
+     ```
+     This rule applies to ALL daily aggregations: returns, OHLC stats, volume, momentum, slopes, etc.
+     Intraday rolling factors (e.g. 30-min rolling std) do NOT need this shift — only daily aggregations do.
+
 qlib_factor_output_format: |-
   Your output should be a pandas dataframe similar to the following example information:
   <class 'pandas.core.frame.DataFrame'>
