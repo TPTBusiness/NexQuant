@@ -29,6 +29,83 @@ from rdagent.scenarios.qlib.experiment.model_experiment import QlibModelExperime
 DIRNAME = Path(__file__).absolute().resolve().parent
 DIRNAME_local = Path.cwd()
 
+
+def _shift_daily_constant_factor_if_needed(factor_col: "pd.Series", factor_name: str) -> "pd.Series":
+    """Detect and fix look-ahead bias in daily-constant factors.
+
+    A factor is "daily-constant" when every minute bar within the same calendar
+    day carries an identical value. This happens when LLM code computes a daily
+    aggregate (e.g. today's log return) and forward-fills it across all intraday
+    bars without shifting — meaning the end-of-day value is visible at 00:00.
+
+    Fix: shift by one trading day so that the value assigned to day T is the
+    aggregate computed from day T-1, eliminating the forward-looking information.
+    """
+    import numpy as np
+
+    try:
+        notnull = factor_col.dropna()
+        if len(notnull) < 200:
+            return factor_col
+
+        datetimes = notnull.index.get_level_values("datetime")
+        dates = datetimes.normalize()
+
+        # Sample up to 50 random days and check intra-day uniqueness
+        unique_dates = pd.Series(dates.unique())
+        sample_dates = unique_dates.sample(min(50, len(unique_dates)), random_state=42)
+
+        daily_unique_counts = []
+        for d in sample_dates:
+            mask = dates == d
+            vals = notnull.values[mask]
+            if len(vals) > 1:
+                daily_unique_counts.append(len(np.unique(vals[~np.isnan(vals)])))
+
+        if not daily_unique_counts:
+            return factor_col
+
+        # If >90% of sampled days have exactly 1 unique value → daily-constant
+        fraction_constant = sum(1 for c in daily_unique_counts if c == 1) / len(daily_unique_counts)
+        if fraction_constant < 0.90:
+            return factor_col  # Intraday factor — no shift needed
+
+        logger.warning(
+            f"[LookAheadFix] Factor '{factor_name}' is daily-constant "
+            f"({fraction_constant:.0%} of days). Applying 1-day shift to remove look-ahead bias."
+        )
+
+        # Shift: for each instrument, map daily values forward by 1 trading day
+        instruments = factor_col.index.get_level_values("instrument").unique()
+        shifted_parts = []
+        for inst in instruments:
+            inst_series = factor_col.xs(inst, level="instrument")
+            # Get one value per calendar day (the first non-null bar)
+            inst_dt = inst_series.index.normalize()
+            daily_vals = inst_series.groupby(inst_dt).first()
+            # Shift by 1 day
+            daily_vals_shifted = daily_vals.shift(1)
+            # Forward-fill back to minute bars
+            minute_idx = inst_series.index
+            minute_dates = minute_idx.normalize()
+            shifted_minute = minute_dates.map(daily_vals_shifted)
+            shifted_s = pd.Series(
+                shifted_minute.values,
+                index=pd.MultiIndex.from_arrays(
+                    [inst_series.index, [inst] * len(inst_series)],
+                    names=["datetime", "instrument"],
+                ),
+                name=factor_col.name,
+            )
+            shifted_parts.append(shifted_s)
+
+        return pd.concat(shifted_parts).sort_index()
+
+    except Exception as e:
+        logger.debug(f"[LookAheadFix] Could not apply daily shift for '{factor_name}': {e}")
+        return factor_col
+
+
 # TODO: supporting multiprocessing and keep previous results
 
 
@@ -408,6 +485,12 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             # Get the factor column
             factor_col = factor_values.iloc[:, 0]
             factor_name = factor_values.columns[0]
+
+            # Detect and fix look-ahead bias in daily-constant factors.
+            # If a factor has the same value for all minute bars within each calendar day
+            # it was computed from same-day data (e.g. today's close return at 00:00).
+            # Fix: shift by 1 trading day so value at day T = aggregate of day T-1.
+            factor_col = _shift_daily_constant_factor_if_needed(factor_col, factor_name)
 
             # Load source data for forward returns
             data_path = (
