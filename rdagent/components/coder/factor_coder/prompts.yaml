@@ -53,7 +53,7 @@ evolving_strategy_factor_implementation_v1_system: |-
   - ALWAYS use `min_periods=N` where N equals the window size in rolling calculations (e.g., `.rolling(20, min_periods=20)`)
   - ALWAYS handle infinite values after division: `.replace([np.inf, -np.inf], np.nan)` before saving results
   - ALWAYS use `groupby(level=1)` or `groupby('instrument')` before rolling operations on MultiIndex dataframes
-  - Process the COMPLETE date range (2020-2026), do NOT filter by date
+  - Process the COMPLETE date range available in the HDF5 file (do NOT filter by date — the file may contain 2024 debug data or full 2020-2026 data)
   - Use `groupby().transform()` instead of `groupby().apply()` for single-column assignments
 
   Notice that you should not add any other text before or after the json format.
