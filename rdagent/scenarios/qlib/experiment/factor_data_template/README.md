@@ -23,13 +23,24 @@ $low: low price at 1-minute bar.
 $volume: volume at 1-minute bar (tick volume for FX).
 
 ## Important Notes for 1min Data
-- 96 bars = 1 trading day (24 hours for FX)
+- 1 bar = 1 minute (confirmed)
 - 16 bars = 16 minutes
-- 4 bars = 4 minutes
-- 1 bar = 1 minute
+- 60 bars = 1 hour
+- ~1440 bars = 1 full trading day (FX trades nearly 24h, Mon 00:00 - Fri 22:00 UTC approx.)
+- Typical bars per calendar day: ~1200-1440 (varies by weekday, holidays have fewer)
+- Do NOT assume 96 bars/day — the actual count depends on the date
 - Data range: 2020-01-01 to 2026-03-20
 - Instrument: EURUSD
 - Timezone: UTC
+
+## IMPORTANT: Bars per Day Correction
+The dataset has approximately 1440 bars per full trading day (1 bar = 1 minute, ~24h of FX trading).
+Some older documentation incorrectly stated "96 bars = 1 day" — this is WRONG. Always use:
+- 60 bars = 1 hour
+- 480 bars = 8 hours (London session 08:00-16:00 UTC)
+- 180 bars = 3 hours (London/NY overlap 13:00-16:00 UTC)
+Use datetime hour filtering (e.g., `df[df.index.get_level_values('datetime').hour.between(8, 15)]`)
+to select session bars — do NOT use bar-count offsets to define sessions.
 
 ## Session Times (UTC)
 - Asian: 00:00-08:00 UTC (low volatility)
