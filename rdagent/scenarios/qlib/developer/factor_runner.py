@@ -468,8 +468,19 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         import numpy as np
 
         try:
-            # Get workspace path
-            workspace_path = exp.experiment_workspace.workspace_path
+            # Get workspace path — factor code and result.h5 live in sub_workspace_list[0],
+            # not in experiment_workspace (which is the Qlib template workspace).
+            workspace_path = None
+            if exp.sub_workspace_list:
+                for ws in exp.sub_workspace_list:
+                    if ws is not None and hasattr(ws, 'workspace_path'):
+                        candidate = ws.workspace_path / "result.h5"
+                        if candidate.exists():
+                            workspace_path = ws.workspace_path
+                            break
+            if workspace_path is None:
+                # Fallback to experiment_workspace
+                workspace_path = exp.experiment_workspace.workspace_path
             if workspace_path is None:
                 return None
 
@@ -670,10 +681,12 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             from pathlib import Path
             from rdagent.components.backtesting import ResultsDatabase
 
-            # Get factor name from hypothesis
+            # Get factor name: prefer hypothesis, fallback to result Series 'factor_name' key
             factor_name = "unknown"
             if hasattr(exp, 'hypothesis') and exp.hypothesis is not None:
                 factor_name = getattr(exp.hypothesis, 'hypothesis', 'unknown')
+            if factor_name == 'unknown' and isinstance(result, pd.Series) and 'factor_name' in result.index:
+                factor_name = str(result['factor_name'])
 
             # Check if already rejected by protection
             if getattr(exp, 'rejected_by_protection', False):
@@ -907,41 +920,74 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         """
         Save factor time-series values as parquet for strategy building.
 
-        This is essential for walk-forward validation and strategy combination.
-
-        Parameters
-        ----------
-        factor_name : str
-            Name of the factor
-        exp : QlibFactorExperiment
-            The experiment with factor values
+        Reruns the factor code on the FULL 6-year dataset so the parquet covers
+        the complete backtest range (not just the debug 2024 subset).
         """
         import os as _os
+        import subprocess
+        import shutil
+        import tempfile
 
         try:
-            # Get workspace path
-            workspace_path = exp.experiment_workspace.workspace_path
+            # factor.py lives in sub_workspace_list[0], not experiment_workspace
+            workspace_path = None
+            if exp.sub_workspace_list:
+                for ws in exp.sub_workspace_list:
+                    if ws is not None and hasattr(ws, 'workspace_path'):
+                        fp = ws.workspace_path / "factor.py"
+                        if fp.exists():
+                            workspace_path = ws.workspace_path
+                            break
+            if workspace_path is None:
+                workspace_path = exp.experiment_workspace.workspace_path
             if workspace_path is None:
                 return
 
-            result_h5 = workspace_path / "result.h5"
-            if not result_h5.exists():
+            factor_py = workspace_path / "factor.py"
+            if not factor_py.exists():
                 return
 
-            # Read factor values
+            project_root = Path(__file__).parent.parent.parent.parent.parent
+            full_data = (
+                project_root
+                / "git_ignore_folder"
+                / "factor_implementation_source_data"
+                / "intraday_pv.h5"
+            )
+            if not full_data.exists():
+                return
+
+            # Run factor code on full data in a temp workspace
             import pandas as pd
-            df = pd.read_hdf(str(result_h5), key="data")
+            with tempfile.TemporaryDirectory(prefix="predix_fullval_") as tmp_dir:
+                tmp = Path(tmp_dir)
+                shutil.copy(str(factor_py), str(tmp / "factor.py"))
+                shutil.copy(str(full_data), str(tmp / "intraday_pv.h5"))
+
+                ret = subprocess.run(
+                    ["python", "factor.py"],
+                    cwd=str(tmp),
+                    capture_output=True,
+                    timeout=300,
+                )
+                if ret.returncode != 0:
+                    # Fall back to debug-data result if full-data run fails
+                    result_h5 = workspace_path / "result.h5"
+                    if not result_h5.exists():
+                        return
+                    df = pd.read_hdf(str(result_h5), key="data")
+                else:
+                    result_h5_full = tmp / "result.h5"
+                    if not result_h5_full.exists():
+                        return
+                    df = pd.read_hdf(str(result_h5_full), key="data")
+
             if df is None or df.empty:
                 return
 
-            # Get the factor series (first column)
             series = df.iloc[:, 0]
             series.name = factor_name
 
-            # Save to results/factors/values/
-            project_root = Path(__file__).parent.parent.parent.parent.parent
-
-            # Parallel run isolation
             parallel_run_id = _os.getenv("PARALLEL_RUN_ID", "0")
             if parallel_run_id != "0":
                 values_dir = project_root / "results" / "runs" / f"run{parallel_run_id}" / "factors" / "values"
@@ -949,16 +995,11 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 values_dir = project_root / "results" / "factors" / "values"
 
             values_dir.mkdir(parents=True, exist_ok=True)
-
-            # Safe filename
             safe_name = factor_name.replace("/", "_").replace("\\", "_").replace(" ", "_")[:100]
             parquet_path = values_dir / f"{safe_name}.parquet"
+            series.to_frame().to_parquet(str(parquet_path))
 
-            # Save as parquet (with datetime index)
-            series.to_parquet(str(parquet_path))
-
-        except Exception as e:
-            # Don't let factor value saving break the main workflow
+        except Exception:
             pass
 
     def _log_result_warnings(self, factor_name: str, result, metrics: dict) -> None:

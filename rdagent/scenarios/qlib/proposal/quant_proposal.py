@@ -152,9 +152,41 @@ class QlibQuantHypothesisGen(FactorAndModelHypothesisGen):
                         factor_inserted = True
             if len(specific_trace.hist) > 0:
                 specific_trace.hist.reverse()
-                hypothesis_and_feedback = T("scenarios.qlib.prompts:hypothesis_and_feedback").r(
-                    trace=specific_trace,
-                )
+                # Keep only the 2 most recent experiments in full detail; compress older ones
+                # to brief bullet points to stay within the LLM context window.
+                FULL_DETAIL_COUNT = 2
+                old_hist = specific_trace.hist[:-FULL_DETAIL_COUNT] if len(specific_trace.hist) > FULL_DETAIL_COUNT else []
+                recent_hist = specific_trace.hist[-FULL_DETAIL_COUNT:] if len(specific_trace.hist) > FULL_DETAIL_COUNT else specific_trace.hist
+
+                parts = []
+                if old_hist:
+                    summary_lines = ["## Earlier experiments (summarized):"]
+                    for exp, fb in old_hist:
+                        factor_names = []
+                        for task in exp.sub_tasks:
+                            if task is not None and hasattr(task, "factor_name"):
+                                factor_names.append(task.factor_name)
+                            elif task is not None and hasattr(task, "model_type"):
+                                factor_names.append(getattr(task, "model_type", "model"))
+                        names_str = ", ".join(factor_names) if factor_names else "unknown"
+                        ic_str = ""
+                        try:
+                            if exp.result is not None:
+                                ic_val = exp.result.loc["IC"] if "IC" in exp.result.index else ""
+                                ic_str = f" IC={ic_val:.4f}" if ic_val != "" else ""
+                        except Exception:
+                            pass
+                        decision_str = "PASS" if fb.decision else "FAIL"
+                        obs_short = (fb.observations or "")[:120].replace("\n", " ")
+                        summary_lines.append(f"- [{decision_str}]{ic_str} {names_str}: {obs_short}")
+                    parts.append("\n".join(summary_lines))
+
+                if recent_hist:
+                    recent_trace = Trace(specific_trace.scen)
+                    recent_trace.hist = recent_hist
+                    parts.append(T("scenarios.qlib.prompts:hypothesis_and_feedback").r(trace=recent_trace))
+
+                hypothesis_and_feedback = "\n\n".join(parts)
             else:
                 hypothesis_and_feedback = "No previous hypothesis and feedback available."
 
