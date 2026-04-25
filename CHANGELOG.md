@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.3](https://github.com/TPTBusiness/Predix/compare/v1.3.2...v1.3.3) (2026-04-25)
+
+
+### Bug Fixes
+
+* **backtest:** replace broken MC permutation test with binomial win-rate test ([c38d894](https://github.com/TPTBusiness/Predix/commit/c38d89478f586825bfca5715a96ca70ccd8791a3))
+* **factors:** detect and correct look-ahead bias in daily-constant factors ([eb490a4](https://github.com/TPTBusiness/Predix/commit/eb490a461b66cbd815ae53ac5205115754712432))
+* **factors:** extend look-ahead rules to session factors and add intraday-factor guidance ([c24c100](https://github.com/TPTBusiness/Predix/commit/c24c100442d6487686c0578de0b32d240fcbf215))
+* **loop:** compress old experiment history in proposal prompt to reduce context size ([4bf90a9](https://github.com/TPTBusiness/Predix/commit/4bf90a905ba8b2aba2a818191c19998088cccaaf))
+* **strategies:** guard against None IC in acceptance check, disable slow wf_rolling ([2197f52](https://github.com/TPTBusiness/Predix/commit/2197f52150a50ef38d9e70991d7e48c8c30caec4))
+* **strategies:** handle None ic/sharpe/dd in rejected strategy log output ([ad2ad3a](https://github.com/TPTBusiness/Predix/commit/ad2ad3ab3360ea75ed3bbc90c12098b9c5cc0114))
+
 ## [1.3.2](https://github.com/TPTBusiness/Predix/compare/v1.3.1...v1.3.2) (2026-04-23)
 
 
