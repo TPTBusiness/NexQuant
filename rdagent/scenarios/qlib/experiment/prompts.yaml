@@ -104,7 +104,7 @@ qlib_factor_strategy: |-
      result_df.columns = ['daily_volume_price_divergence']
      ```
 
-  4. **Process ALL data — do not filter dates**: The source HDF5 contains data from 2020-01-01 to 2026-03-20. Do NOT filter to a single year. If your output has only 314 entries (one year of daily data), the factor will be rejected. Expected output: ~1500+ daily entries for 2020-2026.
+  4. **Process ALL data — do not filter dates**: The source HDF5 contains data from 2020-01-01 to 2026-03-20 (development runs may use a 2024-only debug dataset with ~300 entries, which is acceptable). Do NOT filter to a single year in your code. Write your code to process whatever date range is available in the HDF5 file — do not hardcode date filters. Expected output for production data: ~1500+ daily entries for 2020-2026. Expected output for debug data: ~300 daily entries for 2024. Both are valid.
 
   5. **Use `transform()` instead of `apply()` for per-group calculations**: `transform()` preserves the original index while `apply()` may reduce the number of rows unexpectedly:
      ```python
@@ -140,14 +140,15 @@ qlib_factor_strategy: |-
 
   8. **PREFER pure intraday rolling factors**: Factors that use only a trailing window of recent bars (e.g.
      rolling(30).mean() of returns, RSI(14), Bollinger Band z-score) have NO look-ahead risk and vary every
-     minute. These are the best candidates for short-horizon (96-bar) prediction. Examples:
-     - Rolling 15-min / 30-min / 60-min return momentum
+     minute. These are the best candidates for short-horizon (60-180 bar) prediction. Examples:
+     - Rolling 15-min / 30-min / 60-min return momentum (15, 30, 60 bars respectively)
      - Rolling volatility (std of returns over 20-60 bars)
      - Distance of close from N-bar moving average (z-score)
      - RSI or similar oscillators computed on 1-min bars
      - VWAP deviation (requires volume — use $volume column)
      Always use `.shift(1)` on the lagged window (e.g. `rolling(N).mean().shift(1)`) to avoid using the
      current bar's own price in its own feature value.
+     NOTE: 1 bar = 1 minute. The data has ~1440 bars per full trading day. Do NOT use 96 as a day proxy.
 
 qlib_factor_output_format: |-
   Your output should be a pandas dataframe similar to the following example information:
