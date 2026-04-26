@@ -270,6 +270,11 @@ class LoopBase:
                         msg = "We have reset the loop instance, stop all the routines and resume."
                         raise self.LoopResumeError(msg) from e
                     else:
+                        # Do NOT advance step_idx for unhandled exceptions (e.g. LoopResumeError
+                        # propagating from _propose). Keeping step_idx at the current step lets
+                        # kickoff_loop retry step 0 on the next resume instead of permanently
+                        # corrupting the loop with a missing direct_exp_gen result.
+                        step_forward = False
                         raise  # re-raise unhandled exceptions
                 finally:
                     # No matter the execution succeed or not, we have to finish the following steps
