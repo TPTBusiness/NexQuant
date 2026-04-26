@@ -51,15 +51,17 @@ class FactorAutoFixer:
         self.fixes_applied = []
         fixed_code = code
 
-        # Apply fixes in order - groupby fixes MUST come before min_periods fixes
+        # Apply fixes in order
+        # NOTE: _fix_min_periods is intentionally excluded — it increased min_periods to
+        # match window size, which causes all-NaN output for intraday data with 96 bars/day
+        # (window=240 > 96 means zero valid bars per day). The LLM sets its own min_periods.
         fix_methods = [
             self._fix_reset_index_groupby,          # First: fix groupby(level=N) after reset_index()
             self._fix_groupby_mixed_levels,         # Second: fix groupby(level=[int, str])
             self._fix_groupby_column_on_multiindex, # Third: fix groupby(['instrument','date']) on MultiIndex
             self._fix_chained_groupby,              # Fourth: fix groupby(level=N).groupby('date') chain
             self._fix_rolling_ddof,                 # Fifth: remove unsupported ddof kwarg
-            self._fix_groupby_apply_to_transform,   # Fifth: fix groupby patterns
-            self._fix_min_periods,                  # Sixth: fix min_periods in rolling calls
+            self._fix_groupby_apply_to_transform,   # Sixth: fix groupby patterns
             self._fix_inf_nan_handling,             # Seventh: add inf/nan handling
             self._fix_data_range_processing,        # Eighth: ensure full data range
             self._fix_multiindex_groupby,           # Ninth: ensure groupby on MultiIndex
