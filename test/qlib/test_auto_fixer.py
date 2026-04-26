@@ -73,6 +73,20 @@ class TestChainedGroupby:
         assert '.groupby("date")' not in result
 
 
+class TestMinPeriodsNotTouched:
+    def test_small_min_periods_preserved(self, fixer):
+        # _fix_min_periods is disabled — LLM-set min_periods must not be changed.
+        # window=60, min_periods=1 should stay as-is (was wrongly raised to 60 before).
+        result = fixer.fix("df.groupby(level=1)['x'].transform(lambda x: x.rolling(window=60, min_periods=1).mean())")
+        assert "min_periods=1" in result
+
+    def test_large_window_min_periods_preserved(self, fixer):
+        # window=240 > 96 bars/day: if min_periods were set to 240 the output would be
+        # all-NaN for intraday data. Verify we leave it untouched.
+        result = fixer.fix("df['x'] = df.groupby(level=1)['y'].transform(lambda x: x.rolling(240, min_periods=10).std())")
+        assert "min_periods=10" in result
+
+
 class TestRollingDdof:
     def test_removes_ddof_from_rolling_args(self, fixer):
         result = fixer.fix("df.rolling(20, min_periods=1, ddof=1).std()")
