@@ -720,7 +720,13 @@ class APIBackend(ABC):
 
             if finish_reason is None or finish_reason != "length":
                 break  # we get a full response now.
-            new_messages.append({"role": "assistant", "content": response})
+            # Merge into the previous assistant message if there already is one at the end.
+            # Appending a second consecutive assistant message causes llama-server to return 400
+            # ("Cannot have 2 or more assistant messages at the end of the list").
+            if new_messages and new_messages[-1]["role"] == "assistant":
+                new_messages[-1]["content"] += response
+            else:
+                new_messages.append({"role": "assistant", "content": response})
         else:
             raise RuntimeError(f"Failed to continue the conversation after {try_n} retries.")
 
