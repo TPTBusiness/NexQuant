@@ -129,25 +129,51 @@ class FactorAutoFixer:
 
     def _fix_groupby_column_on_multiindex(self, code: str) -> str:
         """
-        Fix: groupby(['instrument', 'date']) on a MultiIndex DataFrame fails with
-        KeyError because 'instrument' and 'date' are index levels, not columns.
+        Fix: groupby(['instrument', 'date']) on a MultiIndex (datetime, instrument)
+        DataFrame fails with KeyError because those are index levels, not columns.
 
-        Replace with groupby(level=1) (instrument is level 1).
-        Also handle groupby(['date', 'instrument']) and single groupby('instrument').
+        Correct replacement preserves BOTH dimensions so intraday calculations reset
+        per day:
+            var.groupby(['instrument', 'date'])
+            → var.groupby([var.index.get_level_values(1), var.index.get_level_values(0).normalize()])
+
+        Single-column groupby(['instrument']) is correctly replaced with groupby(level=1).
+        Note: do NOT convert groupby('instrument') → groupby(level=1) here — that would
+        undo the reset_index_groupby fix which correctly emits groupby('instrument').
         """
         fixed_code = code
 
-        # groupby(['instrument', 'date']) or groupby(['date', 'instrument'])
-        # Note: do NOT convert groupby('instrument') → groupby(level=1) here —
-        # that would undo the reset_index_groupby fix which correctly emits groupby('instrument').
-        for pat, repl in [
-            (r"\.groupby\(\['instrument',\s*'date'\]\)", ".groupby(level=1)"),
-            (r"\.groupby\(\['date',\s*'instrument'\]\)", ".groupby(level=1)"),
-            (r"\.groupby\(\['instrument'\]\)", ".groupby(level=1)"),
-        ]:
-            if re.search(pat, fixed_code):
-                fixed_code = re.sub(pat, repl, fixed_code)
-                self.fixes_applied.append(f"multiindex_groupby: {pat} → {repl}")
+        def _replace_two_col_groupby(m: re.Match, order: str) -> str:
+            var = m.group(1)
+            if order == "instrument_date":
+                repl = (
+                    f"{var}.groupby([{var}.index.get_level_values(1), "
+                    f"{var}.index.get_level_values(0).normalize()])"
+                )
+            else:  # date_instrument
+                repl = (
+                    f"{var}.groupby([{var}.index.get_level_values(0).normalize(), "
+                    f"{var}.index.get_level_values(1)])"
+                )
+            self.fixes_applied.append(f"multiindex_groupby: {m.group(0)[:60]} → two-level")
+            return repl
+
+        # groupby(['instrument', 'date']) — capture variable name before .groupby
+        fixed_code = re.sub(
+            r'(\w+)\.groupby\(\[\'instrument\',\s*\'date\'\]\)',
+            lambda m: _replace_two_col_groupby(m, "instrument_date"),
+            fixed_code,
+        )
+        # groupby(['date', 'instrument'])
+        fixed_code = re.sub(
+            r'(\w+)\.groupby\(\[\'date\',\s*\'instrument\'\]\)',
+            lambda m: _replace_two_col_groupby(m, "date_instrument"),
+            fixed_code,
+        )
+        # single: groupby(['instrument']) → groupby(level=1)
+        if re.search(r"\.groupby\(\['instrument'\]\)", fixed_code):
+            fixed_code = re.sub(r"\.groupby\(\['instrument'\]\)", ".groupby(level=1)", fixed_code)
+            self.fixes_applied.append("multiindex_groupby: groupby(['instrument']) → groupby(level=1)")
 
         return fixed_code
 
