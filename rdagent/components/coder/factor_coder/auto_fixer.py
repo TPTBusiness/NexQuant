@@ -56,15 +56,16 @@ class FactorAutoFixer:
         # match window size, which causes all-NaN output for intraday data with 96 bars/day
         # (window=240 > 96 means zero valid bars per day). The LLM sets its own min_periods.
         fix_methods = [
-            self._fix_reset_index_groupby,          # First: fix groupby(level=N) after reset_index()
-            self._fix_groupby_mixed_levels,         # Second: fix groupby(level=[int, str])
-            self._fix_groupby_column_on_multiindex, # Third: fix groupby(['instrument','date']) on MultiIndex
-            self._fix_chained_groupby,              # Fourth: fix groupby(level=N).groupby('date') chain
-            self._fix_rolling_ddof,                 # Fifth: remove unsupported ddof kwarg
-            self._fix_groupby_apply_to_transform,   # Sixth: fix groupby patterns
-            self._fix_inf_nan_handling,             # Seventh: add inf/nan handling
-            self._fix_data_range_processing,        # Eighth: ensure full data range
-            self._fix_multiindex_groupby,           # Ninth: ensure groupby on MultiIndex
+            self._fix_instrument_column_access,     # First: fix df['instrument'] on MultiIndex
+            self._fix_reset_index_groupby,          # Second: fix groupby(level=N) after reset_index()
+            self._fix_groupby_mixed_levels,         # Third: fix groupby(level=[int, str])
+            self._fix_groupby_column_on_multiindex, # Fourth: fix groupby(['instrument','date']) on MultiIndex
+            self._fix_chained_groupby,              # Fifth: fix groupby(level=N).groupby('date') chain
+            self._fix_rolling_ddof,                 # Sixth: remove unsupported ddof kwarg
+            self._fix_groupby_apply_to_transform,   # Seventh: fix groupby patterns
+            self._fix_inf_nan_handling,             # Eighth: add inf/nan handling
+            self._fix_data_range_processing,        # Ninth: ensure full data range
+            self._fix_multiindex_groupby,           # Tenth: ensure groupby on MultiIndex
         ]
 
         for fix_method in fix_methods:
@@ -79,6 +80,38 @@ class FactorAutoFixer:
                 f"[AutoFix] Applied {len(self.fixes_applied)} fix(es) for {factor_task_info or 'unknown'}: "
                 f"{', '.join(self.fixes_applied)}"
             )
+
+        return fixed_code
+
+    def _fix_instrument_column_access(self, code: str) -> str:
+        """
+        Fix: df['instrument'] raises KeyError on a MultiIndex DataFrame because
+        'instrument' is an index level (level 1), not a column.
+
+        Replace df['instrument'] with df.index.get_level_values('instrument')
+        but only when the DataFrame has a MultiIndex (not after reset_index which
+        would have promoted it to a real column).
+
+        Also fixes df.reset_index()['instrument'] correctly since after reset_index
+        the column exists.
+        """
+        fixed_code = code
+
+        # Skip if already fixed or if reset_index() is being used before the access
+        # We only fix bare df['instrument'] where df is the original MultiIndex frame.
+        # Heuristic: if the assignment lhs or context shows reset_index, leave it alone.
+
+        # Pattern: <varname>['instrument'] where varname is NOT a reset_index result
+        reset_vars = set(re.findall(r'(\w+)\s*=\s*\w[^=\n]*\.reset_index\(', fixed_code))
+
+        def _replace_instrument_access(m: re.Match) -> str:
+            var = m.group(1)
+            if var in reset_vars:
+                return m.group(0)  # leave reset_index vars alone — column exists
+            self.fixes_applied.append(f"instrument_column: {var}['instrument'] → get_level_values(1)")
+            return f"{var}.index.get_level_values(1)"
+
+        fixed_code = re.sub(r"(\w+)\['instrument'\]", _replace_instrument_access, fixed_code)
 
         return fixed_code
 

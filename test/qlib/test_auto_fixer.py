@@ -101,6 +101,27 @@ class TestMinPeriodsNotTouched:
         assert "min_periods=10" in result
 
 
+class TestInstrumentColumnAccess:
+    def test_instrument_column_replaced(self, fixer):
+        code = "df['group_key'] = df['instrument'] + '_' + df['day_id'].astype(str)"
+        result = fixer.fix(code)
+        assert "df.index.get_level_values(1)" in result
+        assert "df['instrument']" not in result
+
+    def test_reset_index_var_not_touched(self, fixer):
+        # After reset_index, 'instrument' IS a real column — must not be replaced
+        code = "df_r = df.reset_index()\nval = df_r['instrument'].unique()"
+        result = fixer.fix(code)
+        assert "df_r['instrument']" in result
+        assert "get_level_values" not in result
+
+    def test_groupby_after_instrument_fix(self, fixer):
+        # Combined: df['instrument'] in a groupby context
+        code = "df['key'] = df['instrument']\nout = df.groupby(df['key'])[['$close']].mean()"
+        result = fixer.fix(code)
+        assert "df['instrument']" not in result
+
+
 class TestRollingDdof:
     def test_removes_ddof_from_rolling_args(self, fixer):
         result = fixer.fix("df.rolling(20, min_periods=1, ddof=1).std()")
