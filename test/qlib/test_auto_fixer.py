@@ -72,6 +72,20 @@ class TestChainedGroupby:
         assert "get_level_values" in result
         assert '.groupby("date")' not in result
 
+    def test_list_with_level_keyword_syntax_error(self, fixer):
+        # groupby([level=1, 'date']) is a SyntaxError — must be fixed before execution
+        code = "asian_vol = df[mask].groupby([level=1, 'date'])['log_return'].std()"
+        result = fixer.fix(code)
+        assert "get_level_values(1)" in result
+        assert "normalize()" in result
+        assert "level=1," not in result
+
+    def test_list_with_level_keyword_reversed(self, fixer):
+        code = "df.groupby(['date', level=1])['x'].mean()"
+        result = fixer.fix(code)
+        assert "get_level_values" in result
+        assert "level=1" not in result
+
 
 class TestMinPeriodsNotTouched:
     def test_small_min_periods_preserved(self, fixer):
