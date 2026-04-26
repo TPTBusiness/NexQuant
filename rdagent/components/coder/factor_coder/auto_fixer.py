@@ -53,11 +53,15 @@ class FactorAutoFixer:
 
         # Apply fixes in order - groupby fixes MUST come before min_periods fixes
         fix_methods = [
-            self._fix_groupby_apply_to_transform,  # First: fix groupby patterns
-            self._fix_min_periods,                  # Second: fix min_periods in resulting rolling calls
-            self._fix_inf_nan_handling,             # Third: add inf/nan handling
-            self._fix_data_range_processing,        # Fourth: ensure full data range
-            self._fix_multiindex_groupby,           # Fifth: ensure groupby on MultiIndex
+            self._fix_reset_index_groupby,          # First: fix groupby(level=N) after reset_index()
+            self._fix_groupby_mixed_levels,         # Second: fix groupby(level=[int, str])
+            self._fix_groupby_column_on_multiindex, # Third: fix groupby(['instrument','date']) on MultiIndex
+            self._fix_rolling_ddof,                 # Fourth: remove unsupported ddof kwarg
+            self._fix_groupby_apply_to_transform,   # Fifth: fix groupby patterns
+            self._fix_min_periods,                  # Sixth: fix min_periods in rolling calls
+            self._fix_inf_nan_handling,             # Seventh: add inf/nan handling
+            self._fix_data_range_processing,        # Eighth: ensure full data range
+            self._fix_multiindex_groupby,           # Ninth: ensure groupby on MultiIndex
         ]
 
         for fix_method in fix_methods:
@@ -73,6 +77,92 @@ class FactorAutoFixer:
                 f"{', '.join(self.fixes_applied)}"
             )
 
+        return fixed_code
+
+    def _fix_reset_index_groupby(self, code: str) -> str:
+        """
+        Fix: groupby(level=N) on a variable created by .reset_index() fails because
+        reset_index() converts the MultiIndex into regular columns, leaving a plain
+        RangeIndex.  Replace groupby(level=N) on such variables with
+        groupby('instrument').
+
+        Detected pattern:
+            varname = <anything>.reset_index(...)
+            ...
+            varname.groupby(level=0|1)
+        """
+        fixed_code = code
+
+        # Find all variables assigned via reset_index()
+        reset_vars = set(re.findall(r'(\w+)\s*=\s*\w[^=\n]*\.reset_index\(', fixed_code))
+
+        for var in reset_vars:
+            # Replace var.groupby(level=N) with var.groupby('instrument')
+            pattern = rf'{re.escape(var)}\.groupby\(level\s*=\s*\d+\)'
+            if re.search(pattern, fixed_code):
+                fixed_code = re.sub(pattern, f"{var}.groupby('instrument')", fixed_code)
+                self.fixes_applied.append(f"reset_index_groupby: {var}.groupby(level=N) → groupby('instrument')")
+
+        return fixed_code
+
+    def _fix_groupby_mixed_levels(self, code: str) -> str:
+        """
+        Fix: groupby(level=[int, 'str']) raises AssertionError because string level
+        names don't exist on an unnamed MultiIndex.  Keep only integer levels.
+
+        Pattern:  .groupby(level=[0, 'date'])  →  .groupby(level=0)
+                  .groupby(level=[1, 'date'])  →  .groupby(level=1)
+        """
+        fixed_code = code
+
+        def _keep_int_levels(m):
+            inner = m.group(1)
+            ints = re.findall(r'\b(\d+)\b', inner)
+            if not ints:
+                return m.group(0)
+            replacement = f'.groupby(level={ints[0]})' if len(ints) == 1 else f'.groupby(level=[{", ".join(ints)}])'
+            self.fixes_applied.append(f"mixed_levels: groupby(level=[...,str]) → {replacement}")
+            return replacement
+
+        fixed_code = re.sub(r'\.groupby\(level=\[([^\]]+)\]\)', _keep_int_levels, fixed_code)
+        return fixed_code
+
+    def _fix_groupby_column_on_multiindex(self, code: str) -> str:
+        """
+        Fix: groupby(['instrument', 'date']) on a MultiIndex DataFrame fails with
+        KeyError because 'instrument' and 'date' are index levels, not columns.
+
+        Replace with groupby(level=1) (instrument is level 1).
+        Also handle groupby(['date', 'instrument']) and single groupby('instrument').
+        """
+        fixed_code = code
+
+        # groupby(['instrument', 'date']) or groupby(['date', 'instrument'])
+        # Note: do NOT convert groupby('instrument') → groupby(level=1) here —
+        # that would undo the reset_index_groupby fix which correctly emits groupby('instrument').
+        for pat, repl in [
+            (r"\.groupby\(\['instrument',\s*'date'\]\)", ".groupby(level=1)"),
+            (r"\.groupby\(\['date',\s*'instrument'\]\)", ".groupby(level=1)"),
+            (r"\.groupby\(\['instrument'\]\)", ".groupby(level=1)"),
+        ]:
+            if re.search(pat, fixed_code):
+                fixed_code = re.sub(pat, repl, fixed_code)
+                self.fixes_applied.append(f"multiindex_groupby: {pat} → {repl}")
+
+        return fixed_code
+
+    def _fix_rolling_ddof(self, code: str) -> str:
+        """
+        Fix: pandas rolling().std(ddof=N) is not supported — ddof is ignored or
+        raises TypeError depending on pandas version.  Remove the ddof kwarg.
+        """
+        fixed_code = code
+        pattern = r'(\.rolling\([^)]+\)\.\w+\([^)]*),\s*ddof\s*=\s*\d+([^)]*\))'
+        if re.search(pattern, fixed_code):
+            fixed_code = re.sub(pattern, r'\1\2', fixed_code)
+            self.fixes_applied.append("rolling_ddof: removed unsupported ddof kwarg")
+        # Also handle ddof as only arg: .std(ddof=1) → .std()
+        fixed_code = re.sub(r'\.(std|var)\(ddof\s*=\s*\d+\)', r'.\1()', fixed_code)
         return fixed_code
 
     def _fix_min_periods(self, code: str) -> str:

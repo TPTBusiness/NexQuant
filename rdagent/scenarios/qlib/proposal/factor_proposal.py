@@ -1,4 +1,5 @@
 import json
+import os
 from typing import List, Tuple
 
 from rdagent.components.coder.factor_coder.factor import FactorExperiment, FactorTask
@@ -9,6 +10,47 @@ from rdagent.scenarios.qlib.experiment.model_experiment import QlibModelExperime
 from rdagent.scenarios.qlib.experiment.quant_experiment import QlibQuantScenario
 from rdagent.utils.agent.tpl import T
 
+
+def _build_compressed_history(trace: Trace, max_history: int) -> str:
+    """Return hypothesis_and_feedback string with only `max_history` entries.
+
+    Older entries beyond the last 2 are compressed to one bullet line each.
+    """
+    if len(trace.hist) == 0:
+        return "No previous hypothesis and feedback available since it's the first round."
+
+    FULL_DETAIL = 2
+    old_hist = trace.hist[:-FULL_DETAIL] if len(trace.hist) > FULL_DETAIL else []
+    recent_hist = trace.hist[-FULL_DETAIL:] if len(trace.hist) > FULL_DETAIL else trace.hist
+
+    parts = []
+    if old_hist:
+        lines = ["## Earlier experiments (summarized):"]
+        for exp, fb in old_hist:
+            names = []
+            for task in exp.sub_tasks:
+                if task is not None and hasattr(task, "factor_name"):
+                    names.append(task.factor_name)
+                elif task is not None and hasattr(task, "model_type"):
+                    names.append(getattr(task, "model_type", "model"))
+            ic_str = ""
+            try:
+                if exp.result is not None and "IC" in exp.result.index:
+                    ic_str = f" IC={exp.result.loc['IC']:.4f}"
+            except Exception:
+                pass
+            decision = "PASS" if fb.decision else "FAIL"
+            obs = (fb.observations or "")[:120].replace("\n", " ")
+            lines.append(f"- [{decision}]{ic_str} {', '.join(names) or 'unknown'}: {obs}")
+        parts.append("\n".join(lines))
+
+    if recent_hist:
+        rt = Trace(trace.scen)
+        rt.hist = recent_hist
+        parts.append(T("scenarios.qlib.prompts:hypothesis_and_feedback").r(trace=rt))
+
+    return "\n\n".join(parts)
+
 QlibFactorHypothesis = Hypothesis
 
 
@@ -17,13 +59,10 @@ class QlibFactorHypothesisGen(FactorHypothesisGen):
         super().__init__(scen)
 
     def prepare_context(self, trace: Trace) -> Tuple[dict, bool]:
-        hypothesis_and_feedback = (
-            T("scenarios.qlib.prompts:hypothesis_and_feedback").r(
-                trace=trace,
-            )
-            if len(trace.hist) > 0
-            else "No previous hypothesis and feedback available since it's the first round."
-        )
+        max_h = int(os.environ.get("QLIB_QUANT_MAX_FACTOR_HISTORY", "20"))
+        limited = Trace(trace.scen)
+        limited.hist = trace.hist[-max_h:] if len(trace.hist) > max_h else trace.hist
+        hypothesis_and_feedback = _build_compressed_history(limited, max_h)
         last_hypothesis_and_feedback = (
             T("scenarios.qlib.prompts:last_hypothesis_and_feedback").r(
                 experiment=trace.hist[-1][0], feedback=trace.hist[-1][1]
@@ -70,15 +109,15 @@ class QlibFactorHypothesis2Experiment(FactorHypothesis2Experiment):
         if len(trace.hist) == 0:
             hypothesis_and_feedback = "No previous hypothesis and feedback available since it's the first round."
         else:
+            max_h = int(os.environ.get("QLIB_QUANT_MAX_FACTOR_HISTORY", "20"))
+            factor_hist = [
+                e for e in trace.hist
+                if not hasattr(e[0].hypothesis, "action") or e[0].hypothesis.action == "factor"
+            ][-max_h:]
             specific_trace = Trace(trace.scen)
-            for i in range(len(trace.hist) - 1, -1, -1):
-                if not hasattr(trace.hist[i][0].hypothesis, "action") or trace.hist[i][0].hypothesis.action == "factor":
-                    specific_trace.hist.insert(0, trace.hist[i])
-            if len(specific_trace.hist) > 0:
-                specific_trace.hist.reverse()
-                hypothesis_and_feedback = T("scenarios.qlib.prompts:hypothesis_and_feedback").r(
-                    trace=specific_trace,
-                )
+            specific_trace.hist = factor_hist
+            if specific_trace.hist:
+                hypothesis_and_feedback = _build_compressed_history(specific_trace, max_h)
             else:
                 hypothesis_and_feedback = "No previous hypothesis and feedback available."
 
