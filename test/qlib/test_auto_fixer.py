@@ -58,6 +58,21 @@ class TestGroupbyColumnOnMultiindex:
         assert "groupby('instrument')" in result
 
 
+class TestChainedGroupby:
+    def test_chained_groupby_level_then_date(self, fixer):
+        code = "df.groupby(level=1).groupby('date')['price_volume'].transform('cumsum')"
+        result = fixer.fix(code)
+        assert "get_level_values(1)" in result
+        assert "get_level_values(0).normalize()" in result
+        assert ".groupby('date')" not in result
+
+    def test_chained_groupby_with_double_quotes(self, fixer):
+        code = 'df.groupby(level=0).groupby("date")["col"].sum()'
+        result = fixer.fix(code)
+        assert "get_level_values" in result
+        assert '.groupby("date")' not in result
+
+
 class TestRollingDdof:
     def test_removes_ddof_from_rolling_args(self, fixer):
         result = fixer.fix("df.rolling(20, min_periods=1, ddof=1).std()")
