@@ -153,16 +153,25 @@ class FactorAutoFixer:
 
     def _fix_rolling_ddof(self, code: str) -> str:
         """
-        Fix: pandas rolling().std(ddof=N) is not supported — ddof is ignored or
-        raises TypeError depending on pandas version.  Remove the ddof kwarg.
+        Fix: pandas rolling() does not accept a ddof kwarg — raises TypeError.
+        Remove ddof from both rolling(..., ddof=N) and rolling(...).std(ddof=N).
         """
         fixed_code = code
-        pattern = r'(\.rolling\([^)]+\)\.\w+\([^)]*),\s*ddof\s*=\s*\d+([^)]*\))'
-        if re.search(pattern, fixed_code):
-            fixed_code = re.sub(pattern, r'\1\2', fixed_code)
-            self.fixes_applied.append("rolling_ddof: removed unsupported ddof kwarg")
-        # Also handle ddof as only arg: .std(ddof=1) → .std()
-        fixed_code = re.sub(r'\.(std|var)\(ddof\s*=\s*\d+\)', r'.\1()', fixed_code)
+
+        # Form 1: ddof inside rolling() — .rolling(window=N, min_periods=M, ddof=K)
+        def _strip_ddof_from_rolling(m):
+            inner = re.sub(r',?\s*ddof\s*=\s*\d+', '', m.group(1))
+            inner = inner.strip(', ')
+            self.fixes_applied.append("rolling_ddof: removed ddof from rolling()")
+            return f'.rolling({inner})'
+
+        fixed_code = re.sub(r'\.rolling\(([^)]*ddof\s*=\s*\d+[^)]*)\)', _strip_ddof_from_rolling, fixed_code)
+
+        # Form 2: ddof inside .std() / .var() — .std(ddof=N)
+        if re.search(r'\.(std|var)\([^)]*ddof\s*=\s*\d+', fixed_code):
+            fixed_code = re.sub(r'\.(std|var)\([^)]*ddof\s*=\s*\d+[^)]*\)', r'.\1()', fixed_code)
+            self.fixes_applied.append("rolling_ddof: removed ddof from std()/var()")
+
         return fixed_code
 
     def _fix_min_periods(self, code: str) -> str:
