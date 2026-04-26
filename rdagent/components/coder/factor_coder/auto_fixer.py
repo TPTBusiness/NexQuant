@@ -56,7 +56,8 @@ class FactorAutoFixer:
             self._fix_reset_index_groupby,          # First: fix groupby(level=N) after reset_index()
             self._fix_groupby_mixed_levels,         # Second: fix groupby(level=[int, str])
             self._fix_groupby_column_on_multiindex, # Third: fix groupby(['instrument','date']) on MultiIndex
-            self._fix_rolling_ddof,                 # Fourth: remove unsupported ddof kwarg
+            self._fix_chained_groupby,              # Fourth: fix groupby(level=N).groupby('date') chain
+            self._fix_rolling_ddof,                 # Fifth: remove unsupported ddof kwarg
             self._fix_groupby_apply_to_transform,   # Fifth: fix groupby patterns
             self._fix_min_periods,                  # Sixth: fix min_periods in rolling calls
             self._fix_inf_nan_handling,             # Seventh: add inf/nan handling
@@ -175,6 +176,37 @@ class FactorAutoFixer:
             fixed_code = re.sub(r"\.groupby\(\['instrument'\]\)", ".groupby(level=1)", fixed_code)
             self.fixes_applied.append("multiindex_groupby: groupby(['instrument']) → groupby(level=1)")
 
+        return fixed_code
+
+    def _fix_chained_groupby(self, code: str) -> str:
+        """
+        Fix: var.groupby(level=N).groupby('date') is invalid — DataFrameGroupBy has no
+        .groupby() method.  The LLM learns this pattern from poisoned feedback that told
+        it to use groupby(level=1) for instrument, then tries to add a date dimension on
+        top.
+
+        Replace the entire chain with a proper two-level groupby:
+            var.groupby(level=1).groupby('date')
+            → var.groupby([var.index.get_level_values(1),
+                           var.index.get_level_values(0).normalize()])
+        """
+        fixed_code = code
+
+        def _replace_chained(m: re.Match) -> str:
+            var = m.group(1)
+            repl = (
+                f"{var}.groupby([{var}.index.get_level_values(1), "
+                f"{var}.index.get_level_values(0).normalize()])"
+            )
+            self.fixes_applied.append(f"chained_groupby: {m.group(0)[:60]} → two-level")
+            return repl
+
+        # var.groupby(level=N).groupby('date') or .groupby("date")
+        fixed_code = re.sub(
+            r'(\w+)\.groupby\(level=\d+\)\.groupby\(["\']date["\']\)',
+            _replace_chained,
+            fixed_code,
+        )
         return fixed_code
 
     def _fix_rolling_ddof(self, code: str) -> str:
