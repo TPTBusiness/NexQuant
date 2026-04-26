@@ -182,33 +182,53 @@ class FactorAutoFixer:
 
     def _fix_chained_groupby(self, code: str) -> str:
         """
-        Fix: var.groupby(level=N).groupby('date') is invalid — DataFrameGroupBy has no
-        .groupby() method.  The LLM learns this pattern from poisoned feedback that told
-        it to use groupby(level=1) for instrument, then tries to add a date dimension on
-        top.
+        Fix two broken patterns the LLM generates when trying to group by (instrument, date):
 
-        Replace the entire chain with a proper two-level groupby:
+        Pattern A — chained groupby (runtime AttributeError):
             var.groupby(level=1).groupby('date')
             → var.groupby([var.index.get_level_values(1),
                            var.index.get_level_values(0).normalize()])
+
+        Pattern B — keyword arg inside list (SyntaxError):
+            var.groupby([level=1, 'date'])
+            → same two-level replacement
         """
         fixed_code = code
 
-        def _replace_chained(m: re.Match) -> str:
-            var = m.group(1)
-            repl = (
+        def _two_level(var: str, tag: str) -> str:
+            self.fixes_applied.append(f"chained_groupby: {tag} → two-level")
+            return (
                 f"{var}.groupby([{var}.index.get_level_values(1), "
                 f"{var}.index.get_level_values(0).normalize()])"
             )
-            self.fixes_applied.append(f"chained_groupby: {m.group(0)[:60]} → two-level")
-            return repl
 
-        # var.groupby(level=N).groupby('date') or .groupby("date")
+        # Pattern A: var.groupby(level=N).groupby('date')
         fixed_code = re.sub(
             r'(\w+)\.groupby\(level=\d+\)\.groupby\(["\']date["\']\)',
-            _replace_chained,
+            lambda m: _two_level(m.group(1), m.group(0)[:60]),
             fixed_code,
         )
+
+        # Pattern B: .groupby([level=N, 'date']) — SyntaxError in Python.
+        # The variable before .groupby may be complex (e.g. df[mask]) so we don't
+        # try to capture it; we use df as the index reference (always correct since
+        # all filtered frames share df's MultiIndex structure).
+        def _two_level_df(tag: str) -> str:
+            self.fixes_applied.append(f"chained_groupby: {tag} → two-level")
+            return ".groupby([df.index.get_level_values(1), df.index.get_level_values(0).normalize()])"
+
+        fixed_code = re.sub(
+            r'\.groupby\(\[\s*level\s*=\s*\d+\s*,\s*["\']?date["\']?\s*\]\)',
+            lambda m: _two_level_df(m.group(0)[:60]),
+            fixed_code,
+        )
+        # Also handle reversed order: ['date', level=N]
+        fixed_code = re.sub(
+            r'\.groupby\(\[\s*["\']?date["\']?\s*,\s*level\s*=\s*\d+\s*\]\)',
+            lambda m: _two_level_df(m.group(0)[:60]),
+            fixed_code,
+        )
+
         return fixed_code
 
     def _fix_rolling_ddof(self, code: str) -> str:
