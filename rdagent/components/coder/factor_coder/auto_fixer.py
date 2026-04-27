@@ -654,6 +654,25 @@ class FactorAutoFixer:
                 f"groupby: {df_var}.groupby(level={level})['{col}'].apply() → transform()"
             )
 
+        # === FIX: .transform(...).reset_index(level=N, drop=True) ===
+        # transform() already returns the same index as the input — adding reset_index()
+        # after it drops an index level and causes ValueError on assignment back to df['col'].
+        # Detected line-by-line: if a line contains both .transform( and .reset_index(level=
+        reset_suffix = re.compile(r'\s*\.reset_index\s*\(\s*level\s*=[^,)]+,\s*drop\s*=\s*True\s*\)\s*$')
+        new_lines = []
+        changed = False
+        for line in fixed_code.splitlines():
+            if '.transform(' in line and '.reset_index(' in line:
+                cleaned = reset_suffix.sub('', line)
+                if cleaned != line:
+                    new_lines.append(cleaned)
+                    changed = True
+                    continue
+            new_lines.append(line)
+        if changed:
+            fixed_code = '\n'.join(new_lines)
+            self.fixes_applied.append("groupby: removed spurious .reset_index() after .transform()")
+
         # Pattern: Simple groupby().apply() with rolling().method()
         # df.groupby(level=N).apply(lambda x: x['col'].rolling(...).method())
         apply_pattern = r"df\.groupby\(level=(\d+)\)\.apply\(\s*lambda\s+x:\s+x\['([^']+)'\]\.rolling\([^)]+\)\.(\w+)\([^)]*\)\s*\)"
