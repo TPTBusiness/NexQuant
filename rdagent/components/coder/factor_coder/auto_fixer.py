@@ -112,7 +112,9 @@ class FactorAutoFixer:
             self.fixes_applied.append(f"instrument_column: {var}['instrument'] → get_level_values(1)")
             return f"{var}.index.get_level_values(1)"
 
-        fixed_code = re.sub(r"(\w+)\['instrument'\]", _replace_instrument_access, fixed_code)
+        # Exclude assignment targets: var['instrument'] = ... must not become
+        # var.index.get_level_values(1) = ... (SyntaxError: cannot assign to function call)
+        fixed_code = re.sub(r"(\w+)\['instrument'\](?!\s*=)", _replace_instrument_access, fixed_code)
 
         return fixed_code
 
@@ -226,8 +228,14 @@ class FactorAutoFixer:
         """
         fixed_code = code
 
+        # Variables created via reset_index() have a plain RangeIndex — applying
+        # get_level_values() on them would raise AttributeError. Skip those.
+        reset_vars = set(re.findall(r'(\w+)\s*=\s*\w[^=\n]*\.reset_index\(', fixed_code))
+
         def _replace_two_col_groupby(m: re.Match, order: str) -> str:
             var = m.group(1)
+            if var in reset_vars:
+                return m.group(0)  # leave reset_index vars alone — RangeIndex, not MultiIndex
             if order == "instrument_date":
                 repl = (
                     f"{var}.groupby([{var}.index.get_level_values(1), "
@@ -253,10 +261,19 @@ class FactorAutoFixer:
             lambda m: _replace_two_col_groupby(m, "date_instrument"),
             fixed_code,
         )
-        # single: groupby(['instrument']) → groupby(level=1)
-        if re.search(r"\.groupby\(\['instrument'\]\)", fixed_code):
-            fixed_code = re.sub(r"\.groupby\(\['instrument'\]\)", ".groupby(level=1)", fixed_code)
+        # single: groupby(['instrument']) → groupby(level=1), but not on reset_index vars
+        def _replace_single_instrument_groupby(m: re.Match) -> str:
+            # Look backwards to find the variable name
+            prefix = fixed_code[: m.start()]
+            var_match = re.search(r'(\w+)\s*$', prefix)
+            var = var_match.group(1) if var_match else ''
+            if var in reset_vars:
+                return m.group(0)
             self.fixes_applied.append("multiindex_groupby: groupby(['instrument']) → groupby(level=1)")
+            return ".groupby(level=1)"
+
+        if re.search(r"\.groupby\(\['instrument'\]\)", fixed_code):
+            fixed_code = re.sub(r"\.groupby\(\['instrument'\]\)", _replace_single_instrument_groupby, fixed_code)
 
         # groupby(level=['instrument', 'date']) — uses level= keyword with string names.
         # 'date' is NOT a valid level name in our (datetime, instrument) MultiIndex;
