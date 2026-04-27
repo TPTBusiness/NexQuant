@@ -205,6 +205,40 @@ class TestGroupbyApplyToTransform:
         assert ".transform(" in result
 
 
+class TestZeroVolumeProxy:
+    def test_injects_proxy_when_volume_used(self, fixer):
+        code = (
+            "def calc():\n"
+            "    df = pd.read_hdf('data.h5', key='data')\n"
+            "    df['pv'] = df['$close'] * df['$volume']\n"
+            "    return df[['pv']]\n"
+        )
+        result = fixer.fix(code)
+        assert "volume proxy" in result
+        assert "df['$volume'] = df['$high'] - df['$low']" in result
+        # Proxy must come right after read_hdf line
+        lines = result.splitlines()
+        hdf_idx = next(i for i, l in enumerate(lines) if "read_hdf" in l)
+        assert "volume proxy" in lines[hdf_idx + 1]
+
+    def test_no_injection_when_volume_absent(self, fixer):
+        code = "df = pd.read_hdf('data.h5', key='data')\ndf['x'] = df['$close'].pct_change()\n"
+        result = fixer.fix(code)
+        assert "volume proxy" not in result
+
+    def test_no_double_injection(self, fixer):
+        code = (
+            "def calc():\n"
+            "    df = pd.read_hdf('data.h5', key='data')\n"
+            "    # volume proxy: $volume is always 0 in FX data — use price-range as proxy\n"
+            "    if (df['$volume'] == 0).all():\n"
+            "        df['$volume'] = df['$high'] - df['$low']\n"
+            "    df['pv'] = df['$close'] * df['$volume']\n"
+        )
+        result = fixer.fix(code)
+        assert result.count("volume proxy") == 1
+
+
 class TestRollingDdof:
     def test_removes_ddof_from_rolling_args(self, fixer):
         result = fixer.fix("df.rolling(20, min_periods=1, ddof=1).std()")
