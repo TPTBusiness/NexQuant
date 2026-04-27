@@ -258,6 +258,39 @@ class FactorAutoFixer:
             fixed_code = re.sub(r"\.groupby\(\['instrument'\]\)", ".groupby(level=1)", fixed_code)
             self.fixes_applied.append("multiindex_groupby: groupby(['instrument']) → groupby(level=1)")
 
+        # groupby(level=['instrument', 'date']) — uses level= keyword with string names.
+        # 'date' is NOT a valid level name in our (datetime, instrument) MultiIndex;
+        # replace with get_level_values to normalize datetime to daily timestamps.
+        fixed_code = re.sub(
+            r"(\w+)\.groupby\(level=\['instrument',\s*'date'\]\)",
+            lambda m: (
+                self.fixes_applied.append(
+                    f"multiindex_groupby: {m.group(0)[:60]} → two-level get_level_values"
+                )
+                or f"{m.group(1)}.groupby([{m.group(1)}.index.get_level_values(1), "
+                f"{m.group(1)}.index.get_level_values(0).normalize()])"
+            ),
+            fixed_code,
+        )
+        # groupby(level=['date', 'instrument'])
+        fixed_code = re.sub(
+            r"(\w+)\.groupby\(level=\['date',\s*'instrument'\]\)",
+            lambda m: (
+                self.fixes_applied.append(
+                    f"multiindex_groupby: {m.group(0)[:60]} → two-level get_level_values"
+                )
+                or f"{m.group(1)}.groupby([{m.group(1)}.index.get_level_values(0).normalize(), "
+                f"{m.group(1)}.index.get_level_values(1)])"
+            ),
+            fixed_code,
+        )
+        # single: groupby(level=['instrument']) → groupby(level=1)
+        fixed_code = re.sub(
+            r"\.groupby\(level=\['instrument'\]\)",
+            lambda m: (self.fixes_applied.append("multiindex_groupby: groupby(level=['instrument']) → level=1") or ".groupby(level=1)"),
+            fixed_code,
+        )
+
         return fixed_code
 
     def _fix_chained_groupby(self, code: str) -> str:
@@ -583,6 +616,26 @@ class FactorAutoFixer:
             )
             fixed_code = fixed_code.replace(old_code, new_code)
             self.fixes_applied.append(f"groupby: fixed rolling correlation (window={window}) with reset_index")
+
+        # === GENERAL FIX: DF.groupby(level=N)['col'].apply(lambda x: EXPR) ===
+        # apply() on a grouped Series returns a MultiIndex result (extra level prepended),
+        # causing index shape mismatch when assigned back to df['col'].
+        # Replace with transform() which preserves the original index.
+        col_apply_pattern = re.compile(
+            r"(\w+)\.groupby\(level=(\d+)\)\['([^']+)'\]\.apply\((\s*lambda\s+\w+\s*:.*?)\)",
+            re.DOTALL,
+        )
+        for m in list(col_apply_pattern.finditer(fixed_code)):
+            full = m.group(0)
+            df_var = m.group(1)
+            level = m.group(2)
+            col = m.group(3)
+            lam = m.group(4).strip()
+            new_expr = f"{df_var}.groupby(level={level})['{col}'].transform({lam})"
+            fixed_code = fixed_code.replace(full, new_expr, 1)
+            self.fixes_applied.append(
+                f"groupby: {df_var}.groupby(level={level})['{col}'].apply() → transform()"
+            )
 
         # Pattern: Simple groupby().apply() with rolling().method()
         # df.groupby(level=N).apply(lambda x: x['col'].rolling(...).method())
