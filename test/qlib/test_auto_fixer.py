@@ -197,6 +197,13 @@ class TestGroupbyApplyToTransform:
         assert "lambda x: x.cumsum()" in result
         assert ".transform(" in result
 
+    def test_transform_reset_index_stripped(self, fixer):
+        # .transform() already preserves index — .reset_index() after it is wrong
+        code = "df['v'] = df.groupby(level=1)['x'].transform(lambda x: x.rolling(20).mean()).reset_index(level=0, drop=True)"
+        result = fixer.fix(code)
+        assert ".reset_index(level=0, drop=True)" not in result
+        assert ".transform(" in result
+
 
 class TestRollingDdof:
     def test_removes_ddof_from_rolling_args(self, fixer):
