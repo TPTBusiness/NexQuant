@@ -8,7 +8,7 @@
 # Only install if you want to use full PPO/A2C/SAC training.
 
 # Core RL library
-stable-baselines3[extra]>=2.0.0
+stable-baselines3[extra]>=2.8.0
 
 # Gymnasium environment (OpenAI Gym successor)
 gymnasium>=0.29.0
