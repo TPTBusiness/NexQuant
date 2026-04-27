@@ -10,7 +10,7 @@ fire
 fuzzywuzzy
 openai
 litellm>=1.83.14  # to support `from litellm import get_valid_models`
-aiohttp>=3.13.4  # CVE-2026-22815, CVE-2026-34515, CVE-2026-34516, CVE-2026-34525
+aiohttp>=3.13.5  # CVE-2026-22815, CVE-2026-34515, CVE-2026-34516, CVE-2026-34525
 azure.identity
 pyarrow
 rich
@@ -99,7 +99,7 @@ beautifulsoup4>=4.12.0
 
 # ML Training Pipeline
 lightgbm>=3.3.5
-scipy>=1.9.0
+scipy>=1.15.3
 
 # RL Trading (optional - system works without these)
 # Install for full RL training: pip install stable-baselines3[extra] gymnasium
