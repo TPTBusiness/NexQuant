@@ -122,6 +122,40 @@ class TestInstrumentColumnAccess:
         assert "df['instrument']" not in result
 
 
+class TestInstrumentLocMultiindex:
+    def test_loc_replaced_with_xs(self, fixer):
+        code = (
+            "for instrument in df.index.get_level_values('instrument').unique():\n"
+            "    inst_df = df.loc[instrument].copy()\n"
+        )
+        result = fixer.fix(code)
+        assert "df.xs(instrument, level=1)" in result
+        assert "df.loc[instrument]" not in result
+
+    def test_loc_replaced_with_level1_int(self, fixer):
+        code = (
+            "for inst in df.index.get_level_values(1).unique():\n"
+            "    data = df.loc[inst]\n"
+        )
+        result = fixer.fix(code)
+        assert "df.xs(inst, level=1)" in result
+
+    def test_loc_assignment_not_touched(self, fixer):
+        # Write-back df.loc[instrument] = ... must not be changed
+        code = (
+            "for instrument in df.index.get_level_values('instrument').unique():\n"
+            "    df.loc[instrument] = modified\n"
+        )
+        result = fixer.fix(code)
+        assert "df.loc[instrument] = modified" in result
+
+    def test_non_instrument_loop_not_touched(self, fixer):
+        # for-loop not related to instrument levels must not be changed
+        code = "for date in dates:\n    sub = df.loc[date]\n"
+        result = fixer.fix(code)
+        assert "df.loc[date]" in result
+
+
 class TestRollingDdof:
     def test_removes_ddof_from_rolling_args(self, fixer):
         result = fixer.fix("df.rolling(20, min_periods=1, ddof=1).std()")
