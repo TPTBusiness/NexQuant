@@ -57,15 +57,16 @@ class FactorAutoFixer:
         # (window=240 > 96 means zero valid bars per day). The LLM sets its own min_periods.
         fix_methods = [
             self._fix_instrument_column_access,     # First: fix df['instrument'] on MultiIndex
-            self._fix_reset_index_groupby,          # Second: fix groupby(level=N) after reset_index()
-            self._fix_groupby_mixed_levels,         # Third: fix groupby(level=[int, str])
-            self._fix_groupby_column_on_multiindex, # Fourth: fix groupby(['instrument','date']) on MultiIndex
-            self._fix_chained_groupby,              # Fifth: fix groupby(level=N).groupby('date') chain
-            self._fix_rolling_ddof,                 # Sixth: remove unsupported ddof kwarg
-            self._fix_groupby_apply_to_transform,   # Seventh: fix groupby patterns
-            self._fix_inf_nan_handling,             # Eighth: add inf/nan handling
-            self._fix_data_range_processing,        # Ninth: ensure full data range
-            self._fix_multiindex_groupby,           # Tenth: ensure groupby on MultiIndex
+            self._fix_instrument_loc_multiindex,    # Second: fix df.loc[instrument_var] on MultiIndex
+            self._fix_reset_index_groupby,          # Third: fix groupby(level=N) after reset_index()
+            self._fix_groupby_mixed_levels,         # Fourth: fix groupby(level=[int, str])
+            self._fix_groupby_column_on_multiindex, # Fifth: fix groupby(['instrument','date']) on MultiIndex
+            self._fix_chained_groupby,              # Sixth: fix groupby(level=N).groupby('date') chain
+            self._fix_rolling_ddof,                 # Seventh: remove unsupported ddof kwarg
+            self._fix_groupby_apply_to_transform,   # Eighth: fix groupby patterns
+            self._fix_inf_nan_handling,             # Ninth: add inf/nan handling
+            self._fix_data_range_processing,        # Tenth: ensure full data range
+            self._fix_multiindex_groupby,           # Eleventh: ensure groupby on MultiIndex
         ]
 
         for fix_method in fix_methods:
@@ -112,6 +113,52 @@ class FactorAutoFixer:
             return f"{var}.index.get_level_values(1)"
 
         fixed_code = re.sub(r"(\w+)\['instrument'\]", _replace_instrument_access, fixed_code)
+
+        return fixed_code
+
+    def _fix_instrument_loc_multiindex(self, code: str) -> str:
+        """
+        Fix: df.loc[instrument_var] raises DateParseError on a (datetime, instrument)
+        MultiIndex because pandas tries to match the instrument string against the
+        datetime level (level 0).
+
+        Pattern detected: for-loops iterating over get_level_values('instrument') or
+        get_level_values(1) where the loop variable is then used as df.loc[loop_var].
+
+        Replacement: df.loc[instrument_var] → df.xs(instrument_var, level=1)
+        """
+        fixed_code = code
+
+        # Find variables iterated from get_level_values('instrument') or get_level_values(1)
+        inst_vars = set(
+            re.findall(
+                r"for\s+(\w+)\s+in\s+.+?\.get_level_values\s*\(\s*(?:1|['\"]instrument['\"])\s*\)[^:\n]*:",
+                code,
+            )
+        )
+
+        if not inst_vars:
+            return fixed_code
+
+        for var in inst_vars:
+            # Replace DF.loc[var] (read) with DF.xs(var, level=1)
+            # Exclude write-back patterns (DF.loc[var] = ...) — leave those as-is
+            def _make_replacer(v: str):
+                def _replace(m: re.Match) -> str:
+                    df_var = m.group(1)
+                    self.fixes_applied.append(
+                        f"instrument_loc: {df_var}.loc[{v}] → {df_var}.xs({v}, level=1)"
+                    )
+                    return f"{df_var}.xs({v}, level=1)"
+
+                return _replace
+
+            # Only match when NOT followed by ' =' (assignment)
+            fixed_code = re.sub(
+                rf"(\w+)\.loc\[\s*{re.escape(var)}\s*\](?!\s*=)",
+                _make_replacer(var),
+                fixed_code,
+            )
 
         return fixed_code
 
