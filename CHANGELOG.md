@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.3.5](https://github.com/TPTBusiness/Predix/compare/v1.3.4...v1.3.5) (2026-04-27)
+
+
+### Bug Fixes
+
+* **auto-fixer:** add five new factor code fixes for groupby/apply errors ([449c8fd](https://github.com/TPTBusiness/Predix/commit/449c8fd70a327e604dcca122e4a134f0cca918e4))
+* **auto-fixer:** add four new factor code fixes for common runtime errors ([40484f6](https://github.com/TPTBusiness/Predix/commit/40484f6d300425da481f1edd325da4acbc06ec7d))
+* **auto-fixer:** add groupby([level=N,'date']) SyntaxError fix ([ca77c00](https://github.com/TPTBusiness/Predix/commit/ca77c005bea4abdd8854c1de2b0e8d03b7742161))
+* **auto-fixer:** disable _fix_min_periods for intraday data ([77b0740](https://github.com/TPTBusiness/Predix/commit/77b0740f059349df7e769a378af728aa33b2070e))
+* **auto-fixer:** fix chained groupby(level=N).groupby('date') pattern ([7d5fe32](https://github.com/TPTBusiness/Predix/commit/7d5fe32b31a19ce8b04bd8f5a430720fdb748f7a))
+* **auto-fixer:** fix df.loc[instrument] DateParseError on MultiIndex frames ([b7860ea](https://github.com/TPTBusiness/Predix/commit/b7860eafc0ad26384947ce0510ecf4e9f3425807))
+* **auto-fixer:** fix df['instrument'] KeyError on MultiIndex frames ([aad6bd1](https://github.com/TPTBusiness/Predix/commit/aad6bd1c7c720b3d486e0cf248337f32394773b1))
+* **auto-fixer:** fix two assignment-target bugs in instrument column fixers ([421eedf](https://github.com/TPTBusiness/Predix/commit/421eedffed4b883c24397dc5581c019a3985277f))
+* **auto-fixer:** preserve date dimension in groupby(['instrument','date']) fix ([b58fdd8](https://github.com/TPTBusiness/Predix/commit/b58fdd8be43720b5d4363e0f8de9a01591d4d2dc))
+* **auto-fixer:** remove ddof from rolling() args, not only from std()/var() ([b0fc328](https://github.com/TPTBusiness/Predix/commit/b0fc328d0d4a041c65d8eeb32cb3f2bb86568406))
+* **auto-fixer:** replace zero \$volume with price-range proxy for FX data ([3e6732f](https://github.com/TPTBusiness/Predix/commit/3e6732fa6cfcc4423ba11918de9568549ec5748c))
+* **auto-fixer:** strip spurious .reset_index() after .transform() calls ([8708aae](https://github.com/TPTBusiness/Predix/commit/8708aae6e08728cda1875c775a76dc92e43576f3))
+* **loop:** prevent step_idx advance on unhandled exceptions + fix consecutive assistant messages ([5ec4ad1](https://github.com/TPTBusiness/Predix/commit/5ec4ad1b96b5b99ef42bea7bb828cb1ef709a688))
+
 ## [1.3.4](https://github.com/TPTBusiness/Predix/compare/v1.3.3...v1.3.4) (2026-04-27)
 
 
