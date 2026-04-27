@@ -156,6 +156,41 @@ class TestInstrumentLocMultiindex:
         assert "df.loc[date]" in result
 
 
+class TestGroupbyLevelStringNames:
+    def test_level_instrument_date_replaced(self, fixer):
+        code = "df.groupby(level=['instrument', 'date'])['col'].transform('sum')"
+        result = fixer.fix(code)
+        assert "get_level_values(1)" in result
+        assert "get_level_values(0).normalize()" in result
+        assert "level=['instrument', 'date']" not in result
+
+    def test_level_date_instrument_replaced(self, fixer):
+        code = "data.groupby(level=['date', 'instrument'])['x'].mean()"
+        result = fixer.fix(code)
+        assert "get_level_values(0).normalize()" in result
+        assert "get_level_values(1)" in result
+
+    def test_level_instrument_single_replaced(self, fixer):
+        code = "df.groupby(level=['instrument'])['vol'].sum()"
+        result = fixer.fix(code)
+        assert "groupby(level=1)" in result
+        assert "level=['instrument']" not in result
+
+
+class TestGroupbyApplyToTransform:
+    def test_col_apply_lambda_replaced(self, fixer):
+        code = "df_overlap.groupby(level=1)['$close'].apply(lambda x: np.log(x / x.shift(1)))"
+        result = fixer.fix(code)
+        assert ".transform(" in result
+        assert ".apply(" not in result
+
+    def test_col_apply_lambda_preserves_lambda_body(self, fixer):
+        code = "series.groupby(level=1)['ret'].apply(lambda x: x.cumsum())"
+        result = fixer.fix(code)
+        assert "lambda x: x.cumsum()" in result
+        assert ".transform(" in result
+
+
 class TestRollingDdof:
     def test_removes_ddof_from_rolling_args(self, fixer):
         result = fixer.fix("df.rolling(20, min_periods=1, ddof=1).std()")
