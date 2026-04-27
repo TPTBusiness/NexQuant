@@ -121,6 +121,13 @@ class TestInstrumentColumnAccess:
         result = fixer.fix(code)
         assert "df['instrument']" not in result
 
+    def test_assignment_target_not_touched(self, fixer):
+        # df['instrument'] = <expr> is an assignment — must NOT be converted to
+        # df.index.get_level_values(1) = <expr> (SyntaxError)
+        code = "df['instrument'] = df.index.get_level_values('instrument')"
+        result = fixer.fix(code)
+        assert "df['instrument'] =" in result
+
 
 class TestInstrumentLocMultiindex:
     def test_loc_replaced_with_xs(self, fixer):
