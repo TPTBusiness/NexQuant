@@ -58,15 +58,16 @@ class FactorAutoFixer:
         fix_methods = [
             self._fix_instrument_column_access,     # First: fix df['instrument'] on MultiIndex
             self._fix_instrument_loc_multiindex,    # Second: fix df.loc[instrument_var] on MultiIndex
-            self._fix_reset_index_groupby,          # Third: fix groupby(level=N) after reset_index()
-            self._fix_groupby_mixed_levels,         # Fourth: fix groupby(level=[int, str])
-            self._fix_groupby_column_on_multiindex, # Fifth: fix groupby(['instrument','date']) on MultiIndex
-            self._fix_chained_groupby,              # Sixth: fix groupby(level=N).groupby('date') chain
-            self._fix_rolling_ddof,                 # Seventh: remove unsupported ddof kwarg
-            self._fix_groupby_apply_to_transform,   # Eighth: fix groupby patterns
-            self._fix_inf_nan_handling,             # Ninth: add inf/nan handling
-            self._fix_data_range_processing,        # Tenth: ensure full data range
-            self._fix_multiindex_groupby,           # Eleventh: ensure groupby on MultiIndex
+            self._fix_zero_volume_proxy,            # Third: replace zero $volume with range proxy
+            self._fix_reset_index_groupby,          # Fourth: fix groupby(level=N) after reset_index()
+            self._fix_groupby_mixed_levels,         # Fifth: fix groupby(level=[int, str])
+            self._fix_groupby_column_on_multiindex, # Sixth: fix groupby(['instrument','date']) on MultiIndex
+            self._fix_chained_groupby,              # Seventh: fix groupby(level=N).groupby('date') chain
+            self._fix_rolling_ddof,                 # Eighth: remove unsupported ddof kwarg
+            self._fix_groupby_apply_to_transform,   # Ninth: fix groupby patterns
+            self._fix_inf_nan_handling,             # Tenth: add inf/nan handling
+            self._fix_data_range_processing,        # Eleventh: ensure full data range
+            self._fix_multiindex_groupby,           # Twelfth: ensure groupby on MultiIndex
         ]
 
         for fix_method in fix_methods:
@@ -163,6 +164,52 @@ class FactorAutoFixer:
             )
 
         return fixed_code
+
+    def _fix_zero_volume_proxy(self, code: str) -> str:
+        """
+        Fix: $volume is always 0 in our EUR/USD dataset (FX has no real volume).
+        Any factor using $volume (VWAP, volume-weighted returns, etc.) produces
+        all-NaN output because 0*price=0 and sum(0)/sum(0)=NaN.
+
+        Insert a guard right after pd.read_hdf() that replaces zero volume with
+        the intraday price-range proxy ($high - $low) so volume-weighted factors
+        produce meaningful signals.
+        """
+        if "'$volume'" not in code and '"$volume"' not in code:
+            return code
+
+        # Already patched
+        if "volume proxy" in code:
+            return code
+
+        lines = code.splitlines()
+        insert_after = -1
+        df_var = "df"
+        indent = "    "
+
+        for i, line in enumerate(lines):
+            if "read_hdf(" in line:
+                m = re.match(r"(\s*)(\w+)\s*=\s*", line)
+                if m:
+                    indent = m.group(1)
+                    df_var = m.group(2)
+                else:
+                    m2 = re.match(r"(\s*)", line)
+                    indent = m2.group(1) if m2 else "    "
+                insert_after = i
+                break
+
+        if insert_after == -1:
+            return code
+
+        proxy_lines = [
+            f"{indent}# volume proxy: $volume is always 0 in FX data — use price-range as proxy",
+            f"{indent}if ({df_var}['$volume'] == 0).all():",
+            f"{indent}    {df_var}['$volume'] = {df_var}['$high'] - {df_var}['$low']",
+        ]
+        lines = lines[: insert_after + 1] + proxy_lines + lines[insert_after + 1 :]
+        self.fixes_applied.append("volume_proxy: replaced zero $volume with ($high - $low)")
+        return "\n".join(lines)
 
     def _fix_reset_index_groupby(self, code: str) -> str:
         """
