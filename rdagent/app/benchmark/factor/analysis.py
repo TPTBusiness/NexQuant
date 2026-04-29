@@ -1,5 +1,5 @@
 import json
-import pickle
+import pickle  # nosec B301
 from pathlib import Path
 
 import fire

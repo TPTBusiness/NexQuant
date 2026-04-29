@@ -3,7 +3,7 @@ FT Job Summary View
 Display summary table for all tasks in a job directory
 """
 
-import pickle
+import pickle  # nosec B301
 from pathlib import Path
 
 import pandas as pd

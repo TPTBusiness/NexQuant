@@ -2,7 +2,7 @@
 This is the preliminary version of the APE (Automated Prompt Engineering)
 """
 
-import pickle
+import pickle  # nosec B301
 from pathlib import Path
 
 from rdagent.log.conf import LOG_SETTINGS

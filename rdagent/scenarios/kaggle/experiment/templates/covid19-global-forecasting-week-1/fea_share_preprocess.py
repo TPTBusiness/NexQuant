@@ -44,12 +44,12 @@ def prepreprocess():
 
 def preprocess_script():
     if os.path.exists("/kaggle/input/X_train.pkl"):
-        X_train = pd.read_pickle("/kaggle/input/X_train.pkl")
-        X_valid = pd.read_pickle("/kaggle/input/X_valid.pkl")
-        y_train = pd.read_pickle("/kaggle/input/y_train.pkl")
-        y_valid = pd.read_pickle("/kaggle/input/y_valid.pkl")
-        X_test = pd.read_pickle("/kaggle/input/X_test.pkl")
-        forecast_ids = pd.read_pickle("/kaggle/input/forecast_ids.pkl")
+        X_train = pd.read_pickle("/kaggle/input/X_train.pkl")  # nosec B301
+        X_valid = pd.read_pickle("/kaggle/input/X_valid.pkl")  # nosec B301
+        y_train = pd.read_pickle("/kaggle/input/y_train.pkl")  # nosec B301
+        y_valid = pd.read_pickle("/kaggle/input/y_valid.pkl")  # nosec B301
+        X_test = pd.read_pickle("/kaggle/input/X_test.pkl")  # nosec B301
+        forecast_ids = pd.read_pickle("/kaggle/input/forecast_ids.pkl")  # nosec B301
     else:
         X_train, X_valid, y_train, y_valid, X_test, forecast_ids = prepreprocess()
 

@@ -55,12 +55,12 @@ def preprocess_script():
     This method applies the preprocessing steps to the training, validation, and test datasets.
     """
     if os.path.exists("X_train.pkl"):
-        X_train = pd.read_pickle("X_train.pkl")
-        X_valid = pd.read_pickle("X_valid.pkl")
-        y_train = pd.read_pickle("y_train.pkl")
-        y_valid = pd.read_pickle("y_valid.pkl")
-        X_test = pd.read_pickle("X_test.pkl")
-        test_ids = pd.read_pickle("test_ids.pkl")
+        X_train = pd.read_pickle("X_train.pkl")  # nosec B301
+        X_valid = pd.read_pickle("X_valid.pkl")  # nosec B301
+        y_train = pd.read_pickle("y_train.pkl")  # nosec B301
+        y_valid = pd.read_pickle("y_valid.pkl")  # nosec B301
+        X_test = pd.read_pickle("X_test.pkl")  # nosec B301
+        test_ids = pd.read_pickle("test_ids.pkl")  # nosec B301
         return X_train, X_valid, y_train, y_valid, X_test, test_ids
 
     X_train, X_valid, y_train, y_valid, X_test, test_ids = prepreprocess()

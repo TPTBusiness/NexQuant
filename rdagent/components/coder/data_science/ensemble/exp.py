@@ -1,4 +1,4 @@
-import pickle
+import pickle  # nosec B301
 import site
 import traceback
 from pathlib import Path

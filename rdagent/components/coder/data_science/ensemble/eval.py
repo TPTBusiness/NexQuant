@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-from jinja2 import Environment, StrictUndefined
+from jinja2 import Environment, StrictUndefined, select_autoescape
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
 from rdagent.components.coder.CoSTEER.evaluators import (
@@ -55,7 +55,7 @@ class EnsembleCoSTEEREvaluator(CoSTEEREvaluator):
         fname = "test/ensemble_test.txt"
         test_code = (DIRNAME / "eval_tests" / "ensemble_test.txt").read_text()
         test_code = (
-            Environment(undefined=StrictUndefined)
+            Environment(autoescape=select_autoescape(["html", "xml"]), undefined=StrictUndefined)
             .from_string(test_code)
             .render(
                 model_names=[

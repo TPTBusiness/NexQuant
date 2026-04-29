@@ -136,6 +136,7 @@ def setup(command: str, **context: Any):
             format=_FILE_FMT,
             filter=lambda r, k=key: r["extra"].get("cmd", "").lower() == k,
             rotation="00:00",      # new file at midnight
+            compression="gz",
             retention="30 days",
             encoding="utf-8",
             enqueue=True,
@@ -151,6 +152,7 @@ def setup(command: str, **context: Any):
             format=_FILE_FMT,
             filter=lambda r: "cmd" in r["extra"],
             rotation="00:00",
+            compression="gz",
             retention="60 days",
             encoding="utf-8",
             enqueue=True,

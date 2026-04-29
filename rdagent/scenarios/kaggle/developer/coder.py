@@ -1,7 +1,7 @@
 import json
 from typing import Dict, List
 
-from jinja2 import Environment, StrictUndefined
+from jinja2 import Environment, StrictUndefined, select_autoescape
 
 from rdagent.components.coder.factor_coder import FactorCoSTEER
 from rdagent.components.coder.model_coder import ModelCoSTEER
@@ -38,7 +38,7 @@ class KGModelFeatureSelectionCoder(Developer[KGModelExperiment]):
         assert target_model_type in KG_SELECT_MAPPING
         if len(exp.experiment_workspace.data_description) == 1:
             code = (
-                Environment(undefined=StrictUndefined)
+                Environment(autoescape=select_autoescape(["html", "xml"]), undefined=StrictUndefined)
                 .from_string(DEFAULT_SELECTION_CODE)
                 .render(feature_index_list=None)
             )
@@ -62,7 +62,7 @@ class KGModelFeatureSelectionCoder(Developer[KGModelExperiment]):
             chosen_index_to_list_index = [i - 1 for i in chosen_index]
 
             code = (
-                Environment(undefined=StrictUndefined)
+                Environment(autoescape=select_autoescape(["html", "xml"]), undefined=StrictUndefined)
                 .from_string(DEFAULT_SELECTION_CODE)
                 .render(feature_index_list=chosen_index_to_list_index)
             )
