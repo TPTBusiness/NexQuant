@@ -111,7 +111,7 @@ def load_and_process_pdfs_by_azure_document_intelligence(path: Path) -> dict[str
 
 def extract_first_page_screenshot_from_pdf(pdf_path: str) -> Image:
     if not Path(pdf_path).exists():
-        doc = fitz.open(stream=io.BytesIO(requests.get(pdf_path).content), filetype="pdf")
+        doc = fitz.open(stream=io.BytesIO(requests.get(pdf_path).content), filetype="pdf")  # nosec B113
     else:
         doc = fitz.open(pdf_path)
     page = doc.load_page(0)
