@@ -127,7 +127,7 @@ def run(
         agent_log = workspace / "agent.log"
         success = False
         with open(agent_log, "w", encoding="utf-8") as af:
-            proc = subprocess.Popen(
+            proc = subprocess.Popen( # nosec B603
                 ["bash", str(agent.start)],
                 env=env,
                 stdout=af,

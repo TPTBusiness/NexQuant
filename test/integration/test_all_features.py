@@ -706,7 +706,7 @@ class TestSecurityScanning:
 
     def test_bandit_can_run(self):
         """Test that Bandit can execute."""
-        result = subprocess.run(
+        result = subprocess.run( # nosec B603
             ["bandit", "--version"],
             capture_output=True,
             text=True

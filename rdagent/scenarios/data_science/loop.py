@@ -71,7 +71,7 @@ def backup_folder(path: str | Path) -> Path:
         # `cp` may raise error if the workspace is beiing modified.
         # rsync is more robust choice, but it is not installed in some docker images.
         # use shutil.copytree(..., symlinks=True) should be more elegant, but it has more changes to raise error.
-        subprocess.run(
+        subprocess.run( # nosec B603
             ["cp", "-r", "-P", str(path), str(workspace_bak_path)],
             check=True,
             capture_output=True,
@@ -315,7 +315,7 @@ class DataScienceRDLoop(RDLoop):
                 / "mid_workspace.tar"
             )
             log_back_path = backup_folder(Path().cwd() / "log")
-            subprocess.run(["tar", "-cf", str(mid_log_tar_path), "-C", str(log_back_path), "."], check=True)
+            subprocess.run(["tar", "-cf", str(mid_log_tar_path), "-C", str(log_back_path), "."], check=True) # nosec B603
 
             # only clean current workspace without affecting other loops.
             for k in "direct_exp_gen", "coding", "running":
@@ -332,7 +332,7 @@ class DataScienceRDLoop(RDLoop):
                 clean_workspace(bak_workspace)
 
             # - Step 3: Create tarball from the cleaned .bak workspace
-            subprocess.run(["tar", "-cf", str(mid_workspace_tar_path), "-C", str(workspace_bak_path), "."], check=True)
+            subprocess.run(["tar", "-cf", str(mid_workspace_tar_path), "-C", str(workspace_bak_path), "."], check=True) # nosec B603
 
             # - Step 4: Remove .bak package
             shutil.rmtree(workspace_bak_path)

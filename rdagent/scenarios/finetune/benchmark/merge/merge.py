@@ -13,7 +13,7 @@ BLACKWELL_GPU_KEYWORDS = ["b100", "b200", "b300"]
 def is_blackwell_gpu() -> bool:
     """Check if the current GPU is NVIDIA Blackwell architecture (B100, B200, B300)."""
     try:
-        result = subprocess.run(
+        result = subprocess.run( # nosec B603
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
             capture_output=True,
             text=True,

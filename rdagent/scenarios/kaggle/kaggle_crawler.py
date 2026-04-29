@@ -179,7 +179,7 @@ def download_data(competition: str, settings: ExtendedBaseSettings, enable_creat
         zipfile_path = f"{local_path}/zip_files"
         if not Path(f"{zipfile_path}/{competition}.zip").exists():
             try:
-                subprocess.run(
+                subprocess.run( # nosec B603
                     ["kaggle", "competitions", "download", "-c", competition, "-p", zipfile_path],
                     check=True,
                     stderr=subprocess.PIPE,

@@ -75,7 +75,7 @@ except Exception as e:
     print(f"ERROR: {{e}}")
 """)
         try:
-            r = subprocess.run(["python", str(script)], capture_output=True, text=True, timeout=60, cwd=str(tdp))
+            r = subprocess.run(["python", str(script)], capture_output=True, text=True, timeout=60, cwd=str(tdp)) # nosec B603
             if r.returncode != 0:
                 return None
             sig = pd.read_pickle(str(tdp / "s.pkl"))

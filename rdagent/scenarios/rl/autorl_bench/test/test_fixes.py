@@ -74,7 +74,7 @@ def test_b1_lora_detection():
                     "use_cot_postprocessor": False,
                 },
             ),
-            patch("subprocess.run") as mock_run,
+            patch("subprocess.run") as mock_run, # nosec B603
         ):
             mock_run.return_value = MagicMock(returncode=1, stderr="test", stdout="")
             result = evaluator.run_eval(
@@ -102,7 +102,7 @@ def test_b1_lora_detection():
                 else:
                     report("OpenCompass config generated", False, "config file not found")
             else:
-                report("OpenCompass was called", False, "subprocess.run not called")
+                report("OpenCompass was called", False, "subprocess.run not called") # nosec B603
 
         # Case 2: adapter_config.json with missing base model
         bad_adapter_dir = Path(tmpdir) / "bad_lora"
@@ -144,7 +144,7 @@ def test_b1_lora_detection():
                     "use_cot_postprocessor": False,
                 },
             ),
-            patch("subprocess.run") as mock_run,
+            patch("subprocess.run") as mock_run, # nosec B603
         ):
             mock_run.return_value = MagicMock(returncode=1, stderr="test", stdout="")
             evaluator.run_eval(

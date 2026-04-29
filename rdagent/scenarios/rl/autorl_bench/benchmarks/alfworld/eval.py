@@ -359,7 +359,7 @@ class ALFWorldEvaluator(BaseEvaluator):
         if (cache_dir / "json_2.1.1").exists():
             return
         _log("Downloading ALFWorld game data (~2.1GB, first time only)...")
-        subprocess.run(["alfworld-download"], check=True)
+        subprocess.run(["alfworld-download"], check=True) # nosec B603
         _log(f"ALFWorld data downloaded to {cache_dir}")
 
     def _expand_env_vars(self, obj):

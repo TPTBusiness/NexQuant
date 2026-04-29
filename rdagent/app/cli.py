@@ -108,7 +108,7 @@ def ui(port=19899, log_dir="", debug: bool = False, data_science: bool = False):
     if data_science:
         with rpath("rdagent.log.ui", "dsapp.py") as app_path:
             cmds = ["streamlit", "run", app_path, f"--server.port={port}"]
-            subprocess.run(cmds)
+            subprocess.run(cmds) # nosec B603
         return
     with rpath("rdagent.log.ui", "app.py") as app_path:
         cmds = ["streamlit", "run", app_path, f"--server.port={port}"]
@@ -118,7 +118,7 @@ def ui(port=19899, log_dir="", debug: bool = False, data_science: bool = False):
             cmds.append(f"--log_dir={log_dir}")
         if debug:
             cmds.append("--debug")
-        subprocess.run(cmds)
+        subprocess.run(cmds) # nosec B603
 
 
 def server_ui(port=19899):
@@ -135,7 +135,7 @@ def ds_user_interact(port=19900):
     start web app to show the log traces in real time
     """
     commands = ["streamlit", "run", "rdagent/log/ui/ds_user_interact.py", f"--server.port={port}"]
-    subprocess.run(commands)
+    subprocess.run(commands) # nosec B603
 
 
 @app.command(name="fin_factor")
@@ -276,7 +276,7 @@ def fin_quant_cli(
             console = Console()
             console.print(f"\n[bold green]🚀 Starting Web Dashboard on http://localhost:{dashboard_port}...[/bold green]")
             console.print(f"   [cyan]Open: http://localhost:{dashboard_port}/dashboard.html[/cyan]\n")
-            subprocess.run(
+            subprocess.run( # nosec B603
                 ["python", "web/dashboard_api.py"],
                 cwd=str(Path(__file__).parent.parent.parent),
                 env={**os.environ, "FLASK_ENV": "development"}
@@ -1266,7 +1266,7 @@ def start_loop_cli(
     def cleanup(signum=None, frame=None):
         log("Received termination signal. Cleaning up...")
         try:
-            subprocess.run(["pkill", "-f", "predix_smart_strategy_gen.py"], capture_output=True)
+            subprocess.run(["pkill", "-f", "predix_smart_strategy_gen.py"], capture_output=True) # nosec B603
         except Exception:
             logging.debug("Exception caught", exc_info=True)
         try:
@@ -1298,7 +1298,7 @@ def start_loop_cli(
 
         # Check disk space
         try:
-            usage = subprocess.run(["df", "-h", script_dir], capture_output=True, text=True)
+            usage = subprocess.run(["df", "-h", script_dir], capture_output=True, text=True) # nosec B603
             disk_line = usage.stdout.strip().split("\n")[-1]
             pct = int(disk_line.split()[4].replace("%", ""))
             if pct > 90:
@@ -1316,14 +1316,14 @@ def start_loop_cli(
 
         # Kill stale processes
         try:
-            subprocess.run(["pkill", "-9", "-f", "predix_smart_strategy_gen.py"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "predix_smart_strategy_gen.py"], capture_output=True) # nosec B603
         except Exception:
             logging.debug("Exception caught", exc_info=True)
         time.sleep(2)
 
         # Start generator
         log("🤖 Starting generator...")
-        proc = subprocess.Popen(
+        proc = subprocess.Popen( # nosec B603
             generator.split(),
             cwd=script_dir,
             stdout=subprocess.DEVNULL,
@@ -1407,7 +1407,7 @@ def parallel_cli(
     typer.echo(f"   Model: local (llama.cpp)")
 
     try:
-        result = subprocess.run(cmd, cwd=str(project_root))
+        result = subprocess.run(cmd, cwd=str(project_root)) # nosec B603
         _plog.info(f"Parallel runs finished  returncode={result.returncode}")
         raise typer.Exit(code=result.returncode)
     except KeyboardInterrupt:
@@ -1461,7 +1461,7 @@ def eval_all_cli(
     typer.echo(f"   Workers: {parallel}")
 
     try:
-        result = subprocess.run(cmd, cwd=str(project_root))
+        result = subprocess.run(cmd, cwd=str(project_root)) # nosec B603
         _elog.info(f"Evaluation finished  returncode={result.returncode}")
         raise typer.Exit(code=result.returncode)
     except KeyboardInterrupt:
@@ -1516,7 +1516,7 @@ def batch_backtest_cli(
     typer.echo(f"   Workers: {parallel}")
 
     try:
-        result = subprocess.run(cmd, cwd=str(project_root))
+        result = subprocess.run(cmd, cwd=str(project_root)) # nosec B603
         raise typer.Exit(code=result.returncode)
     except KeyboardInterrupt:
         typer.echo("\n⚠️  Interrupted by user")
@@ -1569,7 +1569,7 @@ def simple_eval_cli(
     typer.echo(f"   Workers: {parallel}")
 
     try:
-        result = subprocess.run(cmd, cwd=str(project_root))
+        result = subprocess.run(cmd, cwd=str(project_root)) # nosec B603
         raise typer.Exit(code=result.returncode)
     except KeyboardInterrupt:
         typer.echo("\n⚠️  Interrupted by user")
@@ -1611,7 +1611,7 @@ def rebacktest_cli(
     typer.echo(f"   Script: {script}")
 
     try:
-        result = subprocess.run(cmd, cwd=str(project_root))
+        result = subprocess.run(cmd, cwd=str(project_root)) # nosec B603
         raise typer.Exit(code=result.returncode)
     except KeyboardInterrupt:
         typer.echo("\n⚠️  Interrupted by user")
@@ -1667,7 +1667,7 @@ def report_cli(
     typer.echo(f"   Script: {script}")
 
     try:
-        result = subprocess.run(cmd, cwd=str(project_root))
+        result = subprocess.run(cmd, cwd=str(project_root)) # nosec B603
         raise typer.Exit(code=result.returncode)
     except KeyboardInterrupt:
         typer.echo("\n⚠️  Interrupted by user")

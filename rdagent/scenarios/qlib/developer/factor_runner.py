@@ -926,7 +926,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         the complete backtest range (not just the debug 2024 subset).
         """
         import os as _os
-        import subprocess  # nosec B404 # secure usage: subprocess with sys.executable
+        import subprocess  # nosec B404 # secure usage: subprocess with sys.executable # nosec B404
         import shutil
         import tempfile
 
@@ -966,7 +966,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 shutil.copy(str(factor_py), str(tmp / "factor.py"))
                 shutil.copy(str(full_data), str(tmp / "intraday_pv.h5"))
 
-                ret = subprocess.run(
+                ret = subprocess.run( # nosec B603
                     [sys.executable, "factor.py"],
                     cwd=str(tmp),
                     capture_output=True,

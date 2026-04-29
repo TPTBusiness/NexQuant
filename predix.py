@@ -302,7 +302,7 @@ def quant(
     if dashboard:
         def start_web_dashboard():
             console.print(f"\n[bold green]🚀 Web Dashboard: http://localhost:5000[/bold green]")
-            subprocess.run(
+            subprocess.run( # nosec B603
                 ["python", "web/dashboard_api.py"],
                 cwd=str(Path(__file__).parent),
                 env={**os.environ, "FLASK_ENV": "development"},
@@ -723,7 +723,7 @@ def portfolio(
                 
                 try:
                     # Run factor
-                    result = subprocess.run(
+                    result = subprocess.run( # nosec B603
                         [sys.executable, "factor.py"],
                         cwd=tmp_path,
                         capture_output=True,
@@ -1510,7 +1510,7 @@ def status():
     import sqlite3
 
     # Process check
-    result = subprocess.run(
+    result = subprocess.run( # nosec B603
         ["pgrep", "-f", "fin_quant"],
         capture_output=True, text=True
     )

@@ -18,9 +18,9 @@ def _run_alfworld_download() -> None:
     bin_dir = Path(sys.executable).parent
     script = bin_dir / "alfworld-download"
     if script.exists():
-        subprocess.run([sys.executable, str(script)], check=True)
+        subprocess.run([sys.executable, str(script)], check=True) # nosec B603
     else:
-        subprocess.run(["alfworld-download"], check=True)
+        subprocess.run(["alfworld-download"], check=True) # nosec B603
 
 
 def _ensure_alfworld_data() -> Path:

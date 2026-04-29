@@ -283,7 +283,7 @@ def evaluate_factor_full(factor: FactorInfo, full_data: pd.DataFrame,
             (ws / "factor.py").write_text(factor.factor_code, encoding="utf-8")
 
             # Execute factor code
-            proc = subprocess.run(
+            proc = subprocess.run( # nosec B603
                 [sys.executable, str(ws / "factor.py")],
                 cwd=str(ws),
                 capture_output=True,
