@@ -8,7 +8,7 @@ import os
 import json
 import time
 import tempfile
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
@@ -399,7 +399,7 @@ def generate_signal(factors, close):
     @patch('rdagent.scenarios.qlib.local.strategy_worker.subprocess.run')
     def test_run_subprocess_timeout(self, mock_run, backtest_engine):
         """Test subprocess timeout handling."""
-        import subprocess
+        import subprocess  # nosec B404
         mock_run.side_effect = subprocess.TimeoutExpired(cmd='python', timeout=60)
 
         result = backtest_engine._run_subprocess(Path('/tmp/run.py'))

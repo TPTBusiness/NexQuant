@@ -1,3 +1,4 @@
+import logging
 """
 Simplified LLM Fine-tuning Configuration Validator
 
@@ -236,7 +237,7 @@ class LLMConfigValidator:
                         "train_samples_per_second": metrics.get("train_samples_per_second"),
                     }
                 except Exception:
-                    pass
+                    logging.debug("Exception caught", exc_info=True)
 
             # Check completion
             if "Training completed" in stdout:

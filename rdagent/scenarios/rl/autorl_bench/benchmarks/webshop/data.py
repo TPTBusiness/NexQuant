@@ -5,7 +5,7 @@ WebShop 数据准备
 为避免 setup.sh 破坏当前环境依赖，我们手动下载数据。
 """
 
-import subprocess
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 

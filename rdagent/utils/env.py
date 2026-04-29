@@ -1,3 +1,4 @@
+import logging
 """
 The motivation of the utils is for environment management
 
@@ -14,7 +15,7 @@ import pickle
 import re
 import select
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import time
 import uuid
 import zipfile

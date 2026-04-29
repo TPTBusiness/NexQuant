@@ -14,7 +14,7 @@ Usage:
 """
 import os
 import signal
-import subprocess
+import subprocess  # nosec B404
 import sys
 import time
 from datetime import datetime

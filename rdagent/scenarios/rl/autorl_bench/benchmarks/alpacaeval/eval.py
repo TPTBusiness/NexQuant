@@ -1,3 +1,4 @@
+import logging
 """
 AlpacaEval 2.0 Evaluator
 
@@ -126,7 +127,7 @@ class AlpacaEvalEvaluator(BaseEvaluator):
             try:
                 return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
             except Exception:
-                pass
+                logging.debug("Exception caught", exc_info=True)
         return instruction
 
     def _generate_model_outputs(

@@ -12,7 +12,7 @@ Usage:
 import argparse
 import os
 import signal
-import subprocess
+import subprocess  # nosec B404
 import sys
 from datetime import datetime
 

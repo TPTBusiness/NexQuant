@@ -13,7 +13,7 @@ from loguru import logger
 
 def _run_alfworld_download() -> None:
     """调用 alfworld-download，兼容 conda env PATH 问题"""
-    import subprocess
+    import subprocess  # nosec B404
 
     bin_dir = Path(sys.executable).parent
     script = bin_dir / "alfworld-download"

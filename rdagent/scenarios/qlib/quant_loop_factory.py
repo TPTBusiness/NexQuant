@@ -1,3 +1,4 @@
+import logging
 """
 Predix Quant Loop Factory - Selects appropriate workflow based on available components.
 

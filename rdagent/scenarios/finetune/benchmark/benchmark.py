@@ -16,7 +16,7 @@ FT_JUDGE_API_BASE="https://api.openai.com/v1"
 import json
 import random
 import shutil
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 

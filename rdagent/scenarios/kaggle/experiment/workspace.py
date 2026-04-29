@@ -1,4 +1,4 @@
-import subprocess
+import subprocess  # nosec B404
 import zipfile
 from pathlib import Path
 from typing import Any, List, Tuple

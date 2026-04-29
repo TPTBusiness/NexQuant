@@ -4,7 +4,7 @@ import datetime
 import json
 import re
 import shlex
-import subprocess
+import subprocess  # nosec B404
 import time
 from collections import defaultdict
 from dataclasses import dataclass

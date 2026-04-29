@@ -353,7 +353,7 @@ class ALFWorldEvaluator(BaseEvaluator):
     @staticmethod
     def _ensure_alfworld_data():
         """检查 ALFWorld 游戏数据（~2.1GB），没有就自动下载"""
-        import subprocess
+        import subprocess  # nosec B404
 
         cache_dir = Path.home() / ".cache" / "alfworld"
         if (cache_dir / "json_2.1.1").exists():

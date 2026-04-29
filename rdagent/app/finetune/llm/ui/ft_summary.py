@@ -1,3 +1,4 @@
+import logging
 """
 FT Job Summary View
 Display summary table for all tasks in a job directory
@@ -53,7 +54,7 @@ def extract_benchmark_score(loop_path: Path, split: str = "") -> tuple[str, floa
                     if result is not None:
                         return result
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
     return None
 
 
@@ -94,7 +95,7 @@ def extract_baseline_score(task_path: Path) -> tuple[str, float] | None:
                         metric_name, score, _ = result
                         return metric_name, score
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
     return None
 
 
@@ -137,7 +138,7 @@ def extract_baseline_scores(task_path: Path) -> dict[str, tuple[str, float, bool
 
             return result
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
     return {"validation": None, "test": None}
 
 
@@ -179,7 +180,7 @@ def get_loop_status(
                 feedback_decision = decision
                 break
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
 
     if val_result is not None:
         metric_name, val_score, higher_is_better = val_result
@@ -450,7 +451,7 @@ def extract_full_benchmark(loop_path: Path, split: str = "") -> dict | None:
                 if isinstance(accuracy_summary, dict) and accuracy_summary:
                     return accuracy_summary
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
     return None
 
 
@@ -483,7 +484,7 @@ def extract_baseline_full_benchmark(task_path: Path, split: str = "validation") 
                 if isinstance(accuracy_summary, dict) and accuracy_summary:
                     return accuracy_summary
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
     return None
 
 

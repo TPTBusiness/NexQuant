@@ -1,3 +1,4 @@
+import logging
 """
 Integration Tests for Critical fin_quant Features
 
@@ -196,7 +197,7 @@ class TestResultsDatabaseIntegration:
         try:
             runner._save_result_to_database(mock_exp, mock_exp.result)
         except Exception:
-            pass  # Expected in test env
+            logging.debug("Exception caught", exc_info=True)  # Expected in test env
 
     def test_save_to_db_handles_none_result(self):
         """Test that save method handles None or invalid results."""
@@ -212,7 +213,7 @@ class TestResultsDatabaseIntegration:
         try:
             runner._save_result_to_database(mock_exp, None)
         except Exception:
-            pass  # Expected in test env
+            logging.debug("Exception caught", exc_info=True)  # Expected in test env
 
     def test_save_to_db_handles_exception_gracefully(self):
         """Test that save method handles database errors gracefully."""

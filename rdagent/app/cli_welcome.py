@@ -3,7 +3,7 @@ Predix CLI Welcome Screen - Beautiful dashboard for GitHub README screenshot.
 """
 
 import os
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel

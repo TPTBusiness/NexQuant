@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import logging
 """
 Parallel AI Strategy Generation with REAL OHLCV Backtest.
 
@@ -37,7 +38,7 @@ try:
     _ll.verbose = False
     _ll.set_verbose = False
 except Exception:
-    pass
+    logging.debug("Exception caught", exc_info=True)
 
 # ============================================================================
 # Configuration
