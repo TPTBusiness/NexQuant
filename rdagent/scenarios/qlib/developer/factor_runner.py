@@ -1,4 +1,5 @@
 import os
+import logging
 from pathlib import Path
 """
 Qlib Factor Runner - Executes factor backtests in Docker.
