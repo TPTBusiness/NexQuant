@@ -1,3 +1,4 @@
+import logging
 import json
 import os
 from typing import List, Tuple
@@ -38,7 +39,7 @@ def _build_compressed_history(trace: Trace, max_history: int) -> str:
                 if exp.result is not None and "IC" in exp.result.index:
                     ic_str = f" IC={exp.result.loc['IC']:.4f}"
             except Exception:
-                pass
+                logging.debug("Exception caught", exc_info=True)
             decision = "PASS" if fb.decision else "FAIL"
             obs = (fb.observations or "")[:120].replace("\n", " ")
             lines.append(f"- [{decision}]{ic_str} {', '.join(names) or 'unknown'}: {obs}")
