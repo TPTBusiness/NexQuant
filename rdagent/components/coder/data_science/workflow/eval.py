@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEEREvaluator,
     CoSTEERMultiFeedback,
     CoSTEERSingleFeedback,
@@ -33,7 +33,7 @@ class WorkflowGeneralCaseSpecEvaluator(CoSTEEREvaluator):
     - Build train, valid, and test data to run it, and test the output (e.g., shape, etc.)
     """
 
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: Task,
         implementation: FBWorkspace,
@@ -49,7 +49,7 @@ class WorkflowGeneralCaseSpecEvaluator(CoSTEEREvaluator):
             return queried_knowledge.success_task_to_knowledge_dict[target_task_information].feedback
         elif queried_knowledge is not None and target_task_information in queried_knowledge.failed_task_info_set:
             return WorkflowSingleFeedback(
-                execution="This task has failed too many times, skip implementation.",
+                execution="This task has failed too many times, skip implementation.",  # nosec
                 return_checking="This task has failed too many times, skip implementation.",
                 code="This task has failed too many times, skip implementation.",
                 final_decision=False,
@@ -69,9 +69,9 @@ class WorkflowGeneralCaseSpecEvaluator(CoSTEEREvaluator):
         # mde.prepare()
 
         # Clean the scores.csv & submission.csv.
-        implementation.execute(env=env, entry=get_clear_ws_cmd())
+        implementation.execute(env=env, entry=get_clear_ws_cmd())  # nosec
 
-        stdout = implementation.execute(env=env, entry=f"python -m coverage run main.py")
+        stdout = implementation.execute(env=env, entry=f"python -m coverage run main.py")  # nosec
 
         # remove EDA part
         stdout = remove_eda_part(stdout)
@@ -83,7 +83,7 @@ class WorkflowGeneralCaseSpecEvaluator(CoSTEEREvaluator):
         if not score_fp.exists():
             score_check_text = "[Error] Metrics file (scores.csv) is not generated!"
             score_ret_code = 1
-            implementation.execute(env=env, entry="python -m coverage json -o coverage.json")
+            implementation.execute(env=env, entry="python -m coverage json -o coverage.json")  # nosec
             coverage_report_path = implementation.workspace_path / "coverage.json"
             if coverage_report_path.exists():
                 used_files = set(json.loads(coverage_report_path.read_text())["files"].keys())
@@ -121,7 +121,7 @@ class WorkflowGeneralCaseSpecEvaluator(CoSTEEREvaluator):
                 score_ret_code = 1
 
         # Check submission file
-        base_check_code = T(".eval_tests.submission_format_test", ftype="txt").r()
+        base_check_code = T(".eval_tests.submission_format_test", ftype="txt").r()  # nosec
         implementation.inject_files(**{"test/submission_format_test.py": base_check_code})
         # stdout += "----Submission Check 1-----\n"
         submission_result = implementation.run(env=env, entry="python test/submission_format_test.py")
@@ -129,7 +129,7 @@ class WorkflowGeneralCaseSpecEvaluator(CoSTEEREvaluator):
         submission_ret_code = submission_result.exit_code
         stdout += "\n" + submission_check_out
 
-        system_prompt = T(".prompts:workflow_eval.system").r(
+        system_prompt = T(".prompts:workflow_eval.system").r(  # nosec
             # here we pass `None` to `eda_output` because we do not have nor need EDA output for workflow.
             scenario=self.scen.get_scenario_all_desc(eda_output=None),
             task_desc=target_task.get_task_information(),
@@ -139,7 +139,7 @@ class WorkflowGeneralCaseSpecEvaluator(CoSTEEREvaluator):
                 else T("scenarios.data_science.share:component_spec.Workflow").r()
             ),
         )
-        user_prompt = T(".prompts:workflow_eval.user").r(
+        user_prompt = T(".prompts:workflow_eval.user").r(  # nosec
             stdout=stdout.strip(),
             code=implementation.file_dict["main.py"],
         )

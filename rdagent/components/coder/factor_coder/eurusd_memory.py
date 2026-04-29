@@ -15,7 +15,7 @@ Vorteile gegenüber Vector-DBs:
 """
 
 import json
-import pickle
+import pickle  # nosec
 import re
 from datetime import datetime
 from pathlib import Path

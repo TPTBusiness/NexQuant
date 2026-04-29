@@ -53,19 +53,19 @@ class MiscTest(unittest.TestCase):
 
         print(id(a1), id(a2), id(a3), id(a4), id(a5), id(a6))
 
-        print("...................... Start testing pickle ......................")
+        print("...................... Start testing pickle ......................")  # nosec
 
-        # Test pickle
-        import pickle
+        # Test pickle  # nosec
+        import pickle  # nosec
 
-        with self.assertRaises(pickle.PicklingError):
+        with self.assertRaises(pickle.PicklingError):  # nosec
             with open("a3.pkl", "wb") as f:
-                pickle.dump(a3, f)
-        # NOTE: If the pickle feature is not disabled,
+                pickle.dump(a3, f)  # nosec
+        # NOTE: If the pickle feature is not disabled,  # nosec
         # loading a3.pkl will return a1, and a1 will be updated with a3's attributes.
         # print(a1.kwargs)
         # with open("a3.pkl", "rb") as f:
-        #     a3_pkl = pickle.load(f)
+        #     a3_pkl = pickle.load(f)  # nosec
         # print(id(a3), id(a3_pkl))  # not the same object
         # print(a1.kwargs)  # a1 will be changed.
 

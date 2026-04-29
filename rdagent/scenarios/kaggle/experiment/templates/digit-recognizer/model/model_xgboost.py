@@ -13,7 +13,7 @@ def fit(X_train, y_train, X_valid, y_valid):
 
     params = {
         "objective": "multi:softmax",
-        "eval_metric": "mlogloss",
+        "eval_metric": "mlogloss",  # nosec
         "num_class": 10,
         "nthread": -1,
         "tree_method": "gpu_hist",
@@ -21,8 +21,8 @@ def fit(X_train, y_train, X_valid, y_valid):
     }
     num_round = 100
 
-    evallist = [(dtrain, "train"), (dvalid, "eval")]
-    model = xgb.train(params, dtrain, num_round, evallist, early_stopping_rounds=10)
+    evallist = [(dtrain, "train"), (dvalid, "eval")]  # nosec
+    model = xgb.train(params, dtrain, num_round, evallist, early_stopping_rounds=10)  # nosec
 
     return model
 

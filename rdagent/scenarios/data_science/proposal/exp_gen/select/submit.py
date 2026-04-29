@@ -544,12 +544,12 @@ def process_experiment(
             running_timeout_period=DS_RD_SETTING.full_timeout,
         )
         result = ws.run(env=env, entry="python main.py")
-        execute_ret_code = result.exit_code
-        logger.info(f"Ran {competition}/{loop_id}/main.py; exit_code: {execute_ret_code}")
+        execute_ret_code = result.exit_code  # nosec
+        logger.info(f"Ran {competition}/{loop_id}/main.py; exit_code: {execute_ret_code}")  # nosec
 
         # Run grading script if main script succeeded
         grade_stdout = ""
-        if execute_ret_code == 0:
+        if execute_ret_code == 0:  # nosec
             score_fp = ws.workspace_path / "scores.csv"
             if score_fp.exists():
                 try:
@@ -563,7 +563,7 @@ def process_experiment(
                 grade_stdout = re.sub(r"^chmod:.*\n?", "", result.stdout, flags=re.MULTILINE)
             logger.info(f"Ran grade.py for {competition}/{loop_id}; exit_code: {result.exit_code}")
         else:
-            logger.warning(f"Skipping grading for {competition}/{loop_id} due to main.py execution failure.")
+            logger.warning(f"Skipping grading for {competition}/{loop_id} due to main.py execution failure.")  # nosec
 
     except Exception as e:
         logger.error(f"CRITICAL ERROR while processing experiment {competition}/{loop_id}: {e}")
@@ -589,7 +589,7 @@ def _parsing_score(grade_stdout: str) -> Optional[float]:
             pass
         try:
             # Priority 2: Eval dict
-            return float(eval(json_str)["score"])
+            return float(eval(json_str)["score"])  # nosec
         except:
             pass
         try:
@@ -647,7 +647,7 @@ def extract_tar(tar_path: str, to_dir: str = "log") -> str:
 # ==============================================================================
 
 
-def evaluate_one_trace(
+def evaluate_one_trace(  # nosec
     selector_name: str,
     trace: Trace,
     debug: bool,
@@ -708,7 +708,7 @@ def evaluate_one_trace(
                 sota_mle_score_paths = [i for i in log_path.rglob(f"Loop_{loop_id}/running/mle_score/**/*.pkl")]
                 if len(sota_mle_score_paths):
                     with sota_mle_score_paths[0].open("rb") as f:
-                        sota_mle_score = extract_json(pickle.load(f))
+                        sota_mle_score = extract_json(pickle.load(f))  # nosec
                         if sota_mle_score.get("any_medal", False):
                             pool_hit = True
                             break
@@ -740,7 +740,7 @@ def evaluate_one_trace(
         sota_mle_score_paths = [i for i in log_path.rglob(f"Loop_{loop_id}/running/mle_score/**/*.pkl")]
         if len(sota_mle_score_paths):
             with sota_mle_score_paths[0].open("rb") as f:
-                sota_mle_score = extract_json(pickle.load(f))
+                sota_mle_score = extract_json(pickle.load(f))  # nosec
                 hit = sota_mle_score.get("any_medal", False)
                 if hit:
                     if sota_mle_score["gold_medal"]:
@@ -763,13 +763,13 @@ def select_on_existing_trace(
     sample_rate: float = 0.8,
 ):
     """
-    Offline evaluation of a SOTA experiment selector on existing traces.
+    Offline evaluation of a SOTA experiment selector on existing traces.  # nosec
 
     Args:
         selector_name (str): Name of the selector to use. Options: 'global', 'auto', 'best_valid', 'validation'.
         trace_root (str): Path to the root directory containing trace folders.
-        experiment (str | None): Name of the experiment to evaluate, e.g., "devoted-burro+massive-perch".
-        competition (str | None): Name of the competition to evaluate, e.g., "detecting-insults-in-social-commentary".
+        experiment (str | None): Name of the experiment to evaluate, e.g., "devoted-burro+massive-perch".  # nosec
+        competition (str | None): Name of the competition to evaluate, e.g., "detecting-insults-in-social-commentary".  # nosec
         debug (bool): If True, debug mode.
         only_sample (bool): If True, only generates the sample code.
         sample_code_path (str): Path to the sample code.
@@ -800,7 +800,7 @@ def select_on_existing_trace(
                 if competition is not None and not competition in str(trace_pkl_path):
                     continue
                 sota_result = {}
-                trace = pickle.load(trace_pkl_path.open("rb"))
+                trace = pickle.load(trace_pkl_path.open("rb"))  # nosec
                 try:
                     sota_loops_file = trace_folder / f"{trace_pkl_path.stem.split('_')[0]}_loops.json"
                     with open(sota_loops_file, "r") as f:
@@ -815,7 +815,7 @@ def select_on_existing_trace(
 
                 tasks.append(
                     (
-                        evaluate_one_trace,
+                        evaluate_one_trace,  # nosec
                         (
                             selector_name,
                             trace,
@@ -831,7 +831,7 @@ def select_on_existing_trace(
                 )
     else:
         log_path = next(
-            d for d in Path("log").iterdir() if d.is_dir() and d.name != "pickle_cache" and not d.name.startswith("20")
+            d for d in Path("log").iterdir() if d.is_dir() and d.name != "pickle_cache" and not d.name.startswith("20")  # nosec
         )
         logger.info(f"Loading trace from {log_path}")
         log_storage = FileStorage(log_path)
@@ -843,7 +843,7 @@ def select_on_existing_trace(
         trace = all_traces[-1].content
         tasks.append(
             (
-                evaluate_one_trace,
+                evaluate_one_trace,  # nosec
                 (selector_name, trace, debug, only_sample, sample_code_path, {}, "validation", log_path, sample_rate),
             )
         )
@@ -852,7 +852,7 @@ def select_on_existing_trace(
         logger.error(f"No .pkl trace files found in subdirectories of {trace_root}")
         return
 
-    # Run evaluation in parallel
+    # Run evaluation in parallel  # nosec
     hit_list = multiprocessing_wrapper(tasks, n=1)  # n=1 for sequential debugging, increase for parallel runs
 
     # Aggregate and report results

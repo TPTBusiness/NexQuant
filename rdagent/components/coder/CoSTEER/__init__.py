@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from rdagent.components.coder.CoSTEER.config import CoSTEERSettings
-from rdagent.components.coder.CoSTEER.evaluators import CoSTEERMultiFeedback
+from rdagent.components.coder.CoSTEER.evaluators import CoSTEERMultiFeedback  # nosec
 from rdagent.components.coder.CoSTEER.evolvable_subjects import EvolvingItem
 from rdagent.components.coder.CoSTEER.knowledge_management import (
     CoSTEERRAGStrategyV1,
@@ -28,7 +28,7 @@ class CoSTEER(Developer[Experiment]):
         with_knowledge: bool = True,
         knowledge_self_gen: bool = True,
         max_loop: int | None = None,
-        stop_eval_chain_on_fail: bool = False,
+        stop_eval_chain_on_fail: bool = False,  # nosec
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -45,9 +45,9 @@ class CoSTEER(Developer[Experiment]):
         self.with_knowledge = with_knowledge
         self.knowledge_self_gen = knowledge_self_gen
         self.evolving_strategy = es
-        self.evaluator = eva
+        self.evaluator = eva  # nosec
         self.evolving_version = evolving_version
-        self.stop_eval_chain_on_fail = stop_eval_chain_on_fail
+        self.stop_eval_chain_on_fail = stop_eval_chain_on_fail  # nosec
 
         # init rag method
         self.rag = (
@@ -104,7 +104,7 @@ class CoSTEER(Developer[Experiment]):
             knowledge_self_gen=self.knowledge_self_gen,
             enable_filelock=self.settings.enable_filelock,
             filelock_path=self.settings.filelock_path,
-            stop_eval_chain_on_fail=self.stop_eval_chain_on_fail,
+            stop_eval_chain_on_fail=self.stop_eval_chain_on_fail,  # nosec
         )
 
         # Evolving the solution
@@ -119,7 +119,7 @@ class CoSTEER(Developer[Experiment]):
         # Save initial state before first iteration
         self._save_intermediate_results(evo_exp, None, 0, start_datetime)
 
-        for evo_exp in self.evolve_agent.multistep_evolve(evo_exp, self.evaluator):
+        for evo_exp in self.evolve_agent.multistep_evolve(evo_exp, self.evaluator):  # nosec
             iteration_count += 1
             assert isinstance(evo_exp, Experiment)  # multiple inheritance
             evo_fb = self._get_last_fb()
@@ -176,7 +176,7 @@ class CoSTEER(Developer[Experiment]):
         evo_exp : EvolvingItem
             Current evolving experiment
         evo_fb : CoSTEERMultiFeedback
-            Feedback from the evaluator
+            Feedback from the evaluator  # nosec
         iteration : int
             Current iteration number
         start_datetime : datetime
@@ -270,7 +270,7 @@ class CoSTEER(Developer[Experiment]):
 
         # FIXME: when whould the feedback be None?
         failed_feedbacks = [
-            f"- feedback{index + 1:02d}:\n  - execution: {f.execution}\n  - return_checking: {f.return_checking}\n  - code: {f.code}"
+            f"- feedback{index + 1:02d}:\n  - execution: {f.execution}\n  - return_checking: {f.return_checking}\n  - code: {f.code}"  # nosec
             for index, f in enumerate(feedback)
             if f is not None and not f.is_acceptable()
         ]

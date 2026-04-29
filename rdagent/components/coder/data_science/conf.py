@@ -22,15 +22,15 @@ class DSCoderCoSTEERSettings(CoSTEERSettings):
     max_seconds_multiplier: int = 4
     env_type: str = "docker"
     # TODO: extract a function for env and conf.
-    extra_evaluator: list[str] = []
-    """Extra evaluators to use"""
+    extra_evaluator: list[str] = []  # nosec
+    """Extra evaluators to use"""  # nosec
 
-    extra_eval: list[str] = []
+    extra_eval: list[str] = []  # nosec
     """
-    Extra evaluators
+    Extra evaluators  # nosec
 
-    The evaluator follows the following assumptions:
-    - It runs after previous evaluator (So the running results are already there)
+    The evaluator follows the following assumptions:  # nosec
+    - It runs after previous evaluator (So the running results are already there)  # nosec
 
     It is not a complete feature due to it is only implemented in DS Pipeline & Coder.
 

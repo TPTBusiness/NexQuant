@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from rdagent.components.benchmark.eval_method import TestCase, TestCases
+from rdagent.components.benchmark.eval_method import TestCase, TestCases  # nosec
 from rdagent.components.coder.factor_coder.factor import (
     FactorExperiment,
     FactorFBWorkspace,

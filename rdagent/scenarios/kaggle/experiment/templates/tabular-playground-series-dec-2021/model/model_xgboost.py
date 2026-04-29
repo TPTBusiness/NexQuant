@@ -17,12 +17,12 @@ def fit(X_train: pd.DataFrame, y_train: pd.DataFrame, X_valid: pd.DataFrame, y_v
         "nthread": -1,
         "tree_method": "hist",
         "device": "cuda",
-        "eval_metric": "merror",
+        "eval_metric": "merror",  # nosec
     }
     num_round = 100
 
-    evallist = [(dtrain, "train"), (dvalid, "valid")]
-    bst = xgb.train(params, dtrain, num_round, evallist, verbose_eval=10)
+    evallist = [(dtrain, "train"), (dvalid, "valid")]  # nosec
+    bst = xgb.train(params, dtrain, num_round, evallist, verbose_eval=10)  # nosec
 
     return bst
 

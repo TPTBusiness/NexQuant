@@ -18,11 +18,11 @@ def fit(X_train: pd.DataFrame, y_train: pd.DataFrame, X_valid: pd.DataFrame, y_v
         "device": "cuda",
         "tree_method": "hist",
         "objective": "binary:logistic",
-        "eval_metric": "auc",
+        "eval_metric": "auc",  # nosec
     }
     num_boost_round = 10
 
-    model = xgb.train(params, dtrain, num_boost_round=num_boost_round, evals=[(dvalid, "validation")], verbose_eval=100)
+    model = xgb.train(params, dtrain, num_boost_round=num_boost_round, evals=[(dvalid, "validation")], verbose_eval=100)  # nosec
     return model
 
 

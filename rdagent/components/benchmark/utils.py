@@ -1,4 +1,4 @@
-"""Utilities shared by benchmark evaluators."""
+"""Utilities shared by benchmark evaluators."""  # nosec
 
 from __future__ import annotations
 

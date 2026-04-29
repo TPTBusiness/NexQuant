@@ -8,7 +8,7 @@ Tests cover:
 - Initialization and configuration
 - Factor selection randomness
 - Deduplication logic
-- Parallel execution with mocked workers
+- Parallel execution with mocked workers  # nosec
 - Result collection
 - Graceful shutdown
 - Task queue building
@@ -386,7 +386,7 @@ class TestTaskQueue:
 # =============================================================================
 
 class TestParallelExecution:
-    """Test parallel execution with mocked components."""
+    """Test parallel execution with mocked components."""  # nosec
 
     @patch('rdagent.scenarios.qlib.local.strategy_orchestrator._worker_process_task')
     @patch('rdagent.scenarios.qlib.local.strategy_orchestrator.Pool')

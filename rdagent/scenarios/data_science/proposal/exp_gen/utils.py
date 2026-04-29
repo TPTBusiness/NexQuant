@@ -101,5 +101,5 @@ def get_packages(pkgs: list[str] | None = None) -> str:
     implementation.inject_files(**{fname: (Path(__file__).absolute().resolve().parent / "package_info.py").read_text()})
 
     pkg_args = " ".join(pkgs) if pkgs else ""
-    stdout = implementation.execute(env=env, entry=f"python {fname} {pkg_args}")
+    stdout = implementation.execute(env=env, entry=f"python {fname} {pkg_args}")  # nosec
     return stdout

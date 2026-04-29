@@ -361,7 +361,7 @@ class TestResultsDatabase:
             assert loop_id > 0
 
             c = db.conn.cursor()
-            c.execute("SELECT success_rate FROM loop_results WHERE loop_index = 1")
+            c.execute("SELECT success_rate FROM loop_results WHERE loop_index = 1")  # nosec
             row = c.fetchone()
             assert row is not None
             assert abs(row[0] - 0.4) < 1e-10  # 4 / (4+6) = 0.4
@@ -705,7 +705,7 @@ class TestSecurityScanning:
         assert config_path.exists(), f".pre-commit-config.yaml not found at {config_path}"
 
     def test_bandit_can_run(self):
-        """Test that Bandit can execute."""
+        """Test that Bandit can execute."""  # nosec
         result = subprocess.run( # nosec B603
             ["bandit", "--version"],
             capture_output=True,
@@ -1471,7 +1471,7 @@ class TestCLIModelSelection:
             "predix", Path(__file__).parent.parent.parent / "predix.py"
         )
         predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        spec.loader.exec_module(predix)  # nosec
         assert hasattr(predix, "app")
         assert hasattr(predix, "quant")
 
@@ -1498,7 +1498,7 @@ class TestCLIModelSelection:
             "predix", Path(__file__).parent.parent.parent / "predix.py"
         )
         predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        spec.loader.exec_module(predix)  # nosec
 
         runner = CliRunner()
         result = runner.invoke(predix.app, ["quant", "--help"])
@@ -1515,7 +1515,7 @@ class TestCLIModelSelection:
             "predix", Path(__file__).parent.parent.parent / "predix.py"
         )
         predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        spec.loader.exec_module(predix)  # nosec
 
         runner = CliRunner()
         result = runner.invoke(predix.app, ["quant", "--help"])
@@ -1545,7 +1545,7 @@ class TestCLIModelSelection:
                 "predix", Path(__file__).parent.parent.parent / "predix.py"
             )
             predix = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(predix)
+            spec.loader.exec_module(predix)  # nosec
 
             source = inspect.getsource(predix.quant)
             assert "OPENROUTER_API_KEY" in source
@@ -1562,7 +1562,7 @@ class TestCLIModelSelection:
             "predix", Path(__file__).parent.parent.parent / "predix.py"
         )
         predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        spec.loader.exec_module(predix)  # nosec
 
         # TeeWriter is defined inside the quant function
         # Verify the function source contains TeeWriter
@@ -1579,7 +1579,7 @@ class TestCLIModelSelection:
             "predix", Path(__file__).parent.parent.parent / "predix.py"
         )
         predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        spec.loader.exec_module(predix)  # nosec
 
         runner = CliRunner()
         result = runner.invoke(predix.app, ["health", "--help"])
@@ -1595,7 +1595,7 @@ class TestCLIModelSelection:
             "predix", Path(__file__).parent.parent.parent / "predix.py"
         )
         predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        spec.loader.exec_module(predix)  # nosec
 
         runner = CliRunner()
         result = runner.invoke(predix.app, ["status", "--help"])

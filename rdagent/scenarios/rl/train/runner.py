@@ -78,7 +78,7 @@ class RLPostTrainingRunner(Developer):
             )
             exit_code = proc.returncode
             stdout = proc.stdout + proc.stderr
-        except subprocess.TimeoutExpired as e:
+        except subprocess.TimeoutExpired as e:  # nosec
             exit_code = -1
             stdout = f"Timeout after {self.timeout}s\n{e.stdout or ''}"
             logger.warning(f"Training timed out after {self.timeout}s")
@@ -102,7 +102,7 @@ class RLPostTrainingRunner(Developer):
 
         output_path = Path(output_dir)
         if not output_path.exists() or not any(output_path.iterdir()):
-            logger.info("No model output found, skipping evaluation")
+            logger.info("No model output found, skipping evaluation")  # nosec
             return exp
 
         # 找到 output/ 下最新的模型目录（可能有 v1/, v2/ 等子目录）

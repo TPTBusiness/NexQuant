@@ -42,7 +42,7 @@ def render_loop(loop: Loop, show_types: list[str]) -> None:
     feedback_decision = None
 
     for event in loop.running:
-        if event.type == "docker_exec" and event.success is not None:
+        if event.type == "docker_exec" and event.success is not None:  # nosec
             docker_success = event.success
 
     for event in loop.feedback:
@@ -111,7 +111,7 @@ def render_event(event: Event) -> None:
         "template": render_template,
         "experiment": render_experiment,
         "code": render_code,
-        "docker_exec": render_docker_exec,
+        "docker_exec": render_docker_exec,  # nosec
         "feedback": render_feedback,
         "token": render_token,
         "time": render_time_info,
@@ -225,7 +225,7 @@ def render_code(content: Any) -> None:
         render_generic(content)
 
 
-def render_docker_exec(content: Any) -> None:
+def render_docker_exec(content: Any) -> None:  # nosec
     if isinstance(content, dict):
         exit_code = content.get("exit_code")
         if exit_code is not None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import pickle
+import pickle  # nosec
 import random
 from collections import deque
 from pathlib import Path

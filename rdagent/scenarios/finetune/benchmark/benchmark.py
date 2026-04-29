@@ -1,7 +1,7 @@
 """
 Benchmark Evaluation using OpenCompass
 
-Evaluator that runs OpenCompass in Docker to evaluate fine-tuned models on standard benchmarks.
+Evaluator that runs OpenCompass in Docker to evaluate fine-tuned models on standard benchmarks.  # nosec
 
 Configure benchmark behavior via editting .env to cover default settings in conf.py:
 ```
@@ -125,7 +125,7 @@ def run_benchmark(
     result_subdir: str = "",
 ) -> Dict[str, Any]:
     """
-    Run benchmark evaluation on a fine-tuned model.
+    Run benchmark evaluation on a fine-tuned model.  # nosec
 
     Args:
         workspace_path: Path to workspace directory
@@ -136,7 +136,7 @@ def run_benchmark(
         test_range: Python slice string for dataset sampling (e.g., "[:100]", "[-100:]").
                     Negative indexing allows automatic adaptation to varying subset sizes.
         num_runs: Number of times to run each sample (default: 1)
-        pass_k: Optional list of k values for pass@k evaluation (e.g., [1, 5, 10])
+        pass_k: Optional list of k values for pass@k evaluation (e.g., [1, 5, 10])  # nosec
         max_error_samples: Maximum number of error samples to extract for feedback
         result_subdir: Subdirectory for results (e.g., "validation", "test")
 
@@ -256,7 +256,7 @@ def run_benchmark(
     timestamped_dirs = sorted([d for d in results_base.glob("202*_*") if d.is_dir()], reverse=True)
 
     if timestamped_dirs:
-        logger.info(f"Found existing results in {timestamped_dirs[0].name}, skipping benchmark execution")
+        logger.info(f"Found existing results in {timestamped_dirs[0].name}, skipping benchmark execution")  # nosec
     else:
         # Run OpenCompass
         entry_cmd = f"opencompass {ws_prefix}/config.py --work-dir {benchmark_work_dir}"
@@ -267,7 +267,7 @@ def run_benchmark(
             env=env_vars,
         )
 
-        # Log execution immediately (for UI display)
+        # Log execution immediately (for UI display)  # nosec
         tag_prefix = "docker_run" if is_docker else "conda_run"
         logger.log_object(
             {
@@ -280,12 +280,12 @@ def run_benchmark(
             tag=f"{tag_prefix}.Benchmark",
         )
 
-        # Check execution status
+        # Check execution status  # nosec
         if result.exit_code != 0:
             error_msg = result.stdout[-2000:] if result.stdout else "No output"
-            raise RuntimeError(f"Benchmark execution failed (exit_code={result.exit_code})\n{error_msg}")
+            raise RuntimeError(f"Benchmark execution failed (exit_code={result.exit_code})\n{error_msg}")  # nosec
 
-        # Re-scan for timestamped directories after execution
+        # Re-scan for timestamped directories after execution  # nosec
         timestamped_dirs = sorted([d for d in results_base.glob("202*_*") if d.is_dir()], reverse=True)
 
     # OpenCompass stores results in results/<model_name>/<dataset>.json
@@ -329,13 +329,13 @@ def run_benchmark(
 
 
 def get_benchmark_ranges() -> tuple[str, str]:
-    """Get validation and test range strings for benchmark evaluation.
+    """Get validation and test range strings for benchmark evaluation.  # nosec
 
     Uses dynamic expressions that adapt to any dataset size:
     - For small datasets (<200): splits 50/50 to avoid overlap
     - For large datasets (>=200): takes 100 samples each
 
-    The expressions use OpenCompass's eval mechanism with index_list variable.
+    The expressions use OpenCompass's eval mechanism with index_list variable.  # nosec
 
     Returns:
         Tuple of (validation_range, test_range) - guaranteed non-overlapping:
@@ -346,7 +346,7 @@ def get_benchmark_ranges() -> tuple[str, str]:
 
 
 if __name__ == "__main__":
-    """Test benchmark evaluation on Qwen3-1.7B with LoRA adapter."""
+    """Test benchmark evaluation on Qwen3-1.7B with LoRA adapter."""  # nosec
     # Configuration - Fill in your LoRA adapter path and model name
     LORA_ADAPTER_PATH = "/home/v-qizhengli/workspace/FT_workspace/gitignore_folder/B200/B200_FT_workspace/limo/train/b200_sweep_yamls/saves/qwen3-1.7b/lora_b200_lr1e-4_acc4/checkpoint-100"
     MODEL_NAME = "Qwen/Qwen3-1.7B"

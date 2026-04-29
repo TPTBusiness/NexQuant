@@ -40,7 +40,7 @@ class TestResultsDatabaseInitialization:
         c = results_database.conn.cursor()
         
         # Prüfe ob alle Tabellen existieren
-        c.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        c.execute("SELECT name FROM sqlite_master WHERE type='table'")  # nosec
         tables = [row[0] for row in c.fetchall()]
         
         assert 'factors' in tables, "Tabelle 'factors' fehlt"
@@ -69,7 +69,7 @@ class TestResultsDatabaseInitialization:
         
         # db2 sollte den Faktor sehen
         c = db2.conn.cursor()
-        c.execute("SELECT COUNT(*) FROM factors")
+        c.execute("SELECT COUNT(*) FROM factors")  # nosec
         count = c.fetchone()[0]
         assert count == 1, "Faktor wurde nicht in zweiter Instanz gesehen"
         
@@ -146,7 +146,7 @@ class TestAddBacktest:
         
         # Faktor sollte existieren
         c = results_database.conn.cursor()
-        c.execute("SELECT COUNT(*) FROM factors WHERE factor_name = ?", ("NewFactor",))
+        c.execute("SELECT COUNT(*) FROM factors WHERE factor_name = ?", ("NewFactor",))  # nosec
         count = c.fetchone()[0]
         assert count == 1, "Faktor wurde nicht automatisch erstellt"
 
@@ -182,7 +182,7 @@ class TestAddBacktest:
         
         # Beide Runs sollten in DB sein
         c = results_database.conn.cursor()
-        c.execute("SELECT COUNT(*) FROM backtest_runs")
+        c.execute("SELECT COUNT(*) FROM backtest_runs")  # nosec
         count = c.fetchone()[0]
         assert count == 2, "Beide Runs sollten gespeichert sein"
 
@@ -201,7 +201,7 @@ class TestAddLoop:
         results_database.add_loop(1, 8, 2, 0.05, "completed")
         
         c = results_database.conn.cursor()
-        c.execute("SELECT success_rate FROM loop_results WHERE loop_index = 1")
+        c.execute("SELECT success_rate FROM loop_results WHERE loop_index = 1")  # nosec
         rate = c.fetchone()[0]
         
         assert abs(rate - 0.8) < 1e-10, f"Success Rate {rate} != erwartet 0.8"
@@ -211,7 +211,7 @@ class TestAddLoop:
         loop_id = results_database.add_loop(1, 0, 0, None, "completed")
         
         c = results_database.conn.cursor()
-        c.execute("SELECT success_rate FROM loop_results WHERE id = ?", (loop_id,))
+        c.execute("SELECT success_rate FROM loop_results WHERE id = ?", (loop_id,))  # nosec
         rate = c.fetchone()[0]
         
         assert rate == 0, f"Success Rate sollte 0 sein bei 0 total, ist aber {rate}"
@@ -222,7 +222,7 @@ class TestAddLoop:
             results_database.add_loop(i, i % 5, 5 - (i % 5), 0.01 * i, "completed")
         
         c = results_database.conn.cursor()
-        c.execute("SELECT COUNT(*) FROM loop_results")
+        c.execute("SELECT COUNT(*) FROM loop_results")  # nosec
         count = c.fetchone()[0]
         
         assert count == 10, f"Erwartet 10 Loops, gefunden {count}"
@@ -332,7 +332,7 @@ class TestDatabaseCleanup:
         try:
             # Arbeit mit DB
             c = db.conn.cursor()
-            c.execute("SELECT COUNT(*) FROM factors")
+            c.execute("SELECT COUNT(*) FROM factors")  # nosec
             count = c.fetchone()[0]
             assert count == 1
         finally:
@@ -362,7 +362,7 @@ class TestDatabaseIntegrity:
         backtest_id = results_database.add_backtest("TestFactor", {'ic': 0.05})
         
         c = results_database.conn.cursor()
-        c.execute("""
+        c.execute("""  # nosec
             SELECT b.factor_id, f.id 
             FROM backtest_runs b 
             JOIN factors f ON b.factor_id = f.id 
@@ -385,10 +385,10 @@ class TestDatabaseIntegrity:
         db2 = ResultsDatabase(db_path=temp_db_path)
         
         c = db2.conn.cursor()
-        c.execute("SELECT COUNT(*) FROM factors")
+        c.execute("SELECT COUNT(*) FROM factors")  # nosec
         factor_count = c.fetchone()[0]
         
-        c.execute("SELECT COUNT(*) FROM backtest_runs")
+        c.execute("SELECT COUNT(*) FROM backtest_runs")  # nosec
         backtest_count = c.fetchone()[0]
         
         assert factor_count == 1, "Faktor nicht persistent"

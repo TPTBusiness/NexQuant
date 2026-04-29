@@ -54,11 +54,11 @@ def preprocess_script():
         X_train, X_valid, y_train, y_valid, X_test, forecast_ids = prepreprocess()
 
         # Save preprocessed data
-        X_train.to_pickle("/kaggle/input/X_train.pkl")
-        X_valid.to_pickle("/kaggle/input/X_valid.pkl")
-        y_train.to_pickle("/kaggle/input/y_train.pkl")
-        y_valid.to_pickle("/kaggle/input/y_valid.pkl")
-        X_test.to_pickle("/kaggle/input/X_test.pkl")
-        forecast_ids.to_pickle("/kaggle/input/forecast_ids.pkl")
+        X_train.to_pickle("/kaggle/input/X_train.pkl")  # nosec
+        X_valid.to_pickle("/kaggle/input/X_valid.pkl")  # nosec
+        y_train.to_pickle("/kaggle/input/y_train.pkl")  # nosec
+        y_valid.to_pickle("/kaggle/input/y_valid.pkl")  # nosec
+        X_test.to_pickle("/kaggle/input/X_test.pkl")  # nosec
+        forecast_ids.to_pickle("/kaggle/input/forecast_ids.pkl")  # nosec
 
     return X_train, X_valid, y_train, y_valid, X_test, forecast_ids

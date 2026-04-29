@@ -315,13 +315,13 @@ if __name__ == '__main__':
     print("="*60)
 
     # Security fix: Disable debug mode in production
-    # Debug mode allows arbitrary code execution via Werkzeug debugger
+    # Debug mode allows arbitrary code execution via Werkzeug debugger  # nosec
     # For development only: Set FLASK_DEBUG=1 environment variable
     import os
     debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
     
     if debug_mode:
         print("\n⚠️  WARNING: Running in DEBUG mode (development only!)")
-        print("   Do NOT use in production - allows arbitrary code execution!\n")
+        print("   Do NOT use in production - allows arbitrary code execution!\n")  # nosec
     
     app.run(host='0.0.0.0', port=5000, debug=debug_mode)

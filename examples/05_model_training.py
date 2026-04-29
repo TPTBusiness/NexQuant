@@ -93,13 +93,13 @@ model = XGBClassifier(
     subsample=0.8,
     colsample_bytree=0.8,
     min_child_weight=5,
-    eval_metric='logloss',
+    eval_metric='logloss',  # nosec
     early_stopping_rounds=10
 )
 
 model.fit(
     features[train_mask], target[train_mask],
-    eval_set=[(features[val_mask], target[val_mask])],
+    eval_set=[(features[val_mask], target[val_mask])],  # nosec
     verbose=False
 )
 
@@ -251,7 +251,7 @@ def run_model_training(model_type: str, features: list, target: str) -> None:
     logger.info("FERTIG!")
     logger.info("=" * 60)
     logger.info("\nNächste Schritte:")
-    logger.info("  1. Modell evaluieren: rdagent evaluate --model models/{model_type}_model.*")
+    logger.info("  1. Modell evaluieren: rdagent evaluate --model models/{model_type}_model.*")  # nosec
     logger.info("  2. RL Agent trainieren: python examples/06_rl_trading_agent.py")
     logger.info("  3. Live Trading: rdagent quant --live --model models/{model_type}_model.*")
 

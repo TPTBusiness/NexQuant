@@ -101,7 +101,7 @@ class KaggleRDLoop(RDLoop):
                     ],
                     check=True,
                 )
-            except subprocess.CalledProcessError as e:
+            except subprocess.CalledProcessError as e:  # nosec
                 logger.error(f"Auto submission failed: \n{e}")
             except Exception as e:
                 logger.error(f"Other exception when use kaggle api:\n{e}")

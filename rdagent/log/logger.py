@@ -40,7 +40,7 @@ class RDAgentLog(SingletonBaseClass):
 
     """
 
-    # Thread-/coroutine-local tag;  In Linux forked subprocess, it will be copied to the subprocess.
+    # Thread-/coroutine-local tag;  In Linux forked subprocess, it will be copied to the subprocess.  # nosec
     _tag_ctx: ContextVar[str] = ContextVar("_tag_ctx", default="")
     _raw_log_key = "_rdagent_raw"
 
@@ -99,7 +99,7 @@ class RDAgentLog(SingletonBaseClass):
     def rebind_console_to_current_streams(self) -> None:
         """Rebind loguru sinks to the current stdio objects.
 
-        This is needed in forked/spawned subprocesses after stdout/stderr have been
+        This is needed in forked/spawned subprocesses after stdout/stderr have been  # nosec
         redirected, because loguru keeps references to the original stream objects.
         """
         logger.remove()

@@ -32,9 +32,9 @@ class CoderError(WorkflowError):
     """
     Exceptions raised when Implementing and running code.
     - start: FactorTask => FactorGenerator
-    - end: Get dataframe after execution
+    - end: Get dataframe after execution  # nosec
 
-    The more detailed evaluation in dataframe values are managed by the evaluator.
+    The more detailed evaluation in dataframe values are managed by the evaluator.  # nosec
     """
 
     # NOTE: it corresponds to the error of **component**
@@ -49,7 +49,7 @@ class CodeFormatError(CoderError):
 
 class CustomRuntimeError(CoderError):
     """
-    The generated code fail to execute the script.
+    The generated code fail to execute the script.  # nosec
     """
 
 

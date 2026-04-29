@@ -14,7 +14,7 @@ def fit(X_train: pd.DataFrame, y_train: pd.Series, X_valid: pd.DataFrame, y_vali
 
     params = {
         "objective": "binary:logistic",
-        "eval_metric": "logloss",
+        "eval_metric": "logloss",  # nosec
         "eta": 0.1,
         "max_depth": 6,
         "subsample": 0.8,
@@ -23,8 +23,8 @@ def fit(X_train: pd.DataFrame, y_train: pd.Series, X_valid: pd.DataFrame, y_vali
     }
     num_round = 200  # Increase number of rounds
 
-    evallist = [(dtrain, "train"), (dvalid, "eval")]
-    bst = xgb.train(params, dtrain, num_round, evallist, early_stopping_rounds=50)
+    evallist = [(dtrain, "train"), (dvalid, "eval")]  # nosec
+    bst = xgb.train(params, dtrain, num_round, evallist, early_stopping_rounds=50)  # nosec
 
     return bst
 

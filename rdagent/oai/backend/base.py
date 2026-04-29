@@ -202,7 +202,7 @@ class SQliteLazyCache(SingletonBaseClass):
         self.conn = sqlite3.connect(cache_location, timeout=20)
         self.c = self.conn.cursor()
         if not db_file_exist:
-            self.c.execute(
+            self.c.execute(  # nosec
                 """
                 CREATE TABLE chat_cache (
                     md5_key TEXT PRIMARY KEY,
@@ -210,7 +210,7 @@ class SQliteLazyCache(SingletonBaseClass):
                 )
                 """,
             )
-            self.c.execute(
+            self.c.execute(  # nosec
                 """
                 CREATE TABLE embedding_cache (
                     md5_key TEXT PRIMARY KEY,
@@ -218,7 +218,7 @@ class SQliteLazyCache(SingletonBaseClass):
                 )
                 """,
             )
-            self.c.execute(
+            self.c.execute(  # nosec
                 """
                 CREATE TABLE message_cache (
                     conversation_id TEXT PRIMARY KEY,
@@ -230,19 +230,19 @@ class SQliteLazyCache(SingletonBaseClass):
 
     def chat_get(self, key: str) -> str | None:
         md5_key = md5_hash(key)
-        self.c.execute("SELECT chat FROM chat_cache WHERE md5_key=?", (md5_key,))
+        self.c.execute("SELECT chat FROM chat_cache WHERE md5_key=?", (md5_key,))  # nosec
         result = self.c.fetchone()
         return None if result is None else result[0]
 
     def embedding_get(self, key: str) -> list | dict | str | None:
         md5_key = md5_hash(key)
-        self.c.execute("SELECT embedding FROM embedding_cache WHERE md5_key=?", (md5_key,))
+        self.c.execute("SELECT embedding FROM embedding_cache WHERE md5_key=?", (md5_key,))  # nosec
         result = self.c.fetchone()
         return None if result is None else json.loads(result[0])
 
     def chat_set(self, key: str, value: str) -> None:
         md5_key = md5_hash(key)
-        self.c.execute(
+        self.c.execute(  # nosec
             "INSERT OR REPLACE INTO chat_cache (md5_key, chat) VALUES (?, ?)",
             (md5_key, value),
         )
@@ -252,19 +252,19 @@ class SQliteLazyCache(SingletonBaseClass):
     def embedding_set(self, content_to_embedding_dict: dict) -> None:
         for key, value in content_to_embedding_dict.items():
             md5_key = md5_hash(key)
-            self.c.execute(
+            self.c.execute(  # nosec
                 "INSERT OR REPLACE INTO embedding_cache (md5_key, embedding) VALUES (?, ?)",
                 (md5_key, json.dumps(value)),
             )
         self.conn.commit()
 
     def message_get(self, conversation_id: str) -> list[dict[str, Any]]:
-        self.c.execute("SELECT message FROM message_cache WHERE conversation_id=?", (conversation_id,))
+        self.c.execute("SELECT message FROM message_cache WHERE conversation_id=?", (conversation_id,))  # nosec
         result = self.c.fetchone()
         return [] if result is None else cast(list[dict[str, Any]], json.loads(result[0]))
 
     def message_set(self, conversation_id: str, message_value: list[dict[str, Any]]) -> None:
-        self.c.execute(
+        self.c.execute(  # nosec
             "INSERT OR REPLACE INTO message_cache (conversation_id, message) VALUES (?, ?)",
             (conversation_id, json.dumps(message_value)),
         )

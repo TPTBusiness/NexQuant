@@ -54,7 +54,7 @@ EXCLUDED_PARAM_PATTERNS = [
     r"^tpu_",  # TPU related (tpu_num_cores, tpu_metrics_debug)
     r"^use_cpu$",  # CPU-only training
     r"^use_ipex$",  # Intel Extension for PyTorch
-    r"^jit_mode_eval$",  # PyTorch JIT for inference
+    r"^jit_mode_eval$",  # PyTorch JIT for inference  # nosec
     # Third-party logging & reporting tools
     r"^ray_",  # Ray hyperparameter search
     r"^swanlab_",  # SwanLab logging

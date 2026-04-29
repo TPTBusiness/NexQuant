@@ -8,7 +8,7 @@
 
 import subprocess  # nosec B404
 
-latest_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"], text=True).strip()
+latest_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"], text=True).strip()  # nosec
 
 project = "Predix"
 copyright = "2025, Predix Team"

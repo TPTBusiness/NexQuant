@@ -6,7 +6,7 @@ from pathlib import Path
 
 from rdagent.components.coder.CoSTEER.config import CoSTEER_SETTINGS
 from rdagent.components.coder.data_science.workflow import WorkflowCoSTEER
-from rdagent.components.coder.data_science.workflow.eval import (
+from rdagent.components.coder.data_science.workflow.eval import (  # nosec
     WorkflowGeneralCaseSpecEvaluator,
 )
 from rdagent.components.coder.data_science.workflow.exp import WorkflowTask
@@ -43,7 +43,7 @@ def develop_one_competition(competition: str):
     print(new_code)"""
 
     """eva = WorkflowGeneralCaseSpecEvaluator(scen=scen)
-    exp.feedback = eva.evaluate(target_task=wt, queried_knowledge=None, implementation=workflowexp, gt_implementation=None)
+    exp.feedback = eva.evaluate(target_task=wt, queried_knowledge=None, implementation=workflowexp, gt_implementation=None)  # nosec
     print(exp.feedback)"""
 
     # Run the experiment

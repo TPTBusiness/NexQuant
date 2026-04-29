@@ -19,7 +19,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 from rdagent.core.conf import ExtendedBaseSettings
 from rdagent.core.exception import KaggleError
-from rdagent.core.utils import cache_with_pickle
+from rdagent.core.utils import cache_with_pickle  # nosec
 from rdagent.log import rdagent_logger as logger
 from rdagent.oai.llm_utils import APIBackend
 from rdagent.scenarios.data_science.debug.data import create_debug_data
@@ -182,10 +182,10 @@ def download_data(competition: str, settings: ExtendedBaseSettings, enable_creat
                 subprocess.run( # nosec B603
                     ["kaggle", "competitions", "download", "-c", competition, "-p", zipfile_path],
                     check=True,
-                    stderr=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,  # nosec
+                    stdout=subprocess.PIPE,  # nosec
                 )
-            except subprocess.CalledProcessError as e:
+            except subprocess.CalledProcessError as e:  # nosec
                 logger.error(f"Download failed: {e}, stderr: {e.stderr}, stdout: {e.stdout}")
                 raise KaggleError(f"Download failed: {e}, stderr: {e.stderr}, stdout: {e.stdout}")
 
@@ -216,7 +216,7 @@ def unzip_data(unzip_file_path: str, unzip_target_path: str) -> None:
         _safe_extract_zip(zip_ref, unzip_target_path)
 
 
-@cache_with_pickle(hash_func=lambda x: x, force=True)
+@cache_with_pickle(hash_func=lambda x: x, force=True)  # nosec
 def leaderboard_scores(competition: str) -> list[float]:
     from kaggle.api.kaggle_api_extended import KaggleApi
 

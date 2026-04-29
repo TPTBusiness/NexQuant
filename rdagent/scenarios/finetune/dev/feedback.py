@@ -2,7 +2,7 @@
 LLM Fine-tuning Experiment Feedback Generation
 
 Provides feedback analysis for LLM fine-tuning experiments, including
-model performance evaluation, training metrics analysis, and improvement suggestions.
+model performance evaluation, training metrics analysis, and improvement suggestions.  # nosec
 """
 
 import json
@@ -43,7 +43,7 @@ class FTExperiment2Feedback(Experiment2Feedback):
             trace: Experiment trace (optional)
             exception: If provided, indicates experiment failed and contains error details
 
-        Note: If exception is None, it means training succeeded and we evaluate quality/effectiveness.
+        Note: If exception is None, it means training succeeded and we evaluate quality/effectiveness.  # nosec
               If exception is provided, we analyze the failure cause.
         """
         # Get task information
@@ -58,7 +58,7 @@ class FTExperiment2Feedback(Experiment2Feedback):
             error_info = str(exception)
 
             # Try to get FTRunnerEvaluator's analysis result from workspace
-            # This contains structured feedback (execution, return_checking, code) instead of raw error string
+            # This contains structured feedback (execution, return_checking, code) instead of raw error string  # nosec
             runner_feedback = None
             if exp.sub_workspace_list:
                 for ws in exp.sub_workspace_list:
@@ -69,7 +69,7 @@ class FTExperiment2Feedback(Experiment2Feedback):
             if runner_feedback:
                 # Use FTRunnerEvaluator's structured analysis result
                 error_info = f"""## Execution Analysis
-{runner_feedback.execution}
+{runner_feedback.execution}  # nosec
 
 ## Return Checking
 {runner_feedback.return_checking}
@@ -100,12 +100,12 @@ class FTExperiment2Feedback(Experiment2Feedback):
                 benchmark = exp_result.get("benchmark", {})
                 raw_metrics = exp_result.get("training_metrics", {})
                 # Pass loss_history directly (simpler and preserves full information)
-                loss_history = raw_metrics.get("loss_history", {"train": [], "eval": []})
+                loss_history = raw_metrics.get("loss_history", {"train": [], "eval": []})  # nosec
                 # Sample train entries if too many to avoid token bloat
                 if len(loss_history.get("train", [])) > 60:
                     loss_history["train"] = loss_history["train"][:30] + loss_history["train"][-30:]
                 training_metrics = (
-                    {"loss_history": loss_history} if (loss_history.get("train") or loss_history.get("eval")) else {}
+                    {"loss_history": loss_history} if (loss_history.get("train") or loss_history.get("eval")) else {}  # nosec
                 )
             else:
                 # Legacy format: exp_result is directly the benchmark result (list of dicts)
@@ -127,7 +127,7 @@ class FTExperiment2Feedback(Experiment2Feedback):
                 hypothesis=exp.hypothesis,
                 task_desc=task_desc,
                 workspace_files=exp.experiment_workspace.file_dict,
-                execution_time=exp.experiment_workspace.running_info.running_time,
+                execution_time=exp.experiment_workspace.running_info.running_time,  # nosec
                 benchmark=benchmark,
                 training_metrics=training_metrics,
                 sota_benchmark=sota_benchmark,

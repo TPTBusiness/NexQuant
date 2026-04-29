@@ -12,7 +12,7 @@ Extra feature:
 
 File structure
 - ___init__.py: the entrance/agent of coder
-- evaluator.py
+- evaluator.py  # nosec
 - conf.py
 - exp.py: everything under the experiment, e.g.
     - Task
@@ -25,7 +25,7 @@ File structure
 from pathlib import Path
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEERMultiEvaluator,
     CoSTEERSingleFeedback,
 )
@@ -36,10 +36,10 @@ from rdagent.components.coder.CoSTEER.knowledge_management import (
     CoSTEERQueriedKnowledge,
 )
 from rdagent.components.coder.data_science.conf import DSCoderCoSTEERSettings
-from rdagent.components.coder.data_science.pipeline.eval import PipelineCoSTEEREvaluator
+from rdagent.components.coder.data_science.pipeline.eval import PipelineCoSTEEREvaluator  # nosec
 from rdagent.components.coder.data_science.pipeline.exp import PipelineTask
 from rdagent.components.coder.data_science.share.ds_costeer import DSCoSTEER
-from rdagent.components.coder.data_science.share.eval import ModelDumpEvaluator
+from rdagent.components.coder.data_science.share.eval import ModelDumpEvaluator  # nosec
 from rdagent.core.exception import CoderError
 from rdagent.core.experiment import FBWorkspace
 from rdagent.core.scenario import Scenario
@@ -138,18 +138,18 @@ class PipelineCoSTEER(DSCoSTEER):
         **kwargs,
     ) -> None:
         settings = DSCoderCoSTEERSettings()
-        eval_l = [PipelineCoSTEEREvaluator(scen=scen)]
+        eval_l = [PipelineCoSTEEREvaluator(scen=scen)]  # nosec
         if DS_RD_SETTING.enable_model_dump:
-            eval_l.append(ModelDumpEvaluator(scen=scen, data_type="sample"))
-        for evaluator in settings.extra_evaluator:
-            eval_l.append(import_class(evaluator)(scen=scen))
+            eval_l.append(ModelDumpEvaluator(scen=scen, data_type="sample"))  # nosec
+        for evaluator in settings.extra_evaluator:  # nosec
+            eval_l.append(import_class(evaluator)(scen=scen))  # nosec
 
-        for extra_eval in DSCoderCoSTEERSettings().extra_eval:
-            kls = import_class(extra_eval)
-            eval_l.append(kls(scen=scen))
+        for extra_eval in DSCoderCoSTEERSettings().extra_eval:  # nosec
+            kls = import_class(extra_eval)  # nosec
+            eval_l.append(kls(scen=scen))  # nosec
 
         eva = CoSTEERMultiEvaluator(
-            single_evaluator=eval_l, scen=scen
+            single_evaluator=eval_l, scen=scen  # nosec
         )  # Please specify whether you agree running your eva in parallel or not
         es = PipelineMultiProcessEvolvingStrategy(scen=scen, settings=settings)
 

@@ -11,15 +11,15 @@ def fit(X_train: pd.DataFrame, y_train: pd.DataFrame, X_valid: pd.DataFrame, y_v
 
         params = {
             "objective": "reg:squarederror",
-            "eval_metric": "rmse",
+            "eval_metric": "rmse",  # nosec
             "nthread": -1,
             "tree_method": "gpu_hist",
             "device": "cuda",
         }
         num_round = 1000
 
-        evallist = [(dtrain, "train"), (dvalid, "eval")]
-        models[target] = xgb.train(params, dtrain, num_round, evallist, early_stopping_rounds=50)
+        evallist = [(dtrain, "train"), (dvalid, "eval")]  # nosec
+        models[target] = xgb.train(params, dtrain, num_round, evallist, early_stopping_rounds=50)  # nosec
 
     return models
 

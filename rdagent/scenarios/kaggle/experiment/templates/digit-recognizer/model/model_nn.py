@@ -63,7 +63,7 @@ def fit(X_train: pd.DataFrame, y_train: pd.DataFrame, X_valid: pd.DataFrame, y_v
             optimizer.step()
 
         # Validate the model
-        model.eval()
+        model.eval()  # nosec
         valid_loss = 0
         correct = 0
         with torch.no_grad():
@@ -81,7 +81,7 @@ def fit(X_train: pd.DataFrame, y_train: pd.DataFrame, X_valid: pd.DataFrame, y_v
 
 def predict(model, X):
     X_tensor = torch.tensor(X.values, dtype=torch.float32).view(-1, 1, 28, 28).to(device)
-    model.eval()
+    model.eval()  # nosec
     with torch.no_grad():
         outputs = model(X_tensor)
         _, predicted = torch.max(outputs, 1)

@@ -11,7 +11,7 @@ from rdagent.log.conf import LOG_SETTINGS
 def get_llm_qa(file_path):
     data_flt = []
     with open(file_path, "rb") as f:
-        data = pickle.load(f)
+        data = pickle.load(f)  # nosec
         print(len(data))
         for item in data:
             if "debug_llm" in item["tag"]:

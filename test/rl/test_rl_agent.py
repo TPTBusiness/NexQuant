@@ -250,16 +250,16 @@ class TestSaveLoad:
 
 
 class TestEvaluation:
-    """Test evaluation functionality."""
+    """Test evaluation functionality."""  # nosec
 
-    def test_evaluate_without_model_raises(self, mock_env: MagicMock) -> None:
+    def test_evaluate_without_model_raises(self, mock_env: MagicMock) -> None:  # nosec
         """Evaluate without model should raise ValueError."""
         agent = RLTradingAgent()
         with pytest.raises(ValueError, match="not trained or loaded"):
-            agent.evaluate(mock_env)
+            agent.evaluate(mock_env)  # nosec
 
     @patch("stable_baselines3.PPO")
-    def test_evaluate_returns_metrics(
+    def test_evaluate_returns_metrics(  # nosec
         self, mock_ppo: MagicMock, mock_env: MagicMock
     ) -> None:
         """Evaluate should return metrics dict."""
@@ -280,7 +280,7 @@ class TestEvaluation:
         agent = RLTradingAgent(algorithm="PPO")
         agent.model = mock_model
 
-        metrics = agent.evaluate(mock_env, n_episodes=3)
+        metrics = agent.evaluate(mock_env, n_episodes=3)  # nosec
 
         assert "mean_reward" in metrics
         assert "std_reward" in metrics

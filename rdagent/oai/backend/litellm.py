@@ -29,7 +29,7 @@ def _reduce_no_init(exc: Exception) -> tuple:
 
 # suppose you want to apply this to MyError
 for cls in [BadRequestError, Timeout]:
-    copyreg.pickle(cls, _reduce_no_init)
+    copyreg.pickle(cls, _reduce_no_init)  # nosec
 
 
 class LiteLLMSettings(LLMSettings):

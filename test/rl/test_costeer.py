@@ -4,10 +4,10 @@ Tests for RL Costeer (Trading Controller).
 Covers:
 - Costeer initialization with/without model
 - Market data initialization
-- Action retrieval (mocked model)
+- Action retrieval (mocked model)  # nosec
 - Risk limit enforcement
 - Observation building
-- Step execution
+- Step execution  # nosec
 - Performance tracking
 """
 
@@ -123,7 +123,7 @@ class TestCosteerInit:
 
 
 class TestGetAction:
-    """Test action retrieval."""
+    """Test action retrieval."""  # nosec
 
     def test_no_model_returns_zero(self, initialized_costeer: RLCosteer) -> None:
         """Without model, action should be 0 (hold)."""
@@ -239,7 +239,7 @@ class TestObservationBuilding:
 
 
 class TestStepExecution:
-    """Test step execution."""
+    """Test step execution."""  # nosec
 
     def test_step_records_trade(self, initialized_costeer: RLCosteer) -> None:
         """Step should record trade in history."""

@@ -1,7 +1,7 @@
 """
 Predix Parallel Runner - Run multiple factor experiments concurrently.
 
-Spawns N subprocesses, each running `predix.py quant` with isolated config:
+Spawns N subprocesses, each running `predix.py quant` with isolated config:  # nosec
 - Separate log files (fin_quant_run1.log, fin_quant_run2.log, etc.)
 - Separate result directories (results/runs/run1/, results/runs/run2/, etc.)
 - Separate workspace directories
@@ -80,7 +80,7 @@ class ParallelRunner:
     """
     Manages multiple concurrent factor experiment runs.
 
-    Spawns subprocesses with isolated configurations, monitors progress,
+    Spawns subprocesses with isolated configurations, monitors progress,  # nosec
     and handles graceful shutdown.
     """
 
@@ -151,7 +151,7 @@ class ParallelRunner:
 
     def _build_env(self, run_state: RunState) -> Dict[str, str]:
         """
-        Build isolated environment for a subprocess.
+        Build isolated environment for a subprocess.  # nosec
 
         Parameters
         ----------
@@ -161,7 +161,7 @@ class ParallelRunner:
         Returns
         -------
         dict
-            Environment variables dict for subprocess
+            Environment variables dict for subprocess  # nosec
         """
         # Start with a copy of current environment
         env = os.environ.copy()
@@ -193,7 +193,7 @@ class ParallelRunner:
 
     def _build_command(self, run_state: RunState) -> List[str]:
         """
-        Build the subprocess command to run predix quant.
+        Build the subprocess command to run predix quant.  # nosec
 
         Parameters
         ----------
@@ -206,7 +206,7 @@ class ParallelRunner:
             Command list for subprocess.Popen # nosec B603
         """
         cmd = [
-            sys.executable,  # Use same Python interpreter
+            sys.executable,  # Use same Python interpreter  # nosec
             str(self.project_root / "predix.py"),
             "quant",
             "--model", run_state.model,
@@ -217,7 +217,7 @@ class ParallelRunner:
 
     def _start_run(self, run_state: RunState) -> None:
         """
-        Start a single run as a subprocess.
+        Start a single run as a subprocess.  # nosec
 
         Parameters
         ----------
@@ -235,13 +235,13 @@ class ParallelRunner:
         log_path = self.project_root / run_state.log_file
         log_f = open(log_path, "a", encoding="utf-8")
 
-        # Start subprocess
+        # Start subprocess  # nosec
         run_state.process = subprocess.Popen( # nosec B603
             cmd,
             env=env,
             cwd=str(self.project_root),
             stdout=log_f,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.STDOUT,  # nosec
         )
         run_state.status = "running"
         run_state.start_time = datetime.now()
@@ -285,7 +285,7 @@ class ParallelRunner:
 
     def _stop_run(self, run_state: RunState) -> None:
         """
-        Gracefully stop a running subprocess.
+        Gracefully stop a running subprocess.  # nosec
 
         Parameters
         ----------
@@ -300,7 +300,7 @@ class ParallelRunner:
             run_state.process.terminate()
             try:
                 run_state.process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
+            except subprocess.TimeoutExpired:  # nosec
                 # Force kill if not responding
                 run_state.process.kill()
                 run_state.process.wait()

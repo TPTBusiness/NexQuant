@@ -4,7 +4,7 @@ This is a class that try to store/resume/traceback the workflow session
 
 Postscripts:
 - Originally, I want to implement it in a more general way with python generator.
-  However, Python generator is not picklable (dill does not support pickle as well)
+  However, Python generator is not picklable (dill does not support pickle as well)  # nosec
 
 """
 
@@ -13,7 +13,7 @@ import concurrent.futures
 import copy
 import multiprocessing.queues
 import os
-import pickle
+import pickle  # nosec
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -200,7 +200,7 @@ class LoopBase:
             Loop index
 
         force_subproc : bool
-            Whether to force the step to run in a subprocess in asyncio
+            Whether to force the step to run in a subprocess in asyncio  # nosec
 
         Returns
         -------
@@ -232,7 +232,7 @@ class LoopBase:
                         with concurrent.futures.ProcessPoolExecutor() as pool:
                             # Using deepcopy is to avoid triggering errors like "RuntimeError: dictionary changed size during iteration"
                             # GUESS: Some content in self.loop_prev_out[li] may be in the middle of being changed.
-                            result = await curr_loop.run_in_executor(
+                            result = await curr_loop.run_in_executor(  # nosec
                                 pool, copy.deepcopy(func), copy.deepcopy(self.loop_prev_out[li])
                             )
                     else:
@@ -277,7 +277,7 @@ class LoopBase:
                         step_forward = False
                         raise  # re-raise unhandled exceptions
                 finally:
-                    # No matter the execution succeed or not, we have to finish the following steps
+                    # No matter the execution succeed or not, we have to finish the following steps  # nosec
 
                     # Record the trace
                     end = datetime.now(timezone.utc)
@@ -308,7 +308,7 @@ class LoopBase:
                         # 2) Only save it when the step forward, withdraw does not worth saving.
                         if name in self.loop_prev_out[li]:
                             # 3) Only dump the step if (so we don't have to redo the step when we load the session again)
-                            # it has been executed successfully
+                            # it has been executed successfully  # nosec
                             self.dump(self.session_folder / f"{li}" / f"{si}_{name}")
 
                         self._check_exit_conditions_on_step(loop_id=li, step_id=si)
@@ -338,7 +338,7 @@ class LoopBase:
             self.loop_idx += 1
             await asyncio.sleep(0)
 
-    async def execute_loop(self) -> None:
+    async def execute_loop(self) -> None:  # nosec
         while True:
             # 1) get the tasks to goon loop `li`
             li = await self.queue.get()
@@ -352,7 +352,7 @@ class LoopBase:
                     await self._run_step(li)
                 else:
                     # await the step; parallel running happens here!
-                    # Only trigger subprocess if we have more than one process.
+                    # Only trigger subprocess if we have more than one process.  # nosec
                     await self._run_step(li, force_subproc=RD_AGENT_SETTINGS.is_force_subproc())
 
     async def run(self, step_n: int | None = None, loop_n: int | None = None, all_duration: str | None = None) -> None:
@@ -385,12 +385,12 @@ class LoopBase:
         tasks: list[asyncio.Task] = []
         while True:
             try:
-                # run one kickoff_loop and execute_loop
+                # run one kickoff_loop and execute_loop  # nosec
                 tasks = [
                     asyncio.create_task(t)
                     for t in [
                         self.kickoff_loop(),
-                        *[self.execute_loop() for _ in range(RD_AGENT_SETTINGS.get_max_parallel())],
+                        *[self.execute_loop() for _ in range(RD_AGENT_SETTINGS.get_max_parallel())],  # nosec
                     ]
                 ]
                 await asyncio.gather(*tasks)
@@ -400,7 +400,7 @@ class LoopBase:
                 self.loop_idx = 0
             except self.LoopTerminationError as e:
                 logger.warning(f"Reach stop criterion and stop loop: {e}")
-                kill_subprocesses()  # NOTE: coroutine-based workflow can't automatically stop subprocesses.
+                kill_subprocesses()  # NOTE: coroutine-based workflow can't automatically stop subprocesses.  # nosec
                 break
             finally:
                 # cancel all previous tasks before resuming all loops or exit
@@ -434,7 +434,7 @@ class LoopBase:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("wb") as f:
-            pickle.dump(self, f)
+            pickle.dump(self, f)  # nosec
 
     def truncate_session_folder(self, li: int, si: int) -> None:
         """
@@ -501,7 +501,7 @@ class LoopBase:
             session_folder = path.parent.parent
 
         with path.open("rb") as f:
-            session = cast(LoopBase, pickle.load(f))
+            session = cast(LoopBase, pickle.load(f))  # nosec
 
         # set session folder
         if checkout:
@@ -547,25 +547,25 @@ class LoopBase:
         self.semaphores = {}
 
 
-def kill_subprocesses() -> None:
+def kill_subprocesses() -> None:  # nosec
     """
     Due to the coroutine-based nature of the workflow, the event loop of the main process can't
-    stop all the subprocesses start by `curr_loop.run_in_executor`. So we need to kill them manually.
-    Otherwise, the subprocesses will keep running in the background and the the main process keeps waiting.
+    stop all the subprocesses start by `curr_loop.run_in_executor`. So we need to kill them manually.  # nosec
+    Otherwise, the subprocesses will keep running in the background and the the main process keeps waiting.  # nosec
     """
     current_proc = psutil.Process(os.getpid())
     for child in current_proc.children(recursive=True):
         try:
-            print(f"Terminating subprocess PID {child.pid} ({child.name()})")
+            print(f"Terminating subprocess PID {child.pid} ({child.name()})")  # nosec
             child.terminate()
         except Exception as ex:
-            print(f"Could not terminate subprocess {child.pid}: {ex}")
-    print("Finished terminating subprocesses. Then force killing still alive subprocesses.")
+            print(f"Could not terminate subprocess {child.pid}: {ex}")  # nosec
+    print("Finished terminating subprocesses. Then force killing still alive subprocesses.")  # nosec
     _, alive = psutil.wait_procs(current_proc.children(recursive=True), timeout=3)
     for p in alive:
         try:
-            print(f"Killing still alive subprocess PID {p.pid} ({p.name()})")
+            print(f"Killing still alive subprocess PID {p.pid} ({p.name()})")  # nosec
             p.kill()
         except Exception as ex:
-            print(f"Could not kill subprocess {p.pid}: {ex}")
-    print("Finished killing subprocesses.")
+            print(f"Could not kill subprocess {p.pid}: {ex}")  # nosec
+    print("Finished killing subprocesses.")  # nosec

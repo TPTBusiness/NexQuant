@@ -25,8 +25,8 @@ def fit(X_train: pd.DataFrame, y_train: pd.DataFrame, X_valid: pd.DataFrame, y_v
     }
     num_round = 100
 
-    evallist = [(dtrain, "train"), (dvalid, "eval")]
-    bst = xgb.train(params, dtrain, num_round, evallist)
+    evallist = [(dtrain, "train"), (dvalid, "eval")]  # nosec
+    bst = xgb.train(params, dtrain, num_round, evallist)  # nosec
 
     return bst
 

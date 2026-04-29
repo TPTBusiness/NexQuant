@@ -14,7 +14,7 @@ import yaml
 from rdagent.components.benchmark import BENCHMARK_CONFIGS_DIR
 from rdagent.components.benchmark.utils import build_dataset_imports_explicit
 from rdagent.log import rdagent_logger as logger
-from rdagent.scenarios.rl.autorl_bench.core.evaluator import BaseEvaluator
+from rdagent.scenarios.rl.autorl_bench.core.evaluator import BaseEvaluator  # nosec
 from rdagent.utils.agent.tpl import T
 
 
@@ -28,9 +28,9 @@ class OpenCompassEvaluator(BaseEvaluator):
     def __init__(self, config):
         self.config = config
         self.benchmark_id = config.id
-        self.eval_config = config.eval_config or {}
+        self.eval_config = config.eval_config or {}  # nosec
 
-    def run_eval(
+    def run_eval(  # nosec
         self,
         model_path: str,
         workspace_path: str,
@@ -41,7 +41,7 @@ class OpenCompassEvaluator(BaseEvaluator):
     ) -> Dict[str, Any]:
         """使用 OpenCompass 评测"""
         result = self.get_default_result(self.benchmark_id, model_path)
-        result["eval_type"] = "opencompass"
+        result["eval_type"] = "opencompass"  # nosec
 
         if not self.validate_model(model_path):
             result["error"] = f"Model not found: {model_path}"
@@ -53,11 +53,11 @@ class OpenCompassEvaluator(BaseEvaluator):
         work_dir.mkdir(parents=True, exist_ok=True)
 
         # 获取评测配置
-        dataset_import = self.eval_config.get("dataset", f"opencompass.configs.datasets.{self.benchmark_id}")
+        dataset_import = self.eval_config.get("dataset", f"opencompass.configs.datasets.{self.benchmark_id}")  # nosec
         # 允许 benchmark 在配置中声明默认评测切片（例如 HumanEval 仅评后半）
         effective_test_range = test_range
-        if test_range == "[:]" and self.eval_config.get("test_range"):
-            effective_test_range = self.eval_config["test_range"]
+        if test_range == "[:]" and self.eval_config.get("test_range"):  # nosec
+            effective_test_range = self.eval_config["test_range"]  # nosec
 
         # 从 models.yaml 获取模型推理配置
         inference_config = self._get_model_inference_config(model_name, gpu_count)
@@ -68,7 +68,7 @@ class OpenCompassEvaluator(BaseEvaluator):
         adapter_cfg_file = Path(model_path) / "adapter_config.json"
         if adapter_cfg_file.exists():
             result["error"] = (
-                "LoRA adapter detected — the evaluation system requires a full merged model. "
+                "LoRA adapter detected — the evaluation system requires a full merged model. "  # nosec
                 "Please merge before saving: "
                 "model = model.merge_and_unload(); "
                 "model.save_pretrained(output_path); "
@@ -100,7 +100,7 @@ class OpenCompassEvaluator(BaseEvaluator):
 
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=7200) # nosec B603
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired:  # nosec
             result["error"] = "OpenCompass timeout (7200s)"
             return result
 

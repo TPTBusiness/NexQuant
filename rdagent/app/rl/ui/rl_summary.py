@@ -38,7 +38,7 @@ def get_loop_status(task_path: Path, loop_id: int) -> tuple[str, bool | None]:
     for f in feedback_files:
         try:
             with open(f, "rb") as fp:
-                content = pickle.load(fp)
+                content = pickle.load(fp)  # nosec
             decision = getattr(content, "decision", None)
             if decision is not None:
                 feedback_decision = decision

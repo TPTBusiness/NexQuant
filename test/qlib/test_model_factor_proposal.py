@@ -94,7 +94,7 @@ def test_factor_filtering(mixed_factor_trace):
 )
 def test_code_inspection(converter_class, trace_fixture, request, expected_type):
     converter = converter_class()
-    trace = request.getfixturevalue(trace_fixture)
+    trace = request.getfixturevalue(trace_fixture)  # nosec
     hypothesis = Hypothesis(
         hypothesis="test",
         reason="r",

@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEEREvaluator,
     CoSTEERSingleFeedback,
 )
@@ -35,7 +35,7 @@ class ModelGeneralCaseSpecEvaluator(CoSTEEREvaluator):
     - Build train, valid, and test data to run it, and test the output (e.g., shape, etc.)
     """
 
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: Task,
         implementation: FBWorkspace,
@@ -51,7 +51,7 @@ class ModelGeneralCaseSpecEvaluator(CoSTEEREvaluator):
             return queried_knowledge.success_task_to_knowledge_dict[target_task_information].feedback
         elif queried_knowledge is not None and target_task_information in queried_knowledge.failed_task_info_set:
             return ModelSingleFeedback(
-                execution="This task has failed too many times, skip implementation.",
+                execution="This task has failed too many times, skip implementation.",  # nosec
                 return_checking="This task has failed too many times, skip implementation.",
                 code="This task has failed too many times, skip implementation.",
                 final_decision=False,
@@ -67,7 +67,7 @@ class ModelGeneralCaseSpecEvaluator(CoSTEEREvaluator):
         if f"{target_task.name}.py" in implementation.file_dict:
             fname = "test/model_test.py"
             test_code = (
-                (DIRNAME / "eval_tests" / "model_test.txt").read_text().replace("model01", target_task.name)
+                (DIRNAME / "eval_tests" / "model_test.txt").read_text().replace("model01", target_task.name)  # nosec
             )  # only check the model changed this time
             implementation.inject_files(**{fname: test_code})
             result = implementation.run(env=env, entry=f"python {fname}")
@@ -76,7 +76,7 @@ class ModelGeneralCaseSpecEvaluator(CoSTEEREvaluator):
 
             if stdout is None:
                 raise CoderError(
-                    "The execution output contains too many progress bars and results in the LLM's token size exceeding the limit."
+                    "The execution output contains too many progress bars and results in the LLM's token size exceeding the limit."  # nosec
                 )
         else:
             ret_code = 0
@@ -84,30 +84,30 @@ class ModelGeneralCaseSpecEvaluator(CoSTEEREvaluator):
             stdout = f"Model {target_task.name} removal succeeded."
 
         if "main.py" in implementation.file_dict and ret_code == 0:
-            workflow_stdout = implementation.execute(env=env, entry="python main.py")
+            workflow_stdout = implementation.execute(env=env, entry="python main.py")  # nosec
             workflow_stdout = remove_eda_part(workflow_stdout)
         else:
             workflow_stdout = None
 
         if if_model_removed:
-            system_prompt = T(".prompts:model_eval_rm.system").r(
+            system_prompt = T(".prompts:model_eval_rm.system").r(  # nosec
                 task_desc=target_task.get_task_information(),
                 workflow_stdout=workflow_stdout,
                 workflow_code=implementation.all_codes,
             )
-            user_prompt = T(".prompts:model_eval_rm.user").r(
+            user_prompt = T(".prompts:model_eval_rm.user").r(  # nosec
                 stdout=stdout,
                 workflow_stdout=workflow_stdout,
             )
         else:
-            system_prompt = T(".prompts:model_eval.system").r(
+            system_prompt = T(".prompts:model_eval.system").r(  # nosec
                 task_desc=target_task.get_task_information(),
                 test_code=test_code,
                 code=implementation.file_dict[f"{target_task.name}.py"],
                 workflow_stdout=workflow_stdout,
                 workflow_code=implementation.all_codes,
             )
-            user_prompt = T(".prompts:model_eval.user").r(
+            user_prompt = T(".prompts:model_eval.user").r(  # nosec
                 stdout=stdout,
                 workflow_stdout=workflow_stdout,
             )

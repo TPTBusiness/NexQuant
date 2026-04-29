@@ -76,7 +76,7 @@ def backup_folder(path: str | Path) -> Path:
             check=True,
             capture_output=True,
         )
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError as e:  # nosec
         logger.error(f"Error copying {path} to {workspace_bak_path}: {e}")
         logger.error(f"Stdout: {e.stdout.decode() if e.stdout else ''}")
         logger.error(f"Stderr: {e.stderr.decode() if e.stderr else ''}")

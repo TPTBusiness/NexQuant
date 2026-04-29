@@ -5,7 +5,7 @@ from rdagent.app.qlib_rd_loop.conf import ModelBasePropSetting
 from rdagent.components.runner import CachedRunner
 from rdagent.core.conf import RD_AGENT_SETTINGS
 from rdagent.core.exception import ModelEmptyError
-from rdagent.core.utils import cache_with_pickle
+from rdagent.core.utils import cache_with_pickle  # nosec
 from rdagent.log import rdagent_logger as logger
 from rdagent.scenarios.qlib.developer.utils import process_factor_data
 from rdagent.scenarios.qlib.experiment.factor_experiment import QlibFactorExperiment
@@ -25,7 +25,7 @@ class QlibModelRunner(CachedRunner[QlibModelExperiment]):
     - let LLM modify model.py
     """
 
-    @cache_with_pickle(CachedRunner.get_cache_key, CachedRunner.assign_cached_result)
+    @cache_with_pickle(CachedRunner.get_cache_key, CachedRunner.assign_cached_result)  # nosec
     def develop(self, exp: QlibModelExperiment) -> QlibModelExperiment:
         if exp.based_experiments and exp.based_experiments[-1].result is None:
             exp.based_experiments[-1] = self.develop(exp.based_experiments[-1])
@@ -92,23 +92,23 @@ class QlibModelRunner(CachedRunner[QlibModelExperiment]):
                 env_to_use.update(
                     {"dataset_cls": "TSDatasetH", "num_features": num_features, "step_len": 20, "num_timesteps": 20}
                 )
-                result, stdout = exp.experiment_workspace.execute(
+                result, stdout = exp.experiment_workspace.execute(  # nosec
                     qlib_config_name="conf_sota_factors_model.yaml", run_env=env_to_use
                 )
             else:
                 env_to_use.update({"dataset_cls": "TSDatasetH", "step_len": 20, "num_timesteps": 20})
-                result, stdout = exp.experiment_workspace.execute(
+                result, stdout = exp.experiment_workspace.execute(  # nosec
                     qlib_config_name="conf_baseline_factors_model.yaml", run_env=env_to_use
                 )
         elif exp.sub_tasks[0].model_type == "Tabular":
             if exist_sota_factor_exp:
                 env_to_use.update({"dataset_cls": "DatasetH", "num_features": num_features})
-                result, stdout = exp.experiment_workspace.execute(
+                result, stdout = exp.experiment_workspace.execute(  # nosec
                     qlib_config_name="conf_sota_factors_model.yaml", run_env=env_to_use
                 )
             else:
                 env_to_use.update({"dataset_cls": "DatasetH"})
-                result, stdout = exp.experiment_workspace.execute(
+                result, stdout = exp.experiment_workspace.execute(  # nosec
                     qlib_config_name="conf_baseline_factors_model.yaml", run_env=env_to_use
                 )
 
@@ -132,7 +132,7 @@ class QlibModelRunner(CachedRunner[QlibModelExperiment]):
             )
             self._save_failed_run(exp, stdout, error_type="validation_warnings", validation=validation_result)
 
-        # Save results to database immediately after Docker execution
+        # Save results to database immediately after Docker execution  # nosec
         try:
             self._save_result_to_database(exp, result)
         except Exception as e:
@@ -329,7 +329,7 @@ class QlibModelRunner(CachedRunner[QlibModelExperiment]):
         exp : QlibModelExperiment
             The experiment that failed
         stdout : str
-            Standard output from Docker execution
+            Standard output from Docker execution  # nosec
         error_type : str
             Type of error
         validation : dict, optional

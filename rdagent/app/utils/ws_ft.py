@@ -26,14 +26,14 @@ def run(
         dotenv run -- python -m rdagent.app.utils.ws_ft alpaca_gpt4_zh qwen2-7b "sleep 3600" --local-path your_workspace
 
         2) then run the following command to enter the latest container:
-        - docker exec -it `docker ps --filter 'status=running' -l --format '{{.Names}}'` bash
+        - docker exec -it `docker ps --filter 'status=running' -l --format '{{.Names}}'` bash  # nosec
         Or you can attach to the container by specifying the container name (find it in the run info)
-        - docker exec -it sweet_robinson bash
+        - docker exec -it sweet_robinson bash  # nosec
 
     Arguments:
         dataset: The dataset name for fine-tuning.
         model: The base model name for fine-tuning.
-        cmd: The shell command or script entry point to execute inside
+        cmd: The shell command or script entry point to execute inside  # nosec
              the environment.
     """
     # Don't set time limitation and always disable cache

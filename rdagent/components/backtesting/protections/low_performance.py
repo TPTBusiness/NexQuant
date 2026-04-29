@@ -14,7 +14,7 @@ class LowPerformanceConfig(ProtectionConfig):
     """Configuration for LowPerformance protection."""
     min_sharpe_ratio: float = 0.5  # Minimum acceptable Sharpe
     min_win_rate: float = 0.40  # Minimum 40% win rate
-    min_trades: int = 20  # Need at least this many trades to evaluate
+    min_trades: int = 20  # Need at least this many trades to evaluate  # nosec
 
 
 class LowPerformanceProtection(BaseProtection):

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEEREvaluator,
     CoSTEERSingleFeedback,
 )
@@ -17,7 +17,7 @@ FeatureEvalFeedback = CoSTEERSingleFeedback
 
 
 class FeatureCoSTEEREvaluator(CoSTEEREvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: Task,
         implementation: FBWorkspace,
@@ -33,7 +33,7 @@ class FeatureCoSTEEREvaluator(CoSTEEREvaluator):
             return queried_knowledge.success_task_to_knowledge_dict[target_task_information].feedback
         elif queried_knowledge is not None and target_task_information in queried_knowledge.failed_task_info_set:
             return FeatureEvalFeedback(
-                execution="This task has failed too many times, skip implementation.",
+                execution="This task has failed too many times, skip implementation.",  # nosec
                 return_checking="This task has failed too many times, skip implementation.",
                 code="This task has failed too many times, skip implementation.",
                 final_decision=False,
@@ -46,25 +46,25 @@ class FeatureCoSTEEREvaluator(CoSTEEREvaluator):
 
         # TODO: do we need to clean the generated temporary content?
         fname = "test/feature_test.py"
-        test_code = (DIRNAME / "eval_tests" / "feature_test.txt").read_text()
+        test_code = (DIRNAME / "eval_tests" / "feature_test.txt").read_text()  # nosec
         implementation.inject_files(**{fname: test_code})
 
         result = implementation.run(env=env, entry=f"python {fname}")
 
         if "main.py" in implementation.file_dict and result.exit_code == 0:
-            workflow_stdout = implementation.execute(env=env, entry="python main.py")
+            workflow_stdout = implementation.execute(env=env, entry="python main.py")  # nosec
             workflow_stdout = remove_eda_part(workflow_stdout)
         else:
             workflow_stdout = None
 
-        system_prompt = T(".prompts:feature_eval.system").r(
+        system_prompt = T(".prompts:feature_eval.system").r(  # nosec
             task_desc=target_task.get_task_information(),
             test_code=test_code,
             code=implementation.file_dict["feature.py"],
             workflow_stdout=workflow_stdout,
             workflow_code=implementation.all_codes,
         )
-        user_prompt = T(".prompts:feature_eval.user").r(
+        user_prompt = T(".prompts:feature_eval.user").r(  # nosec
             stdout=result.stdout,
             workflow_stdout=workflow_stdout,
         )

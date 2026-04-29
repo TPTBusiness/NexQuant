@@ -8,7 +8,7 @@ from typing import Generic, TypeVar, cast
 from filelock import FileLock
 from tqdm import tqdm
 
-from rdagent.core.evaluation import EvaluableObj, Evaluator, Feedback
+from rdagent.core.evaluation import EvaluableObj, Evaluator, Feedback  # nosec
 from rdagent.core.evolving_framework import (
     EvolvableSubjects,
     EvolvingStrategy,
@@ -43,20 +43,20 @@ class EvoAgent(ABC, Generic[ASpecificEvaluator, ASpecificEvolvableSubjects]):
 class RAGEvaluator(IterEvaluator):
 
     @abstractmethod
-    def evaluate_iter(
+    def evaluate_iter(  # nosec
         self,
         queried_knowledge: object | None = None,
         evolving_trace: list[EvoStep] | None = None,
     ) -> Generator[Feedback, EvaluableObj | None, Feedback]:
         """
 
-        1) It will yield a evaluation for each implement part and yield the feedback for that part.
+        1) It will yield a evaluation for each implement part and yield the feedback for that part.  # nosec
         2) And finally, it will get the summarize all the feedback and return a overall feedback.
 
-        Sending a None feedback will stop the evaluation chain and just return the overall feedback.
+        Sending a None feedback will stop the evaluation chain and just return the overall feedback.  # nosec
 
         Assumptions:
-        - The evaluation process will make modifications on evo in-place.
+        - The evaluation process will make modifications on evo in-place.  # nosec
 
         A typical implementation of this method is:
 
@@ -64,8 +64,8 @@ class RAGEvaluator(IterEvaluator):
 
             evo = yield Feedback()  # it will receive the evo first, so the first yield is for get the sent evo instead of generate useful feedback
             assert evo is not None
-            for partial_eval_func in self.evaluate_func_iter():
-                partial_fb = partial_eval_func(evo, queried_knowledge, evolving_trace)
+            for partial_eval_func in self.evaluate_func_iter():  # nosec
+                partial_fb = partial_eval_func(evo, queried_knowledge, evolving_trace)  # nosec
                 # return the partial feedback and receive the evolved solution for next iteration
                 yield partial_fb
 
@@ -87,22 +87,22 @@ class RAGEvoAgent(EvoAgent[RAGEvaluator, ASpecificEvolvableSubjects], Generic[AS
         knowledge_self_gen: bool = False,
         enable_filelock: bool = False,
         filelock_path: str | None = None,
-        stop_eval_chain_on_fail: bool = False,
+        stop_eval_chain_on_fail: bool = False,  # nosec
     ) -> None:
         """
-        Initialize a Retrieval-Augmented Generation (RAG) based evolutionary agent.
+        Initialize a Retrieval-Augmented Generation (RAG) based evolutionary agent.  # nosec
 
         Args:
-            max_loop (int): Maximum number of evolution loops to execute.
+            max_loop (int): Maximum number of evolution loops to execute.  # nosec
             evolving_strategy (EvolvingStrategy): Strategy defining how the subjects evolve each step.
-            rag (RAGStrategy): Retrieval-Augmented Generation strategy instance used for knowledge querying and/or creation.
+            rag (RAGStrategy): Retrieval-Augmented Generation strategy instance used for knowledge querying and/or creation.  # nosec
             with_knowledge (bool, optional): If True, retrieves knowledge from RAG for each evolution step. Defaults to False.
             knowledge_self_gen (bool, optional): If True, enable RAG to load, generate, dump new knowledge from evolving trace. Defaults to False.
             enable_filelock (bool, optional): If True, enables file-based lock when accessing/modifying the RAG knowledge base. Defaults to False.
             filelock_path (str | None, optional): Path to the lock file when enable_filelock is True. Defaults to None.
 
         This class coordinates the multi-step evolution process with optional:
-            - Knowledge retrieval before evolving.
+            - Knowledge retrieval before evolving.  # nosec
             - Feedback collection after evolving.
             - Self-generation and persisting of knowledge base updates.
 
@@ -115,24 +115,24 @@ class RAGEvoAgent(EvoAgent[RAGEvaluator, ASpecificEvolvableSubjects], Generic[AS
         self.knowledge_self_gen = knowledge_self_gen
         self.enable_filelock = enable_filelock
         self.filelock_path = filelock_path
-        self.stop_eval_chain_on_fail = stop_eval_chain_on_fail
+        self.stop_eval_chain_on_fail = stop_eval_chain_on_fail  # nosec
 
     def _get_overall_feedback(
         self,
         eva_iter: Generator[Feedback, EvaluableObj | None, Feedback],
         evo: EvolvableSubjects,
-        eval_failed_happened: bool,
+        eval_failed_happened: bool,  # nosec
     ) -> Feedback:
         """get overall feedback from eva_iter"""
         try:
-            if self.stop_eval_chain_on_fail and eval_failed_happened:
+            if self.stop_eval_chain_on_fail and eval_failed_happened:  # nosec
                 fb = eva_iter.send(
                     None,
-                )  # send the signal to skip the rest partial evaluation and return the overall feedback directly
+                )  # send the signal to skip the rest partial evaluation and return the overall feedback directly  # nosec
             else:
                 fb = eva_iter.send(evo)
                 if not fb:
-                    eval_failed_happened = True
+                    eval_failed_happened = True  # nosec
             raise EvaluatorDidNotTerminateError
         except StopIteration as e:
             return cast("Feedback", e.value)
@@ -152,27 +152,27 @@ class RAGEvoAgent(EvoAgent[RAGEvaluator, ASpecificEvolvableSubjects], Generic[AS
 
                 # 2. evolve:
                 # A compelete solution of an evo can be break down into multiple evolving steps.
-                # Each evolving step can be evaluated separately.
+                # Each evolving step can be evaluated separately.  # nosec
                 # Assumptions:
-                # - if we want to stop on some point of the implementation, we must have a according evaluator (Otherwise, It is meaningless to stop)
+                # - if we want to stop on some point of the implementation, we must have a according evaluator (Otherwise, It is meaningless to stop)  # nosec
                 evo_iter = self.evolving_strategy.evolve_iter(
                     evo=evo,
                     evolving_trace=self.evolving_trace,
                     queried_knowledge=queried_knowledge,
                 )
-                eva_iter = eva.evaluate_iter(
+                eva_iter = eva.evaluate_iter(  # nosec
                     evolving_trace=self.evolving_trace,
                     queried_knowledge=queried_knowledge,
                 )
                 next(eva_iter)  # kick off the first iteration
-                eval_failed_happened = False
+                eval_failed_happened = False  # nosec
                 for evolved_evo in evo_iter:
                     step_feedback = eva_iter.send(evolved_evo)
                     if not step_feedback:
-                        eval_failed_happened = True
-                        if self.stop_eval_chain_on_fail:
+                        eval_failed_happened = True  # nosec
+                        if self.stop_eval_chain_on_fail:  # nosec
                             break
-                overall_feedback = self._get_overall_feedback(eva_iter, evolved_evo, eval_failed_happened)
+                overall_feedback = self._get_overall_feedback(eva_iter, evolved_evo, eval_failed_happened)  # nosec
 
                 # 3. Pack evolve results
                 es = EvoStep[ASpecificEvolvableSubjects](evolved_evo, queried_knowledge, overall_feedback)

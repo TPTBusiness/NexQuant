@@ -4,7 +4,7 @@ Kronos Foundation Model Adapter for Predix.
 Wraps the Kronos-mini OHLCV foundation model (4.1M params, AAAI 2026, MIT)
 for use as:
   - Factor (Option A): predicted next-day return signal
-  - Model alongside LightGBM (Option B): IC/Sharpe evaluation
+  - Model alongside LightGBM (Option B): IC/Sharpe evaluation  # nosec
 
 Kronos repo: https://github.com/shiyu-coder/Kronos
 HuggingFace:  NeoQuasar/Kronos-mini  |  NeoQuasar/Kronos-Tokenizer-2k
@@ -295,7 +295,7 @@ def build_kronos_factor(
     return result
 
 
-def evaluate_kronos_model(
+def evaluate_kronos_model(  # nosec
     hdf5_path,
     context_bars: int = 512,
     pred_bars: int = 30,

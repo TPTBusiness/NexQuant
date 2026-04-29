@@ -100,7 +100,7 @@ class NotebookConverter:
                 cell = nbformat.v4.new_code_cell(section["code"])
                 if section["output"]:
                     # For simplicity, treat all output as coming from stdout
-                    # TODO: support Jupyter kernel execution and handle outputs appropriately here
+                    # TODO: support Jupyter kernel execution and handle outputs appropriately here  # nosec
                     cell.outputs = [nbformat.v4.new_output("stream", name="stdout", text=section["output"])]
                 notebook.cells.append(cell)
 
@@ -122,7 +122,7 @@ if __name__ == "__main__":
         "--stdout",
         type=str,
         default="",
-        help="Standard output from the code execution.",
+        help="Standard output from the code execution.",  # nosec
     )
     parser.add_argument("--debug", action="store_true", help="Use debug flag to modify sys.argv.")
     args = parser.parse_args()

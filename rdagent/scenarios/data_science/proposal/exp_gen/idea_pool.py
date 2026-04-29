@@ -179,7 +179,7 @@ class DSKnowledgeBase(UndirectedGraph):
 
         return problems
 
-    def update_pickled_problem(self, problems: Dict, pickled_problem_name: str) -> None:
-        pickled_id = problems[pickled_problem_name].get("idea_node_id", None)
-        if pickled_id is not None:
-            self.used_idea_id_set.add(pickled_id)
+    def update_pickled_problem(self, problems: Dict, pickled_problem_name: str) -> None:  # nosec
+        pickled_id = problems[pickled_problem_name].get("idea_node_id", None)  # nosec
+        if pickled_id is not None:  # nosec
+            self.used_idea_id_set.add(pickled_id)  # nosec

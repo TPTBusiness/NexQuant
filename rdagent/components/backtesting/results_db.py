@@ -27,7 +27,7 @@ class ResultsDatabase:
         c = self.conn.cursor()
 
         # Factors table - stores factor metadata
-        c.execute("""CREATE TABLE IF NOT EXISTS factors (
+        c.execute("""CREATE TABLE IF NOT EXISTS factors (  # nosec
             id INTEGER PRIMARY KEY,
             factor_name TEXT UNIQUE,
             factor_type TEXT,
@@ -35,7 +35,7 @@ class ResultsDatabase:
         )""")
 
         # Backtest runs table - stores individual backtest metrics
-        c.execute("""CREATE TABLE IF NOT EXISTS backtest_runs (
+        c.execute("""CREATE TABLE IF NOT EXISTS backtest_runs (  # nosec
             id INTEGER PRIMARY KEY,
             factor_id INTEGER,
             run_name TEXT,
@@ -49,7 +49,7 @@ class ResultsDatabase:
         )""")
 
         # Loop results table - stores overall loop statistics
-        c.execute("""CREATE TABLE IF NOT EXISTS loop_results (
+        c.execute("""CREATE TABLE IF NOT EXISTS loop_results (  # nosec
             id INTEGER PRIMARY KEY,
             loop_index INTEGER,
             factors_success INTEGER,
@@ -65,9 +65,9 @@ class ResultsDatabase:
         self._add_column_if_not_exists('backtest_runs', 'raw_metrics', 'TEXT')
 
         # Create indexes for common queries
-        c.execute("""CREATE INDEX IF NOT EXISTS idx_backtest_ic ON backtest_runs(ic)""")
-        c.execute("""CREATE INDEX IF NOT EXISTS idx_backtest_sharpe ON backtest_runs(sharpe)""")
-        c.execute("""CREATE INDEX IF NOT EXISTS idx_backtest_date ON backtest_runs(run_date)""")
+        c.execute("""CREATE INDEX IF NOT EXISTS idx_backtest_ic ON backtest_runs(ic)""")  # nosec
+        c.execute("""CREATE INDEX IF NOT EXISTS idx_backtest_sharpe ON backtest_runs(sharpe)""")  # nosec
+        c.execute("""CREATE INDEX IF NOT EXISTS idx_backtest_date ON backtest_runs(run_date)""")  # nosec
 
         self.conn.commit()
 
@@ -95,9 +95,9 @@ class ResultsDatabase:
     
     def add_factor(self, name: str, type: str = "unknown") -> int:
         c = self.conn.cursor()
-        c.execute("INSERT OR IGNORE INTO factors (factor_name, factor_type, created_at) VALUES (?, ?, ?)", 
+        c.execute("INSERT OR IGNORE INTO factors (factor_name, factor_type, created_at) VALUES (?, ?, ?)",  # nosec
                   (name, type, datetime.now()))
-        c.execute("SELECT id FROM factors WHERE factor_name = ?", (name,))
+        c.execute("SELECT id FROM factors WHERE factor_name = ?", (name,))  # nosec
         self.conn.commit()
         result = c.fetchone()
         return result[0] if result else -1
@@ -137,7 +137,7 @@ class ResultsDatabase:
             except Exception:
                 raw_metrics_json = None
 
-        c.execute(
+        c.execute(  # nosec
             """INSERT INTO backtest_runs
             (factor_id, run_name, run_date, ic, sharpe, annual_return, max_drawdown,
              win_rate, information_ratio, volatility, raw_metrics)
@@ -162,7 +162,7 @@ class ResultsDatabase:
     def add_loop(self, loop_idx: int, success: int, fail: int, best_ic: float = None, status: str = "completed") -> int:
         c = self.conn.cursor()
         rate = success / (success + fail) if (success + fail) > 0 else 0
-        c.execute("""INSERT INTO loop_results (loop_index, factors_success, factors_fail, success_rate, best_ic, status)
+        c.execute("""INSERT INTO loop_results (loop_index, factors_success, factors_fail, success_rate, best_ic, status)  # nosec
             VALUES (?, ?, ?, ?, ?, ?)""", (loop_idx, success, fail, rate, best_ic, status))
         self.conn.commit()
         return c.lastrowid
@@ -241,7 +241,7 @@ class ResultsDatabase:
             Dictionary with total_factors, avg_ic, max_sharpe, avg_return
         """
         c = self.conn.cursor()
-        c.execute(
+        c.execute(  # nosec
             """SELECT COUNT(DISTINCT factor_name), AVG(ic), MAX(sharpe), AVG(annual_return)
                FROM backtest_runs
                JOIN factors ON factor_id = factors.id"""

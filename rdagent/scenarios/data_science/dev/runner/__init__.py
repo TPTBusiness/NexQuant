@@ -5,7 +5,7 @@ import pandas as pd
 from rdagent.app.data_science.conf import DS_RD_SETTING
 from rdagent.components.coder.CoSTEER import CoSTEER
 from rdagent.components.coder.CoSTEER.config import CoSTEERSettings
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEERMultiEvaluator,
     CoSTEERMultiFeedback,
     CoSTEERSingleFeedback,
@@ -16,7 +16,7 @@ from rdagent.components.coder.CoSTEER.evolving_strategy import (
     MultiProcessEvolvingStrategy,
 )
 from rdagent.components.coder.CoSTEER.task import CoSTEERTask
-from rdagent.components.coder.data_science.share.eval import ModelDumpEvaluator
+from rdagent.components.coder.data_science.share.eval import ModelDumpEvaluator  # nosec
 from rdagent.core.exception import RunnerError
 from rdagent.core.scenario import Scenario
 from rdagent.log import rdagent_logger as logger
@@ -140,16 +140,16 @@ class DSCoSTEERRunner(CoSTEER):
         **kwargs,
     ) -> None:
 
-        from rdagent.scenarios.data_science.dev.runner.eval import (
+        from rdagent.scenarios.data_science.dev.runner.eval import (  # nosec
             DSRunnerEvaluator,  # avoid circular import
         )
 
-        eval_l = [DSRunnerEvaluator(scen=scen)]
+        eval_l = [DSRunnerEvaluator(scen=scen)]  # nosec
         if DS_RD_SETTING.enable_model_dump:
-            eval_l.append(ModelDumpEvaluator(scen=scen, data_type="full"))
+            eval_l.append(ModelDumpEvaluator(scen=scen, data_type="full"))  # nosec
 
         eva = CoSTEERMultiEvaluator(
-            single_evaluator=eval_l, scen=scen
+            single_evaluator=eval_l, scen=scen  # nosec
         )  # Please specify whether you agree running your eva in parallel or not
         settings = DSRunnerCoSTEERSettings()
         es = DSRunnerMultiProcessEvolvingStrategy(scen=scen, settings=settings, improve_mode=True)
@@ -204,7 +204,7 @@ class DSCoSTEERRunner(CoSTEER):
                 f"Current code repo md5: {md5_hash(exp.experiment_workspace.all_codes)}",
             ),
         ]
-        exp = super().develop(exp)  # run strategy(code implementation & evaluation loops)
+        exp = super().develop(exp)  # run strategy(code implementation & evaluation loops)  # nosec
         exp.sub_tasks = bak_sub_tasks
 
         # NOTE: after running the loops, we expect some results are generated

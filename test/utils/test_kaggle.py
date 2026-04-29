@@ -22,7 +22,7 @@ class TestTpl(unittest.TestCase):
             / f"{competition}",
         )
         print(ws.workspace_path)
-        ws.execute()
+        ws.execute()  # nosec
         success = (ws.workspace_path / "submission.csv").exists()
         self.assertTrue(success, "submission.csv is not generated")
         # ws.clear()

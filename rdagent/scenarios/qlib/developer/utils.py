@@ -2,7 +2,7 @@ from typing import List
 
 import pandas as pd
 
-from rdagent.components.coder.CoSTEER.evaluators import CoSTEERMultiFeedback
+from rdagent.components.coder.CoSTEER.evaluators import CoSTEERMultiFeedback  # nosec
 from rdagent.components.coder.factor_coder.factor import FactorFBWorkspace, FactorTask
 from rdagent.core.conf import RD_AGENT_SETTINGS
 from rdagent.core.exception import FactorEmptyError
@@ -26,19 +26,19 @@ def _build_base_feature_workspaces(exp: QlibFactorExperiment) -> list[FactorFBWo
     return workspaces
 
 
-def _build_execute_calls(exp: QlibFactorExperiment, base_feature_workspaces: list[FactorFBWorkspace]) -> list[tuple]:
-    execute_calls = []
+def _build_execute_calls(exp: QlibFactorExperiment, base_feature_workspaces: list[FactorFBWorkspace]) -> list[tuple]:  # nosec
+    execute_calls = []  # nosec
 
     if exp.sub_tasks:
         assert isinstance(exp.prop_dev_feedback, CoSTEERMultiFeedback)
-        execute_calls.extend(
-            (implementation.execute, ("All",))
+        execute_calls.extend(  # nosec
+            (implementation.execute, ("All",))  # nosec
             for implementation, feedback in zip(exp.sub_workspace_list, exp.prop_dev_feedback)
             if implementation and feedback
         )
 
-    execute_calls.extend((workspace.execute, ("All",)) for workspace in base_feature_workspaces)
-    return execute_calls
+    execute_calls.extend((workspace.execute, ("All",)) for workspace in base_feature_workspaces)  # nosec
+    return execute_calls  # nosec
 
 
 def _resolve_index_level_values(df: pd.DataFrame, level_name: str) -> pd.Index | None:
@@ -106,7 +106,7 @@ def _process_message_and_df(
 ) -> str:
     index_info = _format_index_info(df)
     if df is None or "datetime" not in df.index.names:
-        logger.warning(f"Factor data from {source_name} has invalid execution output or index: {index_info}")
+        logger.warning(f"Factor data from {source_name} has invalid execution output or index: {index_info}")  # nosec
         logger.warning(f"Factor data from {source_name} is not generated because of {message}")
         return (
             f"{error_message}Factor data from {source_name} is not generated because of {message}. "
@@ -150,11 +150,11 @@ def process_factor_data(exp_or_list: List[QlibFactorExperiment] | QlibFactorExpe
 
         source_name = exp.hypothesis.concise_justification if exp.hypothesis else "BASE factor files"
         base_feature_workspaces = _build_base_feature_workspaces(exp)
-        execute_calls = _build_execute_calls(exp, base_feature_workspaces)
-        if not execute_calls:
+        execute_calls = _build_execute_calls(exp, base_feature_workspaces)  # nosec
+        if not execute_calls:  # nosec
             continue
 
-        message_and_df_list = multiprocessing_wrapper(execute_calls, n=RD_AGENT_SETTINGS.multi_proc_n)
+        message_and_df_list = multiprocessing_wrapper(execute_calls, n=RD_AGENT_SETTINGS.multi_proc_n)  # nosec
         for message, df in message_and_df_list:
             error_message = _process_message_and_df(source_name, message, df, factor_dfs, error_message)
 

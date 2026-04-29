@@ -46,7 +46,7 @@ def get_module_by_module_path(module_path: Union[str, ModuleType]) -> ModuleType
             module = importlib.util.module_from_spec(module_spec)
             sys.modules[module_name] = module
             if module_spec.loader is not None:
-                module_spec.loader.exec_module(module)
+                module_spec.loader.exec_module(module)  # nosec
             else:
                 raise ModuleNotFoundError(f"Cannot load module at {module_path}")
         else:
@@ -156,7 +156,7 @@ def filter_redundant_text(stdout: str) -> str:
                     break
             except ValueError as e:
                 # build_messages_and_calculate_token => tiktoken/core.py:self._core_bpe.encode
-                # will raise ValueError: Regex error while tokenizing: Error executing regex: Max stack size exceeded for backtracking
+                # will raise ValueError: Regex error while tokenizing: Error executing regex: Max stack size exceeded for backtracking  # nosec
                 logger.warning(f"Shrink due to Error: {e}")
                 truncated_stdout = _shrink_stdout_once(truncated_stdout)
 

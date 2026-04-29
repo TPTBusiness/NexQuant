@@ -4,7 +4,7 @@ from abc import abstractmethod
 from typing import Callable, Generator
 
 from rdagent.components.coder.CoSTEER.config import CoSTEERSettings
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEERMultiFeedback,
     CoSTEERSingleFeedback,
 )

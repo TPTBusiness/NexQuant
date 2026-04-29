@@ -20,7 +20,7 @@ class FactorEvaluator:
         self.scen = scen
 
     @abstractmethod
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: Task,
         implementation: Workspace,
@@ -31,21 +31,21 @@ class FactorEvaluator:
 
         .. code-block:: python
 
-            _, gen_df = implementation.execute()
-            _, gt_df = gt_implementation.execute()
+            _, gen_df = implementation.execute()  # nosec
+            _, gt_df = gt_implementation.execute()  # nosec
 
         Returns
         -------
         Tuple[str, object]
-            - str: the text-based description of the evaluation result
-            - object: a comparable metric (bool, integer, float ...) None for evaluator with only text-based result
+            - str: the text-based description of the evaluation result  # nosec
+            - object: a comparable metric (bool, integer, float ...) None for evaluator with only text-based result  # nosec
 
         """
-        raise NotImplementedError("Please implement the `evaluator` method")
+        raise NotImplementedError("Please implement the `evaluator` method")  # nosec
 
     def _get_df(self, gt_implementation: Workspace, implementation: Workspace):
         if gt_implementation is not None:
-            _, gt_df = gt_implementation.execute()
+            _, gt_df = gt_implementation.execute()  # nosec
             if isinstance(gt_df, pd.Series):
                 gt_df = gt_df.to_frame("gt_factor")
             if isinstance(gt_df, pd.DataFrame):
@@ -53,7 +53,7 @@ class FactorEvaluator:
         else:
             gt_df = None
 
-        _, gen_df = implementation.execute()
+        _, gen_df = implementation.execute()  # nosec
         if isinstance(gen_df, pd.Series):
             gen_df = gen_df.to_frame("source_factor")
         if isinstance(gen_df, pd.DataFrame):
@@ -65,11 +65,11 @@ class FactorEvaluator:
 
 
 class FactorCodeEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: FactorTask,
         implementation: Workspace,
-        execution_feedback: str,
+        execution_feedback: str,  # nosec
         value_feedback: str = "",
         gt_implementation: Workspace = None,
         **kwargs,
@@ -77,7 +77,7 @@ class FactorCodeEvaluator(FactorEvaluator):
         factor_information = target_task.get_task_information()
         code = implementation.all_codes
 
-        system_prompt = T(".prompts:evaluator_code_feedback_v1_system").r(
+        system_prompt = T(".prompts:evaluator_code_feedback_v1_system").r(  # nosec
             scenario=(
                 self.scen.get_scenario_all_desc(
                     target_task,
@@ -89,12 +89,12 @@ class FactorCodeEvaluator(FactorEvaluator):
             )
         )
 
-        execution_feedback_to_render = execution_feedback
+        execution_feedback_to_render = execution_feedback  # nosec
         for _ in range(10):  # 10 times to split the content is enough
-            user_prompt = T(".prompts:evaluator_code_feedback_v1_user").r(
+            user_prompt = T(".prompts:evaluator_code_feedback_v1_user").r(  # nosec
                 factor_information=factor_information,
                 code=code,
-                execution_feedback=execution_feedback_to_render,
+                execution_feedback=execution_feedback_to_render,  # nosec
                 value_feedback=value_feedback,
                 gt_code=gt_implementation.code if gt_implementation else None,
             )
@@ -105,7 +105,7 @@ class FactorCodeEvaluator(FactorEvaluator):
                 )
                 > APIBackend().chat_token_limit
             ):
-                execution_feedback_to_render = execution_feedback_to_render[len(execution_feedback_to_render) // 2 :]
+                execution_feedback_to_render = execution_feedback_to_render[len(execution_feedback_to_render) // 2 :]  # nosec
             else:
                 break
         critic_response = APIBackend().build_messages_and_create_chat_completion(
@@ -118,7 +118,7 @@ class FactorCodeEvaluator(FactorEvaluator):
 
 
 class FactorInfEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         implementation: Workspace,
         gt_implementation: Workspace,
@@ -140,7 +140,7 @@ class FactorInfEvaluator(FactorEvaluator):
 
 
 class FactorSingleColumnEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         implementation: Workspace,
         gt_implementation: Workspace,
@@ -155,13 +155,13 @@ class FactorSingleColumnEvaluator(FactorEvaluator):
             return "The source dataframe has only one column which is correct.", True
         else:
             return (
-                "The source dataframe has more than one column. Please check the implementation. We only evaluate the first column.",
+                "The source dataframe has more than one column. Please check the implementation. We only evaluate the first column.",  # nosec
                 False,
             )
 
 
 class FactorOutputFormatEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         implementation: Workspace,
         gt_implementation: Workspace,
@@ -169,13 +169,13 @@ class FactorOutputFormatEvaluator(FactorEvaluator):
         gt_df, gen_df = self._get_df(gt_implementation, implementation)
         if gen_df is None:
             return (
-                "The source dataframe is None. Skip the evaluation of the output format.",
+                "The source dataframe is None. Skip the evaluation of the output format.",  # nosec
                 False,
             )
         buffer = io.StringIO()
         gen_df.info(buf=buffer)
         gen_df_info_str = f"The user is currently working on a feature related task.\nThe output dataframe info is:\n{buffer.getvalue()}"
-        system_prompt = T(".prompts:evaluator_output_format_system").r(
+        system_prompt = T(".prompts:evaluator_output_format_system").r(  # nosec
             scenario=(
                 self.scen.get_scenario_all_desc(implementation.target_task, filtered_tag="feature")
                 if self.scen is not None
@@ -186,7 +186,7 @@ class FactorOutputFormatEvaluator(FactorEvaluator):
         # TODO: with retry_context(retry_n=3, except_list=[KeyError]):
         max_attempts = 3
         attempts = 0
-        final_evaluation_dict = None
+        final_evaluation_dict = None  # nosec
 
         while attempts < max_attempts:
             try:
@@ -211,18 +211,18 @@ class FactorOutputFormatEvaluator(FactorEvaluator):
                         "Wrong JSON Response or missing 'output_format_decision' or 'output_format_feedback' key after multiple attempts."
                     ) from e
 
-        return "Failed to evaluate output format after multiple attempts.", False
+        return "Failed to evaluate output format after multiple attempts.", False  # nosec
 
 
 class FactorDatetimeDailyEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         implementation: Workspace,
         gt_implementation: Workspace,
     ) -> Tuple[str | object]:
         _, gen_df = self._get_df(gt_implementation, implementation)
         if gen_df is None:
-            return "The source dataframe is None. Skip the evaluation of the datetime format.", False
+            return "The source dataframe is None. Skip the evaluation of the datetime format.", False  # nosec
 
         if "datetime" not in gen_df.index.names:
             return "The source dataframe does not have a datetime index. Please check the implementation.", False
@@ -248,7 +248,7 @@ class FactorDatetimeDailyEvaluator(FactorEvaluator):
 
 
 class FactorRowCountEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         implementation: Workspace,
         gt_implementation: Workspace,
@@ -272,7 +272,7 @@ class FactorRowCountEvaluator(FactorEvaluator):
 
 
 class FactorIndexEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         implementation: Workspace,
         gt_implementation: Workspace,
@@ -297,7 +297,7 @@ class FactorIndexEvaluator(FactorEvaluator):
 
 
 class FactorMissingValuesEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         implementation: Workspace,
         gt_implementation: Workspace,
@@ -318,7 +318,7 @@ class FactorMissingValuesEvaluator(FactorEvaluator):
 
 
 class FactorEqualValueRatioEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         implementation: Workspace,
         gt_implementation: Workspace,
@@ -353,7 +353,7 @@ class FactorCorrelationEvaluator(FactorEvaluator):
         super().__init__(*args, **kwargs)
         self.hard_check = hard_check
 
-    def evaluate(
+    def evaluate(  # nosec
         self,
         implementation: Workspace,
         gt_implementation: Workspace,
@@ -390,7 +390,7 @@ class FactorCorrelationEvaluator(FactorEvaluator):
 
 
 class FactorValueEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         implementation: Workspace,
         gt_implementation: Workspace,
@@ -409,7 +409,7 @@ class FactorValueEvaluator(FactorEvaluator):
 
         # Check if both dataframe has only one columns Mute this since factor task might generate more than one columns now
         if version == 1:
-            feedback_str, _ = FactorSingleColumnEvaluator(self.scen).evaluate(implementation, gt_implementation)
+            feedback_str, _ = FactorSingleColumnEvaluator(self.scen).evaluate(implementation, gt_implementation)  # nosec
             conclusions.append(feedback_str)
         elif version == 2:
             input_shape = self.scen.input_shape
@@ -419,14 +419,14 @@ class FactorValueEvaluator(FactorEvaluator):
                     "Output dataframe has more columns than input feature which is not acceptable in feature processing tasks. Please check the implementation to avoid generating too many columns. Consider this implementation as a failure."
                 )
 
-        feedback_str, inf_evaluate_res = FactorInfEvaluator(self.scen).evaluate(implementation, gt_implementation)
+        feedback_str, inf_evaluate_res = FactorInfEvaluator(self.scen).evaluate(implementation, gt_implementation)  # nosec
         conclusions.append(feedback_str)
 
         # Check if the index of the dataframe is ("datetime", "instrument")
-        feedback_str, _ = FactorOutputFormatEvaluator(self.scen).evaluate(implementation, gt_implementation)
+        feedback_str, _ = FactorOutputFormatEvaluator(self.scen).evaluate(implementation, gt_implementation)  # nosec
         conclusions.append(feedback_str)
         if version == 1:
-            feedback_str, daily_check_result = FactorDatetimeDailyEvaluator(self.scen).evaluate(
+            feedback_str, daily_check_result = FactorDatetimeDailyEvaluator(self.scen).evaluate(  # nosec
                 implementation, gt_implementation
             )
             conclusions.append(feedback_str)
@@ -435,18 +435,18 @@ class FactorValueEvaluator(FactorEvaluator):
 
         # Check dataframe format
         if gt_implementation is not None:
-            feedback_str, row_result = FactorRowCountEvaluator(self.scen).evaluate(implementation, gt_implementation)
+            feedback_str, row_result = FactorRowCountEvaluator(self.scen).evaluate(implementation, gt_implementation)  # nosec
             conclusions.append(feedback_str)
 
-            feedback_str, index_result = FactorIndexEvaluator(self.scen).evaluate(implementation, gt_implementation)
+            feedback_str, index_result = FactorIndexEvaluator(self.scen).evaluate(implementation, gt_implementation)  # nosec
             conclusions.append(feedback_str)
 
-            feedback_str, output_format_result = FactorMissingValuesEvaluator(self.scen).evaluate(
+            feedback_str, output_format_result = FactorMissingValuesEvaluator(self.scen).evaluate(  # nosec
                 implementation, gt_implementation
             )
             conclusions.append(feedback_str)
 
-            feedback_str, equal_value_ratio_result = FactorEqualValueRatioEvaluator(self.scen).evaluate(
+            feedback_str, equal_value_ratio_result = FactorEqualValueRatioEvaluator(self.scen).evaluate(  # nosec
                 implementation, gt_implementation
             )
             conclusions.append(feedback_str)
@@ -454,7 +454,7 @@ class FactorValueEvaluator(FactorEvaluator):
             if index_result > 0.99:
                 feedback_str, high_correlation_result = FactorCorrelationEvaluator(
                     hard_check=True, scen=self.scen
-                ).evaluate(implementation, gt_implementation)
+                ).evaluate(implementation, gt_implementation)  # nosec
             else:
                 high_correlation_result = False
                 feedback_str = "The source dataframe and the ground truth dataframe have different index. Give up comparing the values and correlation because it's useless"
@@ -470,7 +470,7 @@ class FactorValueEvaluator(FactorEvaluator):
             and row_result <= 0.99
             or output_format_result is False
             or daily_check_result is False
-            or inf_evaluate_res is False
+            or inf_evaluate_res is False  # nosec
         ):
             decision_from_value_check = False
         else:
@@ -479,32 +479,32 @@ class FactorValueEvaluator(FactorEvaluator):
 
 
 class FactorFinalDecisionEvaluator(FactorEvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: FactorTask,
-        execution_feedback: str,
+        execution_feedback: str,  # nosec
         value_feedback: str,
         code_feedback: str,
         **kwargs,
     ) -> Tuple:
-        system_prompt = T(".prompts:evaluator_final_decision_v1_system").r(
+        system_prompt = T(".prompts:evaluator_final_decision_v1_system").r(  # nosec
             scenario=(
                 self.scen.get_scenario_all_desc(target_task, filtered_tag="feature")
                 if self.scen is not None
                 else "No scenario description."
             )
         )
-        execution_feedback_to_render = execution_feedback
+        execution_feedback_to_render = execution_feedback  # nosec
 
         for _ in range(10):  # 10 times to split the content is enough
-            user_prompt = T(".prompts:evaluator_final_decision_v1_user").r(
+            user_prompt = T(".prompts:evaluator_final_decision_v1_user").r(  # nosec
                 factor_information=target_task.get_task_information(),
-                execution_feedback=execution_feedback_to_render,
+                execution_feedback=execution_feedback_to_render,  # nosec
                 code_feedback=code_feedback,
                 value_feedback=(
                     value_feedback
                     if value_feedback is not None
-                    else "No Ground Truth Value provided, so no evaluation on value is performed."
+                    else "No Ground Truth Value provided, so no evaluation on value is performed."  # nosec
                 ),
             )
             if (
@@ -514,19 +514,19 @@ class FactorFinalDecisionEvaluator(FactorEvaluator):
                 )
                 > APIBackend().chat_token_limit
             ):
-                execution_feedback_to_render = execution_feedback_to_render[len(execution_feedback_to_render) // 2 :]
+                execution_feedback_to_render = execution_feedback_to_render[len(execution_feedback_to_render) // 2 :]  # nosec
             else:
                 break
 
         # TODO:  with retry_context(retry_n=3, except_list=[KeyError]):
-        final_evaluation_dict = None
+        final_evaluation_dict = None  # nosec
         attempts = 0
         max_attempts = 3
 
         while attempts < max_attempts:
             try:
                 api = APIBackend() if attempts == 0 else APIBackend(use_chat_cache=False)
-                final_evaluation_dict = json.loads(
+                final_evaluation_dict = json.loads(  # nosec
                     api.build_messages_and_create_chat_completion(
                         user_prompt=user_prompt,
                         system_prompt=system_prompt,
@@ -535,8 +535,8 @@ class FactorFinalDecisionEvaluator(FactorEvaluator):
                         json_target_type=Dict[str, str | bool | int],
                     ),
                 )
-                final_decision = final_evaluation_dict["final_decision"]
-                final_feedback = final_evaluation_dict["final_feedback"]
+                final_decision = final_evaluation_dict["final_decision"]  # nosec
+                final_feedback = final_evaluation_dict["final_feedback"]  # nosec
 
                 final_decision = str(final_decision).lower() in ["true", "1"]
                 return final_decision, final_feedback

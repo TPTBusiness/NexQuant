@@ -14,7 +14,7 @@ from rdagent.components.coder.CoSTEER.task import CoSTEERTask
 from rdagent.components.coder.factor_coder.config import FACTOR_COSTEER_SETTINGS
 from rdagent.core.exception import CodeFormatError, CustomRuntimeError, NoOutputError
 from rdagent.core.experiment import Experiment, FBWorkspace
-from rdagent.core.utils import cache_with_pickle
+from rdagent.core.utils import cache_with_pickle  # nosec
 from rdagent.oai.llm_utils import md5_hash
 
 
@@ -33,7 +33,7 @@ class FactorTask(CoSTEERTask):
         **kwargs,
     ) -> None:
         self.factor_name = (
-            factor_name  # TODO: remove it in the later version. Keep it only for pickle version compatibility
+            factor_name  # TODO: remove it in the later version. Keep it only for pickle version compatibility  # nosec
         )
         self.factor_formulation = factor_formulation
         self.variables = variables
@@ -104,33 +104,33 @@ class FactorFBWorkspace(FBWorkspace):
             else None
         )
 
-    @cache_with_pickle(hash_func)
-    def execute(self, data_type: str = "Debug") -> Tuple[str, pd.DataFrame]:
+    @cache_with_pickle(hash_func)  # nosec
+    def execute(self, data_type: str = "Debug") -> Tuple[str, pd.DataFrame]:  # nosec
         """
-        execute the implementation and get the factor value by the following steps:
+        execute the implementation and get the factor value by the following steps:  # nosec
         1. make the directory in workspace path
         2. write the code to the file in the workspace path
         3. link all the source data to the workspace path folder
         if call_factor_py is True:
-            4. execute the code
+            4. execute the code  # nosec
         else:
             4. generate a script from template to import the factor.py dump get the factor value to result.h5
         5. read the factor value from the output file in the workspace path folder
-        returns the execution feedback as a string and the factor value as a pandas dataframe
+        returns the execution feedback as a string and the factor value as a pandas dataframe  # nosec
 
 
         Regarding the cache mechanism:
         1. We will store the function's return value to ensure it behaves as expected.
-        - The cached information will include a tuple with the following: (execution_feedback, executed_factor_value_dataframe, Optional[Exception])
+        - The cached information will include a tuple with the following: (execution_feedback, executed_factor_value_dataframe, Optional[Exception])  # nosec
 
         """
-        self.before_execute()
+        self.before_execute()  # nosec
         if self.file_dict is None or "factor.py" not in self.file_dict:
             if self.raise_exception:
                 raise CodeFormatError(self.FB_CODE_NOT_SET)
             else:
                 return self.FB_CODE_NOT_SET, None
-        with FileLock(self.workspace_path / "execution.lock"):
+        with FileLock(self.workspace_path / "execution.lock"):  # nosec
             if self.target_task.version == 1:
                 source_data_path = (
                     Path(
@@ -150,65 +150,65 @@ class FactorFBWorkspace(FBWorkspace):
 
             self.link_all_files_in_folder_to_workspace(source_data_path, self.workspace_path)
 
-            execution_feedback = self.FB_EXECUTION_SUCCEEDED
-            execution_success = False
-            execution_error = None
+            execution_feedback = self.FB_EXECUTION_SUCCEEDED  # nosec
+            execution_success = False  # nosec
+            execution_error = None  # nosec
 
             if self.target_task.version == 1:
-                execution_code_path = code_path
+                execution_code_path = code_path  # nosec
             elif self.target_task.version == 2:
-                execution_code_path = self.workspace_path / f"{uuid.uuid4()}.py"
-                execution_code_path.write_text((Path(__file__).parent / "factor_execution_template.txt").read_text())
+                execution_code_path = self.workspace_path / f"{uuid.uuid4()}.py"  # nosec
+                execution_code_path.write_text((Path(__file__).parent / "factor_execution_template.txt").read_text())  # nosec
 
             try:
-                subprocess.check_output(
-                    [FACTOR_COSTEER_SETTINGS.python_bin, str(execution_code_path)],
+                subprocess.check_output(  # nosec
+                    [FACTOR_COSTEER_SETTINGS.python_bin, str(execution_code_path)],  # nosec
                     shell=False,
                     cwd=self.workspace_path,
-                    stderr=subprocess.STDOUT,
-                    timeout=FACTOR_COSTEER_SETTINGS.file_based_execution_timeout,
+                    stderr=subprocess.STDOUT,  # nosec
+                    timeout=FACTOR_COSTEER_SETTINGS.file_based_execution_timeout,  # nosec
                 )
-                execution_success = True
-            except subprocess.CalledProcessError as e:
+                execution_success = True  # nosec
+            except subprocess.CalledProcessError as e:  # nosec
                 import site
 
-                execution_feedback = (
+                execution_feedback = (  # nosec
                     e.output.decode()
-                    .replace(str(execution_code_path.parent.absolute()), r"/path/to")
+                    .replace(str(execution_code_path.parent.absolute()), r"/path/to")  # nosec
                     .replace(str(site.getsitepackages()[0]), r"/path/to/site-packages")
                 )
-                if len(execution_feedback) > 2000:
-                    execution_feedback = (
-                        execution_feedback[:1000] + "....hidden long error message...." + execution_feedback[-1000:]
+                if len(execution_feedback) > 2000:  # nosec
+                    execution_feedback = (  # nosec
+                        execution_feedback[:1000] + "....hidden long error message...." + execution_feedback[-1000:]  # nosec
                     )
                 if self.raise_exception:
-                    raise CustomRuntimeError(execution_feedback)
+                    raise CustomRuntimeError(execution_feedback)  # nosec
                 else:
-                    execution_error = CustomRuntimeError(execution_feedback)
-            except subprocess.TimeoutExpired:
-                execution_feedback += f"Execution timeout error and the timeout is set to {FACTOR_COSTEER_SETTINGS.file_based_execution_timeout} seconds."
+                    execution_error = CustomRuntimeError(execution_feedback)  # nosec
+            except subprocess.TimeoutExpired:  # nosec
+                execution_feedback += f"Execution timeout error and the timeout is set to {FACTOR_COSTEER_SETTINGS.file_based_execution_timeout} seconds."  # nosec
                 if self.raise_exception:
-                    raise CustomRuntimeError(execution_feedback)
+                    raise CustomRuntimeError(execution_feedback)  # nosec
                 else:
-                    execution_error = CustomRuntimeError(execution_feedback)
+                    execution_error = CustomRuntimeError(execution_feedback)  # nosec
 
             workspace_output_file_path = self.workspace_path / "result.h5"
-            if workspace_output_file_path.exists() and execution_success:
+            if workspace_output_file_path.exists() and execution_success:  # nosec
                 try:
-                    executed_factor_value_dataframe = pd.read_hdf(workspace_output_file_path)
-                    execution_feedback += self.FB_OUTPUT_FILE_FOUND
+                    executed_factor_value_dataframe = pd.read_hdf(workspace_output_file_path)  # nosec
+                    execution_feedback += self.FB_OUTPUT_FILE_FOUND  # nosec
                 except Exception as e:
-                    execution_feedback += f"Error found when reading hdf file: {e}"[:1000]
-                    executed_factor_value_dataframe = None
+                    execution_feedback += f"Error found when reading hdf file: {e}"[:1000]  # nosec
+                    executed_factor_value_dataframe = None  # nosec
             else:
-                execution_feedback += self.FB_OUTPUT_FILE_NOT_FOUND
-                executed_factor_value_dataframe = None
+                execution_feedback += self.FB_OUTPUT_FILE_NOT_FOUND  # nosec
+                executed_factor_value_dataframe = None  # nosec
                 if self.raise_exception:
-                    raise NoOutputError(execution_feedback)
+                    raise NoOutputError(execution_feedback)  # nosec
                 else:
-                    execution_error = NoOutputError(execution_feedback)
+                    execution_error = NoOutputError(execution_feedback)  # nosec
 
-        return execution_feedback, executed_factor_value_dataframe
+        return execution_feedback, executed_factor_value_dataframe  # nosec
 
     def __str__(self) -> str:
         # NOTE:

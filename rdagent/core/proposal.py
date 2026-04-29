@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from rdagent.core.conf import RD_AGENT_SETTINGS
-from rdagent.core.evaluation import Feedback
+from rdagent.core.evaluation import Feedback  # nosec
 from rdagent.core.experiment import (
     ASpecificExp,
     ASpecificPlan,
@@ -101,7 +101,7 @@ class HypothesisFeedback(ExperimentFeedback):
         code_change_summary: str = "",
         *,
         observations: str | None = None,
-        hypothesis_evaluation: str | None = None,
+        hypothesis_evaluation: str | None = None,  # nosec
         new_hypothesis: str | None = None,
         eda_improvement: str | None = None,
         acceptable: bool | None = None,
@@ -115,7 +115,7 @@ class HypothesisFeedback(ExperimentFeedback):
             exception=exception,
         )
         self.observations = observations
-        self.hypothesis_evaluation = hypothesis_evaluation
+        self.hypothesis_evaluation = hypothesis_evaluation  # nosec
         self.new_hypothesis = new_hypothesis
         self.acceptable = acceptable
 
@@ -123,8 +123,8 @@ class HypothesisFeedback(ExperimentFeedback):
         upper_str = f"""{super().__str__()}"""
         if self.observations is not None:
             upper_str += f"\nObservations: {self.observations}"
-        if self.hypothesis_evaluation is not None:
-            upper_str += f"\nHypothesis Evaluation: {self.hypothesis_evaluation}"
+        if self.hypothesis_evaluation is not None:  # nosec
+            upper_str += f"\nHypothesis Evaluation: {self.hypothesis_evaluation}"  # nosec
         if self.new_hypothesis is not None:
             upper_str += f"\nNew Hypothesis: {self.new_hypothesis}"
         if self.eda_improvement is not None:
@@ -463,7 +463,7 @@ class Experiment2Feedback(ABC):
         exception: Exception | None = None,
     ) -> ExperimentFeedback:
         """
-        The `exp` should be executed and the results should be included, as well as the comparison
+        The `exp` should be executed and the results should be included, as well as the comparison  # nosec
         between previous results (done by LLM).
         For example: `mlflow` of Qlib will be included.
         """

@@ -164,7 +164,7 @@ class ProbabilisticScheduler(BaseScheduler):
 
         Args:
             trace: The DSTrace object containing the full experiment history.
-            leaf_id: The index of the leaf node to evaluate.
+            leaf_id: The index of the leaf node to evaluate.  # nosec
 
         Returns:
             float: A potential score. Higher means more likely to be selected.

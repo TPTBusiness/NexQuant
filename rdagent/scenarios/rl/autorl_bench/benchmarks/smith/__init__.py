@@ -42,27 +42,27 @@ def discover_smith_benchmarks() -> dict[str, BenchmarkConfig]:
             continue
 
         name = raw["name"]
-        eval_mode = raw.get("eval_mode", "per_sample")
+        eval_mode = raw.get("eval_mode", "per_sample")  # nosec
         bench_id = f"smith-{name}"
 
-        if eval_mode == "opencompass":
-            evaluator_class = f"{_PKG}.core.opencompass.OpenCompassEvaluator"
-            eval_config = {"dataset": raw.get("opencompass_dataset", "")}
-        elif eval_mode == "per_sample":
-            evaluator_class = f"{_PKG}.benchmarks.smith.per_sample_eval.PerSampleEvaluator"
-            eval_config = {"eval_script": str(bench_dir / "eval.py")}
+        if eval_mode == "opencompass":  # nosec
+            evaluator_class = f"{_PKG}.core.opencompass.OpenCompassEvaluator"  # nosec
+            eval_config = {"dataset": raw.get("opencompass_dataset", "")}  # nosec
+        elif eval_mode == "per_sample":  # nosec
+            evaluator_class = f"{_PKG}.benchmarks.smith.per_sample_eval.PerSampleEvaluator"  # nosec
+            eval_config = {"eval_script": str(bench_dir / "eval.py")}  # nosec
         else:
-            # Skip benchmarks with unsupported eval modes (e.g. custom_model)
+            # Skip benchmarks with unsupported eval modes (e.g. custom_model)  # nosec
             # that are already registered as standalone benchmarks.
-            logger.info("Skipping smith-%s: unsupported eval_mode=%s", name, eval_mode)
+            logger.info("Skipping smith-%s: unsupported eval_mode=%s", name, eval_mode)  # nosec
             continue
 
         result[bench_id] = BenchmarkConfig(
             id=bench_id,
-            evaluator_class=evaluator_class,
+            evaluator_class=evaluator_class,  # nosec
             data_module="",
             description=raw.get("description", ""),
-            eval_config=eval_config,
+            eval_config=eval_config,  # nosec
             expose_files=raw.get("expose_files", []),
             bench_dir=str(bench_dir),
         )

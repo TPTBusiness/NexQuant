@@ -1,5 +1,5 @@
 from rdagent.app.data_science.conf import DS_RD_SETTING
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEERMultiEvaluator,
     CoSTEERSingleFeedback,
 )
@@ -11,7 +11,7 @@ from rdagent.components.coder.CoSTEER.knowledge_management import (
 )
 from rdagent.components.coder.data_science.conf import DSCoderCoSTEERSettings
 from rdagent.components.coder.data_science.share.ds_costeer import DSCoSTEER
-from rdagent.components.coder.data_science.workflow.eval import (
+from rdagent.components.coder.data_science.workflow.eval import (  # nosec
     WorkflowGeneralCaseSpecEvaluator,
 )
 from rdagent.components.coder.data_science.workflow.exp import WorkflowTask

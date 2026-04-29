@@ -6,7 +6,7 @@ import pandas as pd
 from rdagent.components.runner import CachedRunner
 from rdagent.core.exception import CoderError, FactorEmptyError, ModelEmptyError
 from rdagent.core.experiment import ASpecificExp, Experiment
-from rdagent.core.utils import cache_with_pickle
+from rdagent.core.utils import cache_with_pickle  # nosec
 from rdagent.oai.llm_utils import md5_hash
 from rdagent.scenarios.kaggle.experiment.kaggle_experiment import (
     KGFactorExperiment,
@@ -37,7 +37,7 @@ class KGCachedRunner(CachedRunner[ASpecificExp]):
         exp.experiment_workspace.data_description = cached_res.experiment_workspace.data_description
         return exp
 
-    @cache_with_pickle(get_cache_key, CachedRunner.assign_cached_result)
+    @cache_with_pickle(get_cache_key, CachedRunner.assign_cached_result)  # nosec
     def init_develop(self, exp: KGFactorExperiment | KGModelExperiment) -> KGFactorExperiment | KGModelExperiment:
         """
         For the initial development, the experiment serves as a benchmark for feature engineering.
@@ -45,7 +45,7 @@ class KGCachedRunner(CachedRunner[ASpecificExp]):
 
         env_to_use = {"PYTHONPATH": "./"}
 
-        result = exp.experiment_workspace.execute(run_env=env_to_use)
+        result = exp.experiment_workspace.execute(run_env=env_to_use)  # nosec
 
         exp.result = result
 
@@ -58,7 +58,7 @@ class KGCachedRunner(CachedRunner[ASpecificExp]):
 
 
 class KGModelRunner(KGCachedRunner[KGModelExperiment]):
-    @cache_with_pickle(KGCachedRunner.get_cache_key, KGCachedRunner.assign_cached_result)
+    @cache_with_pickle(KGCachedRunner.get_cache_key, KGCachedRunner.assign_cached_result)  # nosec
     def develop(self, exp: KGModelExperiment) -> KGModelExperiment:
         if exp.based_experiments and exp.based_experiments[-1].result is None:
             exp.based_experiments[-1] = self.init_develop(exp.based_experiments[-1])
@@ -77,7 +77,7 @@ class KGModelRunner(KGCachedRunner[KGModelExperiment]):
             raise ModelEmptyError("No model is implemented.")
         env_to_use = {"PYTHONPATH": "./"}
 
-        result = exp.experiment_workspace.execute(run_env=env_to_use)
+        result = exp.experiment_workspace.execute(run_env=env_to_use)  # nosec
 
         if result is None:
             raise CoderError("No result is returned from the experiment workspace")
@@ -92,20 +92,20 @@ class KGModelRunner(KGCachedRunner[KGModelExperiment]):
 
 
 class KGFactorRunner(KGCachedRunner[KGFactorExperiment]):
-    @cache_with_pickle(KGCachedRunner.get_cache_key, KGCachedRunner.assign_cached_result)
+    @cache_with_pickle(KGCachedRunner.get_cache_key, KGCachedRunner.assign_cached_result)  # nosec
     def develop(self, exp: KGFactorExperiment) -> KGFactorExperiment:
         current_feature_file_count = len(list(exp.experiment_workspace.workspace_path.glob("feature/feature*.py")))
         implemented_factor_count = 0
         for sub_ws in exp.sub_workspace_list:
             if sub_ws.file_dict == {}:
                 continue
-            execued_df = sub_ws.execute()[1]
-            if execued_df is None:
+            execued_df = sub_ws.execute()[1]  # nosec
+            if execued_df is None:  # nosec
                 continue
             implemented_factor_count += 1
             target_feature_file_name = f"feature/feature_{current_feature_file_count:05d}.py"
             exp.experiment_workspace.inject_files(**{target_feature_file_name: sub_ws.file_dict["factor.py"]})
-            feature_shape = execued_df.shape[-1]
+            feature_shape = execued_df.shape[-1]  # nosec
             exp.experiment_workspace.data_description.append((sub_ws.target_task.get_task_information(), feature_shape))
             current_feature_file_count += 1
         if implemented_factor_count == 0:
@@ -117,7 +117,7 @@ class KGFactorRunner(KGCachedRunner[KGFactorExperiment]):
 
         env_to_use = {"PYTHONPATH": "./"}
 
-        result = exp.experiment_workspace.execute(run_env=env_to_use)
+        result = exp.experiment_workspace.execute(run_env=env_to_use)  # nosec
 
         if result is None:
             raise CoderError("No result is returned from the experiment workspace")

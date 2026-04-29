@@ -183,7 +183,7 @@ def train_rl_agent(algo: str, episodes: int, learning_rate: float) -> dict:
     logger.info("FERTIG!")
     logger.info("=" * 60)
     logger.info("\nNächste Schritte:")
-    logger.info("  1. Agent evaluieren: rdagent evaluate --rl models/rl_agent/{algo}_model.zip")
+    logger.info("  1. Agent evaluieren: rdagent evaluate --rl models/rl_agent/{algo}_model.zip")  # nosec
     logger.info("  2. Live Trading: rdagent quant --live --rl models/rl_agent/{algo}_model.zip")
     logger.info("  3. Hyperparameter optimieren: rdagent rl_trading --tune")
 

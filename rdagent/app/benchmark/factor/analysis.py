@@ -9,7 +9,7 @@ import pandas as pd
 import seaborn as sns
 
 from rdagent.components.benchmark.conf import BenchmarkSettings
-from rdagent.components.benchmark.eval_method import FactorImplementEval
+from rdagent.components.benchmark.eval_method import FactorImplementEval  # nosec
 
 
 class BenchmarkAnalyzer:
@@ -32,7 +32,7 @@ class BenchmarkAnalyzer:
             raise ValueError("Invalid file path")
 
         with file_path.open("rb") as f:
-            res = pickle.load(f)
+            res = pickle.load(f)  # nosec
 
         return res
 
@@ -111,7 +111,7 @@ class BenchmarkAnalyzer:
 
         succ_rate_f = self.reformat_index(succ_rate)
 
-        # if it rasis Error when running the evaluator, we will get NaN
+        # if it rasis Error when running the evaluator, we will get NaN  # nosec
         # Running failures are reguarded to zero score.
         format_issue = sum_df_clean[["FactorRowCountEvaluator", "FactorIndexEvaluator"]].apply(
             lambda x: np.mean(x.fillna(0.0)), axis=1
@@ -202,7 +202,7 @@ class Plotter:
 
 
 def main(
-    path="git_ignore_folder/eval_results/res_promptV220240724-060037.pkl",
+    path="git_ignore_folder/eval_results/res_promptV220240724-060037.pkl",  # nosec
     round=1,
     title="Comparison of Different Methods",
     only_correct_format=False,

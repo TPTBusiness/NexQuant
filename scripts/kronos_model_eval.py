@@ -7,8 +7,8 @@ vs actual realized returns. Results are printed for comparison with LightGBM.
 
 Usage:
     conda activate predix
-    python scripts/kronos_model_eval.py
-    python scripts/kronos_model_eval.py --pred 30 --context 512 --device cuda
+    python scripts/kronos_model_eval.py  # nosec
+    python scripts/kronos_model_eval.py --pred 30 --context 512 --device cuda  # nosec
 """
 
 import argparse
@@ -29,7 +29,7 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate Kronos as model (alongside LightGBM)")
     parser.add_argument("--context", type=int, default=512, help="Context window in bars")
     parser.add_argument("--pred", type=int, default=30, help="Prediction horizon in bars")
-    parser.add_argument("--stride", type=int, default=None, help="Stride between evaluations (default: pred)")
+    parser.add_argument("--stride", type=int, default=None, help="Stride between evaluations (default: pred)")  # nosec
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
@@ -43,10 +43,10 @@ def main():
         print(f"ERROR: Data not found at {DATA_PATH}")
         raise SystemExit(1)
 
-    from rdagent.components.coder.kronos_adapter import evaluate_kronos_model
+    from rdagent.components.coder.kronos_adapter import evaluate_kronos_model  # nosec
 
-    print("Running evaluation (this may take several minutes)...")
-    metrics = evaluate_kronos_model(
+    print("Running evaluation (this may take several minutes)...")  # nosec
+    metrics = evaluate_kronos_model(  # nosec
         hdf5_path=DATA_PATH,
         context_bars=args.context,
         pred_bars=args.pred,
@@ -67,7 +67,7 @@ def main():
     print("Reference: LightGBM baseline IC typically 0.01–0.05 on 1-min EUR/USD")
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = OUTPUT_DIR / f"kronos_eval_ctx{args.context}_pred{args.pred}.json"
+    out = OUTPUT_DIR / f"kronos_eval_ctx{args.context}_pred{args.pred}.json"  # nosec
     with open(out, "w") as f:
         json.dump({**metrics, "context_bars": args.context, "pred_bars": args.pred}, f, indent=2)
     print(f"\nResults saved to: {out}")

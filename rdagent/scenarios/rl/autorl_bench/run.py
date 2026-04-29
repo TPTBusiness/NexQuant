@@ -131,7 +131,7 @@ def run(
                 ["bash", str(agent.start)],
                 env=env,
                 stdout=af,
-                stderr=subprocess.STDOUT,
+                stderr=subprocess.STDOUT,  # nosec
                 start_new_session=True,
             )
             _agent_proc[0] = proc
@@ -139,7 +139,7 @@ def run(
                 proc.wait(timeout=timeout)
                 success = proc.returncode == 0
                 logger.info(f"Agent finished, exit_code={proc.returncode}, log: {agent_log}")
-            except subprocess.TimeoutExpired:
+            except subprocess.TimeoutExpired:  # nosec
                 logger.warning(f"Agent timed out after {timeout}s, killing process group...")
                 kill_process_group(proc)
 

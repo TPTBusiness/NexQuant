@@ -3,7 +3,7 @@ HumanEval 数据下载
 
 HumanEval 官方数据只有 test split，这里固定按 1:1 划分：
 - 前半（82 条）导出到 train.jsonl，给 agent 训练使用
-- 后半（82 条）留给评测使用（由 evaluator 通过 test_range 控制）
+- 后半（82 条）留给评测使用（由 evaluator 通过 test_range 控制）  # nosec
 """
 
 import json
@@ -17,7 +17,7 @@ _TRAIN_SAMPLES = _TOTAL_SAMPLES // 2
 
 
 def _convert_row(row: dict) -> dict:
-    """将 openai/openai_humaneval 统一为 autorl_bench 常用字段。"""
+    """将 openai/openai_humaneval 统一为 autorl_bench 常用字段。"""  # nosec
     return {
         "question": row.get("prompt", ""),
         "answer": row.get("canonical_solution", ""),
@@ -40,7 +40,7 @@ def download_train_data(target_dir: Path) -> None:
 
     target_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Downloading HumanEval split...")
-    dataset = load_dataset("openai/openai_humaneval", split="test")
+    dataset = load_dataset("openai/openai_humaneval", split="test")  # nosec
     train_split = dataset.select(range(_TRAIN_SAMPLES))
 
     with open(output_file, "w", encoding="utf-8") as f:

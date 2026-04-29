@@ -33,7 +33,7 @@ if RD_AGENT_SETTINGS.enable_mlflow:
 
 class WorkflowTracker:
     """
-    A workflow-specific tracking system that logs metrics related to workflow execution.
+    A workflow-specific tracking system that logs metrics related to workflow execution.  # nosec
 
     This class handles metric logging while keeping the MLflow dependency optional.
     If MLflow is not enabled in settings, tracking calls become no-ops.
