@@ -176,7 +176,7 @@ class QlibQuantHypothesisGen(FactorAndModelHypothesisGen):
                                 ic_val = exp.result.loc["IC"] if "IC" in exp.result.index else ""
                                 ic_str = f" IC={ic_val:.4f}" if ic_val != "" else ""
                         except Exception:
-                            pass
+    logging.debug("Error getting IC", exc_info=True)
                         decision_str = "PASS" if fb.decision else "FAIL"
                         obs_short = (fb.observations or "")[:120].replace("\n", " ")
                         summary_lines.append(f"- [{decision_str}]{ic_str} {names_str}: {obs_short}")
