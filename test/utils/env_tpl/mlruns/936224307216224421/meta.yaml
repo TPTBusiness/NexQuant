@@ -1,0 +1,8 @@
+artifact_location: file:///workspace/qlib_workspace/mlruns/936224307216224421
+creation_time: 1777476655662
+experiment_id: '936224307216224421'
+last_update_time: 1777476655662
+lifecycle_stage: active
+name: workflow
+trace_location: null
+workspace: default

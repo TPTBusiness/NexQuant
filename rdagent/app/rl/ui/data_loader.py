@@ -5,7 +5,7 @@ Simplified version: no EvoLoop (RL doesn't have evolution loops)
 """
 
 import os
-import pickle
+import pickle  # nosec B301
 import re
 from dataclasses import dataclass, field
 from datetime import datetime

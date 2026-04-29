@@ -4,7 +4,7 @@ import functools
 import importlib
 import json
 import multiprocessing as mp
-import pickle
+import pickle  # nosec B301
 import random
 from collections.abc import Callable
 from pathlib import Path

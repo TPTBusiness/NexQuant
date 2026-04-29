@@ -1,6 +1,6 @@
 import io
 import json
-import pickle
+import pickle  # nosec B301
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict

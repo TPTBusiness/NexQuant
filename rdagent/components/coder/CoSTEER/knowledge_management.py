@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
-import pickle
+import pickle  # nosec B301
 import random
 import re
 from itertools import combinations
