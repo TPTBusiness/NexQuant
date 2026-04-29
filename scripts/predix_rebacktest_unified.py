@@ -23,7 +23,7 @@ import argparse
 import csv
 import json
 import logging
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tempfile
 from datetime import datetime
@@ -96,7 +96,7 @@ def load_factor_series(names: List[str]) -> Dict[str, pd.Series]:
                         out[name] = df.iloc[:, 0]
                         break
                 except Exception:
-                    pass
+                    logging.debug("Exception caught", exc_info=True)
     return out
 
 

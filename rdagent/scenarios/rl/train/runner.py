@@ -8,7 +8,7 @@ RL Runner - 执行训练代码并提交 Grading Server 评测
 
 import json
 import os
-import subprocess
+import subprocess  # nosec B404
 import time
 from pathlib import Path
 

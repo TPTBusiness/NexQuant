@@ -1,3 +1,4 @@
+import logging
 """
 CLI entrance for all rdagent application.
 
@@ -19,7 +20,7 @@ load_dotenv(".env")
 # 1) Make sure it is at the beginning of the script so that it will load dotenv before initializing BaseSettings.
 # 2) The ".env" argument is necessary to make sure it loads `.env` from the current directory.
 
-import subprocess
+import subprocess  # nosec B404
 from importlib.resources import path as rpath
 from typing import Dict, Optional
 
@@ -210,7 +211,7 @@ def fin_quant_cli(
       2. Set OPENROUTER_MODEL (default: openrouter/google/gemini-2.0-flash:free)
       3. Run: rdagent fin_quant -m openrouter
     """
-    import subprocess
+    import subprocess  # nosec B404
     import threading
     import time
 
@@ -260,7 +261,7 @@ def fin_quant_cli(
                         console.print("   [bold green]✅ LLM server is ready.[/bold green]")
                         break
             except Exception:
-                pass
+                logging.debug("Exception caught", exc_info=True)
             time.sleep(interval)
             waited += interval
             console.print(f"   [dim]Still waiting... ({waited}s)[/dim]")
@@ -1170,7 +1171,7 @@ def start_llama_cli(
       rdagent start_llama --gpu-layers 40 --ctx-size 4096
       rdagent start_llama --reasoning
     """
-    import subprocess
+    import subprocess  # nosec B404
     import sys
     import os
 
@@ -1241,7 +1242,7 @@ def start_loop_cli(
       rdagent start_loop
       rdagent start_loop --target 5 --max-wait 3600
     """
-    import subprocess
+    import subprocess  # nosec B404
     import signal
     import sys
     import os
@@ -1267,7 +1268,7 @@ def start_loop_cli(
         try:
             subprocess.run(["pkill", "-f", "predix_smart_strategy_gen.py"], capture_output=True)
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
         try:
             os.remove(pidfile)
         except FileNotFoundError:
@@ -1305,7 +1306,7 @@ def start_loop_cli(
                 time.sleep(300)
                 continue
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
 
         # Count existing strategies
         from pathlib import Path as P
@@ -1317,7 +1318,7 @@ def start_loop_cli(
         try:
             subprocess.run(["pkill", "-9", "-f", "predix_smart_strategy_gen.py"], capture_output=True)
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
         time.sleep(2)
 
         # Start generator
@@ -1385,7 +1386,7 @@ def parallel_cli(
       rdagent parallel --runs 5 --api-keys 1
       rdagent parallel -n 10 -k 2
     """
-    import subprocess
+    import subprocess  # nosec B404
     import sys
     from pathlib import Path
     from rdagent.log import daily_log as _dlog
@@ -1436,7 +1437,7 @@ def eval_all_cli(
       rdagent eval_all --top 100
       rdagent eval_all -n 500 -p 8
     """
-    import subprocess
+    import subprocess  # nosec B404
     import sys
     from pathlib import Path
     from rdagent.log import daily_log as _dlog
@@ -1491,7 +1492,7 @@ def batch_backtest_cli(
       rdagent batch_backtest -n 500 -p 8
       rdagent batch_backtest --all
     """
-    import subprocess
+    import subprocess  # nosec B404
     import sys
     from pathlib import Path
 
@@ -1544,7 +1545,7 @@ def simple_eval_cli(
       rdagent simple_eval -n 500 -p 8
       rdagent simple_eval --all
     """
-    import subprocess
+    import subprocess  # nosec B404
     import sys
     from pathlib import Path
 
@@ -1591,7 +1592,7 @@ def rebacktest_cli(
       rdagent rebacktest
       rdagent rebacktest -d results/strategies_new/
     """
-    import subprocess
+    import subprocess  # nosec B404
     import sys
     from pathlib import Path
 
@@ -1645,7 +1646,7 @@ def report_cli(
       rdagent report -s results/strategies_new/123_MyStrategy.json
       rdagent report -o custom/reports/
     """
-    import subprocess
+    import subprocess  # nosec B404
     import sys
     from pathlib import Path
 

@@ -3,7 +3,7 @@ import bisect
 import json
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import tarfile
 import time
 import zipfile

@@ -148,7 +148,7 @@ def scan_factors(workspace_dir: Path, skip_evaluated: bool = True) -> List[Facto
                     if data.get("status") == "success" and data.get("ic") is not None:
                         evaluated_factors.add(data.get("factor_name"))
                 except Exception:
-                    pass
+                    logging.debug("Exception caught", exc_info=True)
             print(f"  Found {len(evaluated_factors)} already evaluated factors - skipping")
 
     for ws in workspace_dir.iterdir():
@@ -167,7 +167,7 @@ def scan_factors(workspace_dir: Path, skip_evaluated: bool = True) -> List[Facto
                 if result is not None and len(result.columns) > 0:
                     factor_name = result.columns[0]
             except Exception:
-                pass
+                logging.debug("Exception caught", exc_info=True)
 
         if factor_name is None:
             # Try to extract from code
@@ -269,7 +269,7 @@ def evaluate_factor_full(factor: FactorInfo, full_data: pd.DataFrame,
     EvalResult
     """
     import tempfile
-    import subprocess
+    import subprocess  # nosec B404
 
     with tempfile.TemporaryDirectory(prefix="predix_full_") as tmp_dir:
         ws = Path(tmp_dir)

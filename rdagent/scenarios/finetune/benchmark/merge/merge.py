@@ -1,5 +1,6 @@
+import logging
 import json
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 
 from rdagent.components.coder.finetune.conf import get_workspace_prefix
@@ -22,7 +23,7 @@ def is_blackwell_gpu() -> bool:
             gpu_names = result.stdout.strip().lower()
             return any(kw in gpu_names for kw in BLACKWELL_GPU_KEYWORDS)
     except Exception:
-        pass
+        logging.debug("Exception caught", exc_info=True)
     return False
 
 

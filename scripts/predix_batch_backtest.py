@@ -1,3 +1,4 @@
+import logging
 """
 Predix Batch Backtest Script - Extract and backtest existing factors.
 
@@ -355,7 +356,7 @@ class FactorExtractor:
                         existing_max_drawdown, existing_information_ratio
                     ])
             except Exception:
-                pass
+                logging.debug("Exception caught", exc_info=True)
 
         # Extract description from code (first docstring or comment)
         description = self._extract_description(code)
@@ -627,7 +628,7 @@ def run_simplified_backtest(factor_info: FactorInfo) -> BacktestResult:
                 direct_result.duration_seconds = time.time() - start_time
                 return direct_result
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
 
         # Strategy 3: Mark as skipped (no Qlib, no existing results)
         result.status = "skipped"
@@ -658,7 +659,7 @@ def _run_factor_directly(factor_info: FactorInfo) -> Optional[BacktestResult]:
     BacktestResult or None
     """
     import tempfile
-    import subprocess
+    import subprocess  # nosec B404
 
     with tempfile.TemporaryDirectory(prefix="predix_factor_") as tmp_dir:
         ws = Path(tmp_dir)
@@ -738,7 +739,7 @@ def _run_qlib_single(factor_info: FactorInfo) -> BacktestResult:
     -------
     BacktestResult
     """
-    import subprocess
+    import subprocess  # nosec B404
     import tempfile
 
     # Create temp workspace

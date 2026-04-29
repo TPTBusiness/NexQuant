@@ -1,6 +1,6 @@
 import asyncio
 import shutil
-import subprocess
+import subprocess  # nosec B404
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional, Union

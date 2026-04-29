@@ -1,3 +1,4 @@
+import logging
 """Per-sample evaluator for smith benchmarks (arc_agi, zero_shot_cot).
 
 Loads a model via vLLM, runs inference on each test sample, then uses the
@@ -160,12 +161,12 @@ def _cleanup_vllm(llm) -> None:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
 
     try:
         del llm
     except Exception:
-        pass
+        logging.debug("Exception caught", exc_info=True)
 
     try:
         ctx = mp.get_context("spawn")
@@ -173,7 +174,7 @@ def _cleanup_vllm(llm) -> None:
         p.start()
         p.join(timeout=30)
     except Exception:
-        pass
+        logging.debug("Exception caught", exc_info=True)
 
 
 def _apply_range(data: list, test_range: str) -> list:

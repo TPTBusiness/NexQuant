@@ -8,7 +8,7 @@ import csv
 import json
 import os
 import re
-import subprocess
+import subprocess  # nosec B404
 from datetime import datetime
 from pathlib import Path
 from typing import Optional

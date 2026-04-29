@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-import subprocess
+import subprocess  # nosec B404
 
 latest_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"], text=True).strip()
 

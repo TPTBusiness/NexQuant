@@ -1,3 +1,4 @@
+import logging
 """
 EURUSD Regime Detection mit Hurst Exponent
 

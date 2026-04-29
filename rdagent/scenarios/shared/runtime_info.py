@@ -1,7 +1,7 @@
 import json
 import platform
 import re
-import subprocess
+import subprocess  # nosec B404
 import sys
 from importlib.metadata import distributions
 

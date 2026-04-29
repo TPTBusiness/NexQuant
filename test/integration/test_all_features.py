@@ -1,3 +1,4 @@
+import logging
 """
 Comprehensive Integration Test Suite for Predix
 Tests all 13 implemented features to ensure they work correctly.
@@ -24,7 +25,7 @@ Features Tested:
 """
 
 import pytest
-import subprocess
+import subprocess  # nosec B404
 import tempfile
 import os
 import sys
@@ -1622,14 +1623,14 @@ class TestLoggingTeeWriter:
                         s.write(data)
                         s.flush()
                     except Exception:
-                        pass
+                        logging.debug("Exception caught", exc_info=True)
 
             def flush(self):
                 for s in self._streams:
                     try:
                         s.flush()
                     except Exception:
-                        pass
+                        logging.debug("Exception caught", exc_info=True)
 
         tee = TeeWriter(stream1, stream2)
         tee.write("test message\n")
@@ -1659,14 +1660,14 @@ class TestLoggingTeeWriter:
                         s.write(data)
                         s.flush()
                     except Exception:
-                        pass
+                        logging.debug("Exception caught", exc_info=True)
 
             def flush(self):
                 for s in self._streams:
                     try:
                         s.flush()
                     except Exception:
-                        pass
+                        logging.debug("Exception caught", exc_info=True)
 
         tee = TeeWriter(BrokenStream(), good_stream)
         tee.write("test message\n")

@@ -1,3 +1,4 @@
+import logging
 """
 Volatility-Adjusted Position Sizing für EURUSD
 

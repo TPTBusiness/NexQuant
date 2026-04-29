@@ -1,3 +1,4 @@
+import logging
 """
 Realistic backtest of all strategies in results/strategies_new/.
 
@@ -93,7 +94,7 @@ def _build_signal(factor_names: list[str], full_idx: pd.Index,
         if sig is not None and isinstance(sig, pd.Series):
             return sig.reindex(full_idx).fillna(0).astype(int)
     except Exception:
-        pass
+        logging.debug("Exception caught", exc_info=True)
 
     # Fallback: generic composite z-score (same as original loop)
     composite = pd.Series(0.0, index=full_idx)

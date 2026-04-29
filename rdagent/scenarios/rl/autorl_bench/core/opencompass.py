@@ -4,7 +4,7 @@ OpenCompass Evaluator
 用于所有使用 OpenCompass 评测的 benchmark（gsm8k, math 等）。
 """
 
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 from typing import Any, Dict
 

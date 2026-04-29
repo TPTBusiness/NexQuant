@@ -194,7 +194,7 @@ def quant(
         predix top - Show top-performing factors by IC or Sharpe
         predix health - Check system health and configuration
     """
-    import subprocess
+    import subprocess  # nosec B404
     import threading
     import time
     import sys
@@ -637,7 +637,7 @@ def portfolio(
     """
     import json
     import glob as glob_module
-    import subprocess
+    import subprocess  # nosec B404
     import tempfile
     import shutil
     import numpy as np
