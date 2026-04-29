@@ -9,7 +9,7 @@ peft>=0.18.1
 
 # Evaluation
 opencompass==0.5.1
-setuptools<75  # uv venv doesn't include, opencompass depends on pkg_resources
+setuptools>=78.1.1  # Security fix: GHSA-8g6x-3r52-4m6c (path traversal in PackageIndex.download, arbitrary file write/RCE)
 
 # Inference acceleration (optional, TRL supports 0.10.2-0.12.0)
 # Security: Version >=0.14.0 fixes CVE-2026-22807 (RCE via auto_map dynamic module loading)
