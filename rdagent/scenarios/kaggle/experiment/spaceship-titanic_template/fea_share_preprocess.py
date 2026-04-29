@@ -81,7 +81,7 @@ def preprocess_script():
     if os.path.exists("/kaggle/input/X_train.pkl"):
         X_train = pd.read_pickle("/kaggle/input/X_train.pkl")
         X_valid = pd.read_pickle("/kaggle/input/X_valid.pkl")
-        y_train = pd.read_pickle("/kaggle/input/y_train.pkl")
+        y_train = pd.read_pickle("/kaggle/input/y_train.pkl")  # nosec B301
         y_valid = pd.read_pickle("/kaggle/input/y_valid.pkl")  # nosec B301
         X_test = pd.read_pickle("/kaggle/input/X_test.pkl")
         others = pd.read_pickle("/kaggle/input/others.pkl")  # nosec B301
