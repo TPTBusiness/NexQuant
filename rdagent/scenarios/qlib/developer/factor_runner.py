@@ -1,3 +1,4 @@
+import sys
 import logging
 import os
 from pathlib import Path
@@ -966,7 +967,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 shutil.copy(str(full_data), str(tmp / "intraday_pv.h5"))
 
                 ret = subprocess.run(
-                    ["python", "factor.py"],
+                    [sys.executable, "factor.py"],
                     cwd=str(tmp),
                     capture_output=True,
                     timeout=300,
