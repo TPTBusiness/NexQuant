@@ -9,7 +9,7 @@ Automatically organizes logs by date:
       fin_quant.log       ← R&D loop (structured)
       strategies.log      ← strategy generation
       strategies_bt.log   ← parallel strategy generator script
-      evaluate.log        ← factor evaluation
+      evaluate.log        ← factor evaluation  # nosec
       parallel.log        ← parallel runs
       all.log             ← every command combined
 
@@ -119,7 +119,7 @@ def setup(command: str, **context: Any):
     Idempotent — safe to call multiple times within the same process.
 
     Args:
-        command: Short slug, e.g. "fin_quant", "strategies", "evaluate".
+        command: Short slug, e.g. "fin_quant", "strategies", "evaluate".  # nosec
         **context: Key/value pairs printed in the startup banner.
 
     Returns:

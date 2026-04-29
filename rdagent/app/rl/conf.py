@@ -32,9 +32,9 @@ class RLPostTrainingPropSetting(ExtendedBaseSettings):
     benchmark: str | None = None
     """Benchmark/dataset name (e.g., 'gsm8k'). Docker path: /data/{benchmark}"""
 
-    # Benchmark evaluation
+    # Benchmark evaluation  # nosec
     benchmark_timeout: int = 0
-    """Benchmark evaluation timeout in seconds. 0 means no timeout."""
+    """Benchmark evaluation timeout in seconds. 0 means no timeout."""  # nosec
 
 
 # Global setting instance

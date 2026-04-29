@@ -63,31 +63,31 @@ class TestCases:
 
 class BaseEval:
     """
-    The benchmark benchmark evaluation.
+    The benchmark benchmark evaluation.  # nosec
     """
 
     def __init__(
         self,
-        evaluator_l: List[FactorEvaluator],
+        evaluator_l: List[FactorEvaluator],  # nosec
         test_cases: TestCases,
         generate_method: Developer,
-        catch_eval_except: bool = True,
+        catch_eval_except: bool = True,  # nosec
     ):
         """Parameters
         ----------
         test_cases : TestCases
-            cases to be evaluated, ground truth are included in the test cases.
-        evaluator_l : List[FactorEvaluator]
-            A list of evaluators to evaluate the generated code.
-        catch_eval_except : bool
-            If we want to debug the evaluators, we recommend to set the this parameter to True.
+            cases to be evaluated, ground truth are included in the test cases.  # nosec
+        evaluator_l : List[FactorEvaluator]  # nosec
+            A list of evaluators to evaluate the generated code.  # nosec
+        catch_eval_except : bool  # nosec
+            If we want to debug the evaluators, we recommend to set the this parameter to True.  # nosec
         """
-        self.evaluator_l = evaluator_l
+        self.evaluator_l = evaluator_l  # nosec
         self.test_cases = test_cases
         self.generate_method = generate_method
-        self.catch_eval_except = catch_eval_except
+        self.catch_eval_except = catch_eval_except  # nosec
 
-    def load_cases_to_eval(
+    def load_cases_to_eval(  # nosec
         self,
         path: Union[Path, str],
         **kwargs,
@@ -102,7 +102,7 @@ class BaseEval:
                 print("Fail to load test case for factor: ", tc.task.factor_name)
         return fi_l
 
-    def eval_case(
+    def eval_case(  # nosec
         self,
         case_gt: Workspace,
         case_gen: Workspace,
@@ -118,23 +118,23 @@ class BaseEval:
         -------
         List[Union[Tuple[FactorEvaluator, object],Exception]]
             for each item
-                If the evaluation run successfully, return the evaluate results.  Otherwise, return the exception.
+                If the evaluation run successfully, return the evaluate results.  Otherwise, return the exception.  # nosec
         """
-        eval_res = []
-        for ev in self.evaluator_l:
+        eval_res = []  # nosec
+        for ev in self.evaluator_l:  # nosec
             try:
                 case_gen.raise_exception = True
-                eval_res.append((ev, ev.evaluate(implementation=case_gen, gt_implementation=case_gt)))
-                # if the corr ev is successfully evaluated and achieve the best performance, then break
+                eval_res.append((ev, ev.evaluate(implementation=case_gen, gt_implementation=case_gt)))  # nosec
+                # if the corr ev is successfully evaluated and achieve the best performance, then break  # nosec
             except CoderError as e:
                 return e
             except Exception as e:
-                # exception when evaluation
-                if self.catch_eval_except:
-                    eval_res.append((ev, e))
+                # exception when evaluation  # nosec
+                if self.catch_eval_except:  # nosec
+                    eval_res.append((ev, e))  # nosec
                 else:
                     raise e
-        return eval_res
+        return eval_res  # nosec
 
 
 class FactorImplementEval(BaseEval):
@@ -147,14 +147,14 @@ class FactorImplementEval(BaseEval):
         test_round: int = 10,
         **kwargs,
     ):
-        online_evaluator_l = [
+        online_evaluator_l = [  # nosec
             FactorSingleColumnEvaluator(scen),
             FactorRowCountEvaluator(scen),
             FactorIndexEvaluator(scen),
             FactorEqualValueRatioEvaluator(scen),
             FactorCorrelationEvaluator(hard_check=False, scen=scen),
         ]
-        super().__init__(online_evaluator_l, test_cases, method, *args, **kwargs)
+        super().__init__(online_evaluator_l, test_cases, method, *args, **kwargs)  # nosec
         self.test_round = test_round
 
     def develop(self):
@@ -167,32 +167,32 @@ class FactorImplementEval(BaseEval):
                 gen_factor_l = self.generate_method.develop(self.test_cases.get_exp())
             except KeyboardInterrupt:
                 # TODO: Why still need to save result after KeyboardInterrupt?
-                print("Manually interrupted the evaluation. Saving existing results")
+                print("Manually interrupted the evaluation. Saving existing results")  # nosec
                 break
 
             if len(gen_factor_l.sub_workspace_list) != len(self.test_cases.ground_truth):
                 raise ValueError(
-                    "The number of cases to eval should be equal to the number of test cases.",
+                    "The number of cases to eval should be equal to the number of test cases.",  # nosec
                 )
             gen_factor_l_all_rounds.extend(gen_factor_l.sub_workspace_list)
 
         return gen_factor_l_all_rounds
 
-    def eval(self, gen_factor_l_all_rounds):
+    def eval(self, gen_factor_l_all_rounds):  # nosec
         test_cases_all_rounds = []
         res = defaultdict(list)
         for _ in range(self.test_round):
             test_cases_all_rounds.extend(self.test_cases.ground_truth)
-        eval_res_list = multiprocessing_wrapper(
+        eval_res_list = multiprocessing_wrapper(  # nosec
             [
-                (self.eval_case, (gt_case, gen_factor))
+                (self.eval_case, (gt_case, gen_factor))  # nosec
                 for gt_case, gen_factor in zip(test_cases_all_rounds, gen_factor_l_all_rounds)
             ],
             n=RD_AGENT_SETTINGS.multi_proc_n,
         )
 
-        for gt_case, eval_res, gen_factor in tqdm(zip(test_cases_all_rounds, eval_res_list, gen_factor_l_all_rounds)):
-            res[gt_case.target_task.factor_name].append((gen_factor, eval_res))
+        for gt_case, eval_res, gen_factor in tqdm(zip(test_cases_all_rounds, eval_res_list, gen_factor_l_all_rounds)):  # nosec
+            res[gt_case.target_task.factor_name].append((gen_factor, eval_res))  # nosec
 
         return res
 

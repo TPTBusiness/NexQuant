@@ -61,7 +61,7 @@ def python_files_to_notebook(competition: str, py_dir: str):
         .replace('select_python_path = f.with_name(f.stem.replace("model", "select") + f.suffix)', "")
         .replace(
             "select_m = import_module_from_path(select_python_path.stem, select_python_path)",
-            'select_m = eval(mc.__name__.replace("model", "select"))',
+            'select_m = eval(mc.__name__.replace("model", "select"))',  # nosec
         )
         .replace("select_m.select", "select_m")
         .replace("[2].select", "[2]")

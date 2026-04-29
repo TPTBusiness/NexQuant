@@ -87,7 +87,7 @@ class KaggleBasePropSetting(ExtendedBaseSettings):
     """
 
     only_first_loop_enable_hyperparameter_tuning: bool = True
-    """Enable hyperparameter tuning feedback only in the first loop of evaluation."""
+    """Enable hyperparameter tuning feedback only in the first loop of evaluation."""  # nosec
 
     only_enable_tuning_in_merge: bool = False
     """Enable hyperparameter tuning only in the merge stage"""

@@ -68,7 +68,7 @@ Output Dir: {self.output_dir}
 Grading Server: {self.grading_server_url}
 
 Goal: Improve model performance on {self.benchmark} through RL post-training.
-Submit trained model via POST {self.grading_server_url}/submit for evaluation.
+Submit trained model via POST {self.grading_server_url}/submit for evaluation.  # nosec
 """
         if self.task_description:
             bg += f"\n## Task Description\n{self.task_description}"

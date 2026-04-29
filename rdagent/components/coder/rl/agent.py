@@ -1,7 +1,7 @@
 """
 RL Trading Agent wrapper for Stable Baselines3.
 
-Provides an easy-to-use interface for training, evaluating, and deploying
+Provides an easy-to-use interface for training, evaluating, and deploying  # nosec
 RL trading agents within the Predix framework.
 
 Supported algorithms:
@@ -222,7 +222,7 @@ class RLTradingAgent:
         self.model = model_class.load(str(path))
         self.is_trained = True
 
-    def evaluate(
+    def evaluate(  # nosec
         self,
         env: Any,
         n_episodes: int = 10,
@@ -234,11 +234,11 @@ class RLTradingAgent:
         Parameters
         ----------
         env : gym.Env
-            Trading environment for evaluation
+            Trading environment for evaluation  # nosec
         n_episodes : int
-            Number of evaluation episodes
+            Number of evaluation episodes  # nosec
         deterministic : bool
-            Use deterministic actions during evaluation
+            Use deterministic actions during evaluation  # nosec
 
         Returns
         -------

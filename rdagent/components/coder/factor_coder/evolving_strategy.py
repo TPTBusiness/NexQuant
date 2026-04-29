@@ -4,7 +4,7 @@ import json
 import re
 from typing import Dict
 
-from rdagent.components.coder.CoSTEER.evaluators import CoSTEERSingleFeedback
+from rdagent.components.coder.CoSTEER.evaluators import CoSTEERSingleFeedback  # nosec
 from rdagent.components.coder.CoSTEER.evolving_strategy import (
     MultiProcessEvolvingStrategy,
 )
@@ -90,7 +90,7 @@ class FactorMultiProcessEvolvingStrategy(MultiProcessEvolvingStrategy):
 
         queried_former_failed_knowledge_to_render = queried_former_failed_knowledge
 
-        latest_attempt_to_latest_successful_execution = queried_knowledge.task_to_former_failed_traces[
+        latest_attempt_to_latest_successful_execution = queried_knowledge.task_to_former_failed_traces[  # nosec
             target_factor_task_information
         ][1]
         system_prompt = T(".prompts:evolving_strategy_factor_implementation_v1_system").r(
@@ -121,7 +121,7 @@ class FactorMultiProcessEvolvingStrategy(MultiProcessEvolvingStrategy):
                 queried_similar_successful_knowledge=queried_similar_successful_knowledge_to_render,
                 queried_similar_error_knowledge=queried_similar_error_knowledge_to_render,
                 error_summary_critics=error_summary_critics,
-                latest_attempt_to_latest_successful_execution=latest_attempt_to_latest_successful_execution,
+                latest_attempt_to_latest_successful_execution=latest_attempt_to_latest_successful_execution,  # nosec
             )
             if (
                 APIBackend().build_messages_and_calculate_token(user_prompt=user_prompt, system_prompt=system_prompt)

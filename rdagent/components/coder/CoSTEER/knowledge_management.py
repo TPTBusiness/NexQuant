@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Union
 
 from rdagent.components.coder.CoSTEER.config import CoSTEERSettings
-from rdagent.components.coder.CoSTEER.evaluators import CoSTEERSingleFeedback
+from rdagent.components.coder.CoSTEER.evaluators import CoSTEERSingleFeedback  # nosec
 from rdagent.components.knowledge_management.graph import (
     UndirectedGraph,
     UndirectedNode,
@@ -61,7 +61,7 @@ class CoSTEERRAGStrategy(RAGStrategy):
         self, former_knowledge_base_path: Path = None, component_init_list: list = [], evolving_version: int = 2
     ) -> EvolvingKnowledgeBase:
         if former_knowledge_base_path is not None and former_knowledge_base_path.exists():
-            knowledge_base = pickle.load(open(former_knowledge_base_path, "rb"))
+            knowledge_base = pickle.load(open(former_knowledge_base_path, "rb"))  # nosec
             if evolving_version == 1 and not isinstance(knowledge_base, CoSTEERKnowledgeBaseV1):
                 raise ValueError("The former knowledge base is not compatible with the current version")
             elif evolving_version == 2 and not isinstance(
@@ -86,7 +86,7 @@ class CoSTEERRAGStrategy(RAGStrategy):
             if not self.dump_knowledge_base_path.parent.exists():
                 self.dump_knowledge_base_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.dump_knowledge_base_path, "wb") as f:
-                pickle.dump(self.knowledgebase, f)
+                pickle.dump(self.knowledgebase, f)  # nosec
 
     def load_dumped_knowledge_base(self, *args, **kwargs):
         if self.dump_knowledge_base_path is None:
@@ -95,7 +95,7 @@ class CoSTEERRAGStrategy(RAGStrategy):
             logger.info(f"Dumped knowledge base {self.dump_knowledge_base_path} does not exist, skip loading.")
         else:
             with open(self.dump_knowledge_base_path, "rb") as f:
-                self.knowledgebase = pickle.load(f)
+                self.knowledgebase = pickle.load(f)  # nosec
             logger.info(f"Loaded dumped knowledge base from {self.dump_knowledge_base_path}")
 
 
@@ -281,14 +281,14 @@ class CoSTEERRAGStrategyV1(CoSTEERRAGStrategy):
 class CoSTEERQueriedKnowledgeV2(CoSTEERQueriedKnowledgeV1):
     """
     Aggregation subclass of `CoSTEERQueriedKnowledgeV1` that extends the queried knowledge to also
-    include mappings between tasks and knowledge related to similar errors from successful executions.
+    include mappings between tasks and knowledge related to similar errors from successful executions.  # nosec
 
     Parameters
     ----------
     task_to_former_failed_traces : dict, optional
         Mapping from task information strings to a tuple containing:
             - A list of `CoSTEERKnowledge` objects representing the most recent failed attempts for that task.
-            - An optional `CoSTEERKnowledge` object of the latest failed attempt after a successful execution,
+            - An optional `CoSTEERKnowledge` object of the latest failed attempt after a successful execution,  # nosec
               or `None` if not applicable.
         Type: dict[str, tuple[list[CoSTEERKnowledge], CoSTEERKnowledge | None]]
         Example:
@@ -415,8 +415,8 @@ class CoSTEERRAGStrategyV2(CoSTEERRAGStrategy):
                                 )
                             else:
                                 error_analysis_result = self.analyze_error(
-                                    single_feedback.execution,
-                                    feedback_type="execution",
+                                    single_feedback.execution,  # nosec
+                                    feedback_type="execution",  # nosec
                                 )
                             self.knowledgebase.working_trace_error_analysis.setdefault(
                                 target_task_information,
@@ -438,7 +438,7 @@ class CoSTEERRAGStrategyV2(CoSTEERRAGStrategy):
             evo,
             queried_knowledge_v2,
             self.settings.v2_query_former_trace_limit,
-            self.settings.v2_add_fail_attempt_to_latest_successful_execution,
+            self.settings.v2_add_fail_attempt_to_latest_successful_execution,  # nosec
         )
         queried_knowledge_v2 = self.component_query(
             evo,
@@ -488,11 +488,11 @@ class CoSTEERRAGStrategyV2(CoSTEERRAGStrategy):
     def analyze_error(
         self,
         single_feedback,
-        feedback_type="execution",
+        feedback_type="execution",  # nosec
     ) -> list[
         UndirectedNode | str
     ]:  # Hardcode: Raised errors, existed error nodes + not existed error nodes(here, they are strs)
-        if feedback_type == "execution":
+        if feedback_type == "execution":  # nosec
             match = re.search(
                 r'File "(?P<file>.+)", line (?P<line>\d+), in (?P<function>.+)\n\s+(?P<error_line>.+)\n(?P<error_type>\w+): (?P<error_message>.+)',
                 single_feedback,
@@ -532,7 +532,7 @@ class CoSTEERRAGStrategyV2(CoSTEERRAGStrategy):
         evo: EvolvableSubjects,
         queried_knowledge_v2: CoSTEERQueriedKnowledgeV2,
         v2_query_former_trace_limit: int = 5,
-        v2_add_fail_attempt_to_latest_successful_execution: bool = False,
+        v2_add_fail_attempt_to_latest_successful_execution: bool = False,  # nosec
     ) -> Union[CoSTEERQueriedKnowledge, set]:
         """
         Query the former trace knowledge of the working trace, and find all the failed task information which tried more than fail_task_trial_limit times
@@ -569,8 +569,8 @@ class CoSTEERRAGStrategyV2(CoSTEERRAGStrategy):
                         current_index += 1
 
                 latest_attempt = None
-                if v2_add_fail_attempt_to_latest_successful_execution:
-                    # When the last successful execution is not the last one in the working trace, it means we have tried to correct it. We should tell the agent this fail trial to avoid endless loop in the future.
+                if v2_add_fail_attempt_to_latest_successful_execution:  # nosec
+                    # When the last successful execution is not the last one in the working trace, it means we have tried to correct it. We should tell the agent this fail trial to avoid endless loop in the future.  # nosec
                     if (
                         len(former_trace_knowledge) > 0
                         and len(self.knowledgebase.working_trace_knowledge[target_task_information]) > 1

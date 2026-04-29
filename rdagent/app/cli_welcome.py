@@ -67,7 +67,7 @@ def show_welcome():
     cmd_table.add_row("rdagent start_loop", "Start strategy generator loop")
     cmd_table.add_row("rdagent generate_strategies", "Generate strategies from factors")
     cmd_table.add_row("rdagent optimize_portfolio", "Portfolio optimization")
-    cmd_table.add_row("rdagent eval_all", "Evaluate factors with full data")
+    cmd_table.add_row("rdagent eval_all", "Evaluate factors with full data")  # nosec
     cmd_table.add_row("rdagent batch_backtest", "Batch backtest existing factors")
     cmd_table.add_row("rdagent report", "Generate PDF performance reports")
     cmd_table.add_row("rdagent rebacktest", "Re-backtest existing strategies")

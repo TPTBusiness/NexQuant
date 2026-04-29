@@ -31,15 +31,15 @@ class KGExperiment2Feedback(Experiment2Feedback):
         # )
 
         # Add a note about metric direction
-        evaluation_direction = "higher" if self.scen.evaluation_metric_direction else "lower"
-        evaluation_description = f"Direction of improvement (higher/lower is better) should be judged per metric. Here '{evaluation_direction}' is better for the metrics."
-        combined_df["Note"] = evaluation_description
+        evaluation_direction = "higher" if self.scen.evaluation_metric_direction else "lower"  # nosec
+        evaluation_description = f"Direction of improvement (higher/lower is better) should be judged per metric. Here '{evaluation_direction}' is better for the metrics."  # nosec
+        combined_df["Note"] = evaluation_description  # nosec
 
-        return combined_df, evaluation_description
+        return combined_df, evaluation_description  # nosec
 
     def generate_feedback(self, exp: Experiment, trace: Trace) -> HypothesisFeedback:
         """
-        The `ti` should be executed and the results should be included, as well as the comparison between previous results (done by LLM).
+        The `ti` should be executed and the results should be included, as well as the comparison between previous results (done by LLM).  # nosec
         For example: `mlflow` of Qlib will be included.
         """
         """
@@ -55,15 +55,15 @@ class KGExperiment2Feedback(Experiment2Feedback):
         logger.info("Generating feedback...")
         current_result = exp.result
 
-        evaluation_description = None
+        evaluation_description = None  # nosec
         # Check if there are any based experiments
         if exp.based_experiments:
             sota_result = exp.based_experiments[-1].result
             # Process the results to filter important metrics
-            combined_result, evaluation_description = self.process_results(current_result, sota_result)
+            combined_result, evaluation_description = self.process_results(current_result, sota_result)  # nosec
         else:
             # If there are no based experiments, we'll only use the current result
-            combined_result, evaluation_description = self.process_results(
+            combined_result, evaluation_description = self.process_results(  # nosec
                 current_result, current_result
             )  # Compare with itself
             print("Warning: No previous experiments to compare against. Using current result as baseline.")
@@ -123,7 +123,7 @@ class KGExperiment2Feedback(Experiment2Feedback):
             "current_result": current_result,
             "current_sub_results": current_sub_results,
             "combined_result": combined_result,
-            "evaluation_description": evaluation_description,
+            "evaluation_description": evaluation_description,  # nosec
             "last_hypothesis_and_feedback": last_hypothesis_and_feedback,
         }
 
@@ -139,7 +139,7 @@ class KGExperiment2Feedback(Experiment2Feedback):
         response_json = json.loads(response)
 
         observations = response_json.get("Observations", "No observations provided")
-        hypothesis_evaluation = response_json.get("Feedback for Hypothesis", "No feedback provided")
+        hypothesis_evaluation = response_json.get("Feedback for Hypothesis", "No feedback provided")  # nosec
         new_hypothesis = response_json.get("New Hypothesis", "No new hypothesis provided")
         reason = response_json.get("Reasoning", "No reasoning provided")
         decision = convert2bool(response_json.get("Replace Best Result", "no"))
@@ -148,7 +148,7 @@ class KGExperiment2Feedback(Experiment2Feedback):
         # sorted_scores = sorted(leaderboard, reverse=True)
         # import bisect
 
-        # if self.scen.evaluation_metric_direction:
+        # if self.scen.evaluation_metric_direction:  # nosec
         #     insert_position = bisect.bisect_right([-score for score in sorted_scores], -current_score)
         # else:
         #     insert_position = bisect.bisect_left(sorted_scores, current_score, lo=0, hi=len(sorted_scores))
@@ -184,7 +184,7 @@ class KGExperiment2Feedback(Experiment2Feedback):
 
         return HypothesisFeedback(
             observations=observations,
-            hypothesis_evaluation=hypothesis_evaluation,
+            hypothesis_evaluation=hypothesis_evaluation,  # nosec
             new_hypothesis=new_hypothesis,
             reason=reason,
             decision=decision,

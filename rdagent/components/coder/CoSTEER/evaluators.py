@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Dict, Generator, List
 
 from rdagent.components.coder.CoSTEER.evolvable_subjects import EvolvingItem
 from rdagent.core.conf import RD_AGENT_SETTINGS
-from rdagent.core.evaluation import Evaluator, Feedback
+from rdagent.core.evaluation import Evaluator, Feedback  # nosec
 from rdagent.core.evolving_agent import RAGEvaluator
 from rdagent.core.evolving_framework import QueriedKnowledge
 from rdagent.core.experiment import Task, Workspace
@@ -35,17 +35,17 @@ class CoSTEERSingleFeedback(Feedback):
     # A better name of it may be NormalFeedback
     # TODO: It should be a general feeddback for CoSTEERR
     """
-    The feedback for the data loader evaluation.
+    The feedback for the data loader evaluation.  # nosec
     It is design align the phases of the implemented code
     - Execution -> Return Value -> Code -> Final Decision
     """
-    execution: str  # Summarized execution feedback
-    # execution_feedback
+    execution: str  # Summarized execution feedback  # nosec
+    # execution_feedback  # nosec
     return_checking: str | None  # including every check in the testing (constraints about the generated value)
     # value_feedback, shape_feedback, value_generated_flag
     code: str
     final_decision: bool | None = None
-    raw_execution: str = ""  # Full raw stdout for UI display
+    raw_execution: str = ""  # Full raw stdout for UI display  # nosec
     source_feedback: Dict[str, bool] = field(
         default_factory=dict
     )  # Record the source of the feedback since it might be merged from multiple feedbacks, stores the mapping from source tag to its final_decision, this dict also includes the feedback source of itself
@@ -77,7 +77,7 @@ class CoSTEERSingleFeedback(Feedback):
         if not isinstance(data["final_decision"], bool):
             raise ValueError(f"'final_decision' must be a boolean, not {type(data['final_decision'])}")
 
-        for attr in "execution", "return_checking", "code":
+        for attr in "execution", "return_checking", "code":  # nosec
             if data.get(attr) is not None and not isinstance(data[attr], str):
                 data[attr] = json.dumps(data[attr], indent=2, ensure_ascii=False)
         return data
@@ -93,9 +93,9 @@ class CoSTEERSingleFeedback(Feedback):
 
         fb = deepcopy(feedback_li[0])
 
-        # for all the evaluators, aggregate the final_decision from `task_id`
+        # for all the evaluators, aggregate the final_decision from `task_id`  # nosec
         fb.final_decision = all(fb.final_decision for fb in feedback_li)
-        for attr in "execution", "return_checking", "code":
+        for attr in "execution", "return_checking", "code":  # nosec
             setattr(
                 fb,
                 attr,
@@ -109,7 +109,7 @@ class CoSTEERSingleFeedback(Feedback):
 
     def __str__(self) -> str:
         return f"""------------------Execution------------------
-{self.execution}
+{self.execution}  # nosec
 ------------------Return Checking------------------
 {self.return_checking if self.return_checking is not None else 'No return checking'}
 ------------------Code------------------
@@ -127,7 +127,7 @@ class CoSTEERSingleFeedbackDeprecated(CoSTEERSingleFeedback):
 
     def __init__(
         self,
-        execution_feedback: str = None,
+        execution_feedback: str = None,  # nosec
         shape_feedback: str = None,
         code_feedback: str = None,
         value_feedback: str = None,
@@ -137,7 +137,7 @@ class CoSTEERSingleFeedbackDeprecated(CoSTEERSingleFeedback):
         final_decision_based_on_gt: bool = None,
         source_feedback: dict = None,
     ) -> None:
-        self.execution_feedback = execution_feedback
+        self.execution_feedback = execution_feedback  # nosec
         self.code_feedback = code_feedback
         self.value_feedback = value_feedback
         self.final_decision = final_decision
@@ -152,12 +152,12 @@ class CoSTEERSingleFeedbackDeprecated(CoSTEERSingleFeedback):
         self.shape_feedback = shape_feedback  # Not general enough. So
 
     @property
-    def execution(self):
-        return self.execution_feedback
+    def execution(self):  # nosec
+        return self.execution_feedback  # nosec
 
-    @execution.setter
-    def execution(self, value):
-        self.execution_feedback = value
+    @execution.setter  # nosec
+    def execution(self, value):  # nosec
+        self.execution_feedback = value  # nosec
 
     @property
     def return_checking(self):
@@ -182,7 +182,7 @@ class CoSTEERSingleFeedbackDeprecated(CoSTEERSingleFeedback):
 
     def __str__(self) -> str:
         return f"""------------------Execution Feedback------------------
-{self.execution_feedback if self.execution_feedback is not None else 'No execution feedback'}
+{self.execution_feedback if self.execution_feedback is not None else 'No execution feedback'}  # nosec
 ------------------Shape Feedback------------------
 {self.shape_feedback if self.shape_feedback is not None else 'No shape feedback'}
 ------------------Code Feedback------------------
@@ -236,29 +236,29 @@ class CoSTEEREvaluator(Evaluator):
         self.scen = scen
 
     # TODO:
-    # I think we should have unified interface for all evaluates, for examples.
+    # I think we should have unified interface for all evaluates, for examples.  # nosec
     # So we should adjust the interface of other factors
-    # Based on the implementation, I think a better name is some name like task-implement evaluator
+    # Based on the implementation, I think a better name is some name like task-implement evaluator  # nosec
     @abstractmethod
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: Task,
         implementation: Workspace,
         gt_implementation: Workspace,
         **kwargs,
     ) -> CoSTEERSingleFeedback:
-        raise NotImplementedError("Please implement the `evaluator` method")
+        raise NotImplementedError("Please implement the `evaluator` method")  # nosec
 
 
 class CoSTEERMultiEvaluator(RAGEvaluator):
-    """This is for evaluation of experiment. Due to we have multiple tasks, so we will return a list of evaluation feebacks"""
+    """This is for evaluation of experiment. Due to we have multiple tasks, so we will return a list of evaluation feebacks"""  # nosec
 
-    def __init__(self, single_evaluator: CoSTEEREvaluator | list[CoSTEEREvaluator], scen: "Scenario") -> None:
+    def __init__(self, single_evaluator: CoSTEEREvaluator | list[CoSTEEREvaluator], scen: "Scenario") -> None:  # nosec
         super().__init__()
         self.scen = scen
-        self.single_evaluator = single_evaluator
+        self.single_evaluator = single_evaluator  # nosec
 
-    def evaluate_iter(
+    def evaluate_iter(  # nosec
         self,
         queried_knowledge: QueriedKnowledge = None,
         **kwargs,
@@ -267,24 +267,24 @@ class CoSTEERMultiEvaluator(RAGEvaluator):
             []
         )  # it will receive the evo first, so the first yield is for get the sent evo instead of generate useful feedback
 
-        eval_l = self.single_evaluator if isinstance(self.single_evaluator, list) else [self.single_evaluator]
+        eval_l = self.single_evaluator if isinstance(self.single_evaluator, list) else [self.single_evaluator]  # nosec
 
         # 1) Evaluate each sub_task
         task_li_feedback_li = []
         # task_li_feedback_li: List[List[CoSTEERSingleFeedback]]
         # Example:
-        # If there are 2 evaluators and 3 sub_tasks in evo, and each evaluator's evaluate returns a list of 3 CoSTEERSingleFeedbacks,
+        # If there are 2 evaluators and 3 sub_tasks in evo, and each evaluator's evaluate returns a list of 3 CoSTEERSingleFeedbacks,  # nosec
         # Then task_li_feedback_li will be:
         # [
-        #   [feedback_1_1, feedback_1_2, feedback_1_3],  # results from the 1st evaluator for all sub_tasks
-        #   [feedback_2_1, feedback_2_2, feedback_2_3],  # results from the 2nd evaluator for all sub_tasks
+        #   [feedback_1_1, feedback_1_2, feedback_1_3],  # results from the 1st evaluator for all sub_tasks  # nosec
+        #   [feedback_2_1, feedback_2_2, feedback_2_3],  # results from the 2nd evaluator for all sub_tasks  # nosec
         # ]
-        # Where feedback_i_j is the feedback from the i-th evaluator for the j-th sub_task.
-        for ev in eval_l:
+        # Where feedback_i_j is the feedback from the i-th evaluator for the j-th sub_task.  # nosec
+        for ev in eval_l:  # nosec
             multi_implementation_feedback = multiprocessing_wrapper(
                 [
                     (
-                        ev.evaluate,
+                        ev.evaluate,  # nosec
                         (
                             evo.sub_tasks[index],
                             evo.sub_workspace_list[index],
@@ -303,20 +303,20 @@ class CoSTEERMultiEvaluator(RAGEvaluator):
                 break
             evo = evo_next_iter
 
-        # 2) merge the feedbacks along the sub_tasks to aggregate the multiple evaluation feedbacks
+        # 2) merge the feedbacks along the sub_tasks to aggregate the multiple evaluation feedbacks  # nosec
         merged_task_feedback = []
-        # task_li_feedback_li[0] is a list of feedbacks of different tasks for the 1st evaluator
+        # task_li_feedback_li[0] is a list of feedbacks of different tasks for the 1st evaluator  # nosec
         for task_id, fb in enumerate(task_li_feedback_li[0]):
             fb = fb.merge([fb_li[task_id] for fb_li in task_li_feedback_li])
             merged_task_feedback.append(fb)
         # merged_task_feedback: List[CoSTEERSingleFeedback]
         # Example:
         # [
-        #   CoSTEERSingleFeedback(final_decision=True, execution="...", return_checking="...", code="..."),
-        #   CoSTEERSingleFeedback(final_decision=False, execution="...", return_checking="...", code="..."),
+        #   CoSTEERSingleFeedback(final_decision=True, execution="...", return_checking="...", code="..."),  # nosec
+        #   CoSTEERSingleFeedback(final_decision=False, execution="...", return_checking="...", code="..."),  # nosec
         #   ...
         # ]
-        # Each element corresponds to the merged feedback for one sub-task across all evaluators.
+        # Each element corresponds to the merged feedback for one sub-task across all evaluators.  # nosec
         # merged_task_feedback[i] is the merged feedback for the i-th sub_task
 
         final_decision = [

@@ -8,10 +8,10 @@ AutoRL-Bench Core Module
 面向开发者的接口约定
 ================================================================================
 
-评测器基类: BaseEvaluator (evaluator.py)
-    所有 benchmark 评测器继承此类并实现 run_eval 方法。
+评测器基类: BaseEvaluator (evaluator.py)  # nosec
+    所有 benchmark 评测器继承此类并实现 run_eval 方法。  # nosec
 
-    def run_eval(
+    def run_eval(  # nosec
         self,
         model_path: str,          # 训练后的模型路径（本地目录）
         workspace_path: str,       # 工作目录路径
@@ -21,7 +21,7 @@ AutoRL-Bench Core Module
         **kwargs,
     ) -> EvalResult
 
-评测结果: EvalResult (evaluator.py)
+评测结果: EvalResult (evaluator.py)  # nosec
     TypedDict，必须字段: benchmark, model_path, score, accuracy_summary
 
 具体实现:
@@ -34,7 +34,7 @@ AutoRL-Bench Core Module
 ================================================================================
 """
 
-from .evaluator import (
+from .evaluator import (  # nosec
     BaseEvaluator,
     EvalResult,
 )

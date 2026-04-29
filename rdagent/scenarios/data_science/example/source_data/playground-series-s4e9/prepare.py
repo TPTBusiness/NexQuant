@@ -38,5 +38,5 @@ if __name__ == "__main__":
     prepare(
         raw=raw,
         public=raw.parent.parent / competitions,
-        private=raw.parent.parent / "eval" / competitions,
+        private=raw.parent.parent / "eval" / competitions,  # nosec
     )

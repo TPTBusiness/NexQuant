@@ -212,7 +212,7 @@ class KGHypothesisGen(FactorAndModelHypothesisGen):
             else:
                 performance_t_minus_1 = self.scen.initial_performance
 
-            if self.scen.evaluation_metric_direction:
+            if self.scen.evaluation_metric_direction:  # nosec
                 reward = (performance_t - performance_t_minus_1) / max(performance_t_minus_1, 1e-8)
             else:
                 reward = (performance_t_minus_1 - performance_t) / max(performance_t_minus_1, 1e-8)
@@ -225,7 +225,7 @@ class KGHypothesisGen(FactorAndModelHypothesisGen):
             # First iteration, nothing to update
             pass
 
-    def execute_next_action(self, trace: Trace) -> str:
+    def execute_next_action(self, trace: Trace) -> str:  # nosec
         actions = list(self.scen.action_counts.keys())
         t = sum(self.scen.action_counts.values()) + 1
 
@@ -257,7 +257,7 @@ class KGHypothesisGen(FactorAndModelHypothesisGen):
         )
 
         if self.scen.if_action_choosing_based_on_UCB:
-            action = self.execute_next_action(trace)
+            action = self.execute_next_action(trace)  # nosec
 
         hypothesis_specification = f"Hypothesis should avoid being too general and vague, and should be specific and actionable. For example, hypothesis like 'tune a model' is too general, while hypothesis like 'increase the learning rate to 0.1 of the lightgbm model will improve the performance' is specific and actionable."
         if len(trace.hist) > 0:

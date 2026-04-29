@@ -198,7 +198,7 @@ def test_win_rate_uses_per_trade_pnl():
 # Consistency tests — all four call sites produce identical numbers
 # ---------------------------------------------------------------------------
 def test_orchestrator_path_matches_direct_call(random_close):
-    """Orchestrator's evaluate_strategy should produce the same bt numbers."""
+    """Orchestrator's evaluate_strategy should produce the same bt numbers."""  # nosec
     np.random.seed(11)
     idx = random_close.index
     signal = pd.Series(np.random.choice([-1, 0, 1], size=len(idx)), index=idx).astype(float)

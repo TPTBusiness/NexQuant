@@ -8,10 +8,10 @@ def get_data_conf(init_val):
     # TODO: design this step in the workflow
     in_dim = 1000
     in_channels = 128
-    exec_config = {"model_eval_param_init": init_val}
+    exec_config = {"model_eval_param_init": init_val}  # nosec
     node_feature = torch.randn(in_dim, in_channels)
     edge_index = torch.randint(0, in_dim, (2, 2000))
-    return (node_feature, edge_index), exec_config
+    return (node_feature, edge_index), exec_config  # nosec
 
 
 class ModelImpValEval:
@@ -32,22 +32,22 @@ class ModelImpValEval:
     For each hidden output, we can calculate a correlation. The average correlation will be the metrics.
     """
 
-    def evaluate(self, gt: ModelFBWorkspace, gen: ModelFBWorkspace):
+    def evaluate(self, gt: ModelFBWorkspace, gen: ModelFBWorkspace):  # nosec
         round_n = 10
 
-        eval_pairs: list[tuple] = []
+        eval_pairs: list[tuple] = []  # nosec
 
         # run different input value
         for _ in range(round_n):
             # run different model initial parameters.
             for init_val in [-0.2, -0.1, 0.1, 0.2]:
-                _, gt_res = gt.execute(input_value=init_val, param_init_value=init_val)
-                _, res = gen.execute(input_value=init_val, param_init_value=init_val)
-                eval_pairs.append((res, gt_res))
+                _, gt_res = gt.execute(input_value=init_val, param_init_value=init_val)  # nosec
+                _, res = gen.execute(input_value=init_val, param_init_value=init_val)  # nosec
+                eval_pairs.append((res, gt_res))  # nosec
 
         # flat and concat the output
         res_batch, gt_res_batch = [], []
-        for res, gt_res in eval_pairs:
+        for res, gt_res in eval_pairs:  # nosec
             res_batch.append(res.reshape(-1))
             gt_res_batch.append(gt_res.reshape(-1))
         res_batch = torch.stack(res_batch)
@@ -66,6 +66,6 @@ class ModelImpValEval:
         avr_corr = dim_corr.mean()
         # FIXME:
         # It is too high(e.g. 0.944) .
-        # Check if it is not a good evaluation!!
+        # Check if it is not a good evaluation!!  # nosec
         # Maybe all the same initial params will results in extreamly high correlation without regard to the model structure.
         return avr_corr

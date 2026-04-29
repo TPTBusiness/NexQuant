@@ -1,7 +1,7 @@
 """
 File structure
 - ___init__.py: the entrance/agent of coder
-- evaluator.py
+- evaluator.py  # nosec
 - conf.py
 - exp.py: everything under the experiment, e.g.
     - Task
@@ -16,7 +16,7 @@ from pathlib import Path
 from jinja2 import Environment, StrictUndefined, select_autoescape
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEERMultiEvaluator,
     CoSTEERSingleFeedback,
 )
@@ -27,7 +27,7 @@ from rdagent.components.coder.CoSTEER.knowledge_management import (
     CoSTEERQueriedKnowledge,
 )
 from rdagent.components.coder.data_science.conf import DSCoderCoSTEERSettings
-from rdagent.components.coder.data_science.ensemble.eval import EnsembleCoSTEEREvaluator
+from rdagent.components.coder.data_science.ensemble.eval import EnsembleCoSTEEREvaluator  # nosec
 from rdagent.components.coder.data_science.ensemble.exp import EnsembleTask
 from rdagent.components.coder.data_science.share.ds_costeer import DSCoSTEER
 from rdagent.core.exception import CoderError
@@ -89,7 +89,7 @@ class EnsembleMultiProcessEvolvingStrategy(MultiProcessEvolvingStrategy):
         else:
             test_code = (
                 Environment(autoescape=select_autoescape(["html", "xml"]), undefined=StrictUndefined)
-                .from_string((DIRNAME / "eval_tests" / "ensemble_test.txt").read_text())
+                .from_string((DIRNAME / "eval_tests" / "ensemble_test.txt").read_text())  # nosec
                 .render(
                     model_names=[
                         fn[:-3] for fn in workspace.file_dict.keys() if fn.startswith("model_") and "test" not in fn

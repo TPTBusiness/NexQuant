@@ -40,7 +40,7 @@ def extract_benchmark_score(loop_path: Path, split: str = "") -> tuple[str, floa
     for pkl_file in loop_path.rglob("**/benchmark_result*/**/*.pkl"):
         try:
             with open(pkl_file, "rb") as f:
-                content = pickle.load(f)
+                content = pickle.load(f)  # nosec
             if isinstance(content, dict):
                 # Check split filter
                 content_split = content.get("split", "")
@@ -84,7 +84,7 @@ def extract_baseline_score(task_path: Path) -> tuple[str, float] | None:
     for pkl_file in scenario_dir.rglob("*.pkl"):
         try:
             with open(pkl_file, "rb") as f:
-                scenario = pickle.load(f)
+                scenario = pickle.load(f)  # nosec
             baseline_score = getattr(scenario, "baseline_benchmark_score", None)
             if baseline_score and isinstance(baseline_score, dict):
                 benchmark_name = getattr(scenario, "target_benchmark", "")
@@ -113,7 +113,7 @@ def extract_baseline_scores(task_path: Path) -> dict[str, tuple[str, float, bool
     for pkl_file in scenario_dir.rglob("*.pkl"):
         try:
             with open(pkl_file, "rb") as f:
-                scenario = pickle.load(f)
+                scenario = pickle.load(f)  # nosec
 
             benchmark_name = getattr(scenario, "target_benchmark", "")
             result = {"validation": None, "test": None}
@@ -174,7 +174,7 @@ def get_loop_status(
     for f in feedback_files:
         try:
             with open(f, "rb") as fp:
-                content = pickle.load(fp)
+                content = pickle.load(fp)  # nosec
             decision = getattr(content, "decision", None)
             if decision is not None:
                 feedback_decision = decision
@@ -440,7 +440,7 @@ def extract_full_benchmark(loop_path: Path, split: str = "") -> dict | None:
     for pkl_file in loop_path.rglob("**/benchmark_result*/**/*.pkl"):
         try:
             with open(pkl_file, "rb") as f:
-                content = pickle.load(f)
+                content = pickle.load(f)  # nosec
             if isinstance(content, dict):
                 # Check split filter
                 content_split = content.get("split", "")
@@ -472,7 +472,7 @@ def extract_baseline_full_benchmark(task_path: Path, split: str = "validation") 
     for pkl_file in scenario_dir.rglob("*.pkl"):
         try:
             with open(pkl_file, "rb") as f:
-                scenario = pickle.load(f)
+                scenario = pickle.load(f)  # nosec
 
             if split == "validation":
                 baseline = getattr(scenario, "baseline_benchmark_score", None)

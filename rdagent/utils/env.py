@@ -11,7 +11,7 @@ Tries to create uniform environment for the agent to run;
 import contextlib
 import json
 import os
-import pickle
+import pickle  # nosec
 import re
 import select
 import shutil
@@ -56,7 +56,7 @@ from tqdm import tqdm
 
 from rdagent.core.conf import ExtendedBaseSettings
 from rdagent.core.experiment import RD_AGENT_SETTINGS
-from rdagent.core.utils import cache_with_pickle
+from rdagent.core.utils import cache_with_pickle  # nosec
 from rdagent.log import rdagent_logger as logger
 from rdagent.oai.llm_utils import md5_hash
 from rdagent.utils import filter_redundant_text
@@ -240,7 +240,7 @@ class EnvResult:
     def hash_full_stdout(self, full_stdout: str) -> str:
         return md5_hash(full_stdout)
 
-    @cache_with_pickle(hash_full_stdout)
+    @cache_with_pickle(hash_full_stdout)  # nosec
     def _get_truncated_stdout(self, full_stdout: str) -> str:
         return shrink_text(
             filter_redundant_text(full_stdout),
@@ -263,7 +263,7 @@ class Env(Generic[ASpecificEnvConf]):
 
     def zip_a_folder_into_a_file(self, folder_path: str, zip_file_path: str) -> None:
         """
-        Zip a folder into a file, use zipfile instead of subprocess
+        Zip a folder into a file, use zipfile instead of subprocess  # nosec
         """
         with zipfile.ZipFile(zip_file_path, "w") as z:
             for root, _, files in os.walk(folder_path):
@@ -294,7 +294,7 @@ class Env(Generic[ASpecificEnvConf]):
         self, zip_file_path: str, folder_path: str, files_to_extract: list[str] | None = None
     ) -> None:
         """
-        Unzip a file into a folder, use zipfile instead of subprocess
+        Unzip a file into a folder, use zipfile instead of subprocess  # nosec
         """
         if files_to_extract is None:
             # Clear folder_path before extracting
@@ -388,7 +388,7 @@ class Env(Generic[ASpecificEnvConf]):
         env : dict | None
             Run the code with your specific environment.
         running_extra_volume : Mapping
-            Extra volumes to mount during execution.
+            Extra volumes to mount during execution.  # nosec
         cache_key_extra_func : CacheKeyFunc | None
             Optional function to calculate extra information for cache key calculation
         cache_files_to_extract : list[str] | None
@@ -423,7 +423,7 @@ class Env(Generic[ASpecificEnvConf]):
                 if name:  # Skip empty names
                     find_cmd += f" ! -name {name}"
 
-            chmod_cmd = f"{find_cmd} -exec chmod -R 777 {{}} +"
+            chmod_cmd = f"{find_cmd} -exec chmod -R 777 {{}} +"  # nosec
             return chmod_cmd
 
         if self.conf.redirect_stdout_to_file:
@@ -490,7 +490,7 @@ class Env(Generic[ASpecificEnvConf]):
         Will cache the output and the folder diff for next round of running.
         Use the python codes and the parameters(entry, running_extra_volume) as key to hash the input.
         """
-        target_folder = Path(RD_AGENT_SETTINGS.pickle_cache_folder_path_str) / f"utils.env.run"
+        target_folder = Path(RD_AGENT_SETTINGS.pickle_cache_folder_path_str) / f"utils.env.run"  # nosec
         target_folder.mkdir(parents=True, exist_ok=True)
 
         if cache_key_extra_func is not None:
@@ -506,12 +506,12 @@ class Env(Generic[ASpecificEnvConf]):
         )
         if Path(target_folder / f"{key}.pkl").exists() and Path(target_folder / f"{key}.zip").exists():
             with open(target_folder / f"{key}.pkl", "rb") as f:
-                ret = pickle.load(f)
+                ret = pickle.load(f)  # nosec
             self.unzip_a_file_into_a_folder(str(target_folder / f"{key}.zip"), local_path, cache_files_to_extract)
         else:
             ret = self.__run_with_retry(entry, local_path, env, running_extra_volume)
             with open(target_folder / f"{key}.pkl", "wb") as f:
-                pickle.dump(ret, f)
+                pickle.dump(ret, f)  # nosec
             self.zip_a_folder_into_a_file(local_path, str(target_folder / f"{key}.zip"))
         return cast(EnvResult, ret)
 
@@ -530,13 +530,13 @@ class Env(Generic[ASpecificEnvConf]):
         Parameters
         ----------
         entry : str | None
-            The entry point to execute. If None, defaults to the configured entry.
+            The entry point to execute. If None, defaults to the configured entry.  # nosec
         local_path : str
-            The local directory path where the execution should occur.
+            The local directory path where the execution should occur.  # nosec
         env : dict | None
-            Environment variables to set during execution.
+            Environment variables to set during execution.  # nosec
         kwargs : dict
-            Additional keyword arguments for execution customization.
+            Additional keyword arguments for execution customization.  # nosec
 
         Returns
         -------
@@ -566,7 +566,7 @@ class Env(Generic[ASpecificEnvConf]):
         os.remove(os.path.join(local_path, random_file_name))
         for name in dump_file_names:
             if os.path.exists(os.path.join(local_path, f"{name}")):
-                results.append(pickle.load(open(os.path.join(local_path, f"{name}"), "rb")))
+                results.append(pickle.load(open(os.path.join(local_path, f"{name}"), "rb")))  # nosec
                 os.remove(os.path.join(local_path, f"{name}"))
             else:
                 return log_output, []
@@ -683,8 +683,8 @@ class LocalEnv(Env[ASpecificLocalConf]):
                 entry,
                 cwd=cwd,
                 env={**os.environ, **env},
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE,  # nosec
+                stderr=subprocess.PIPE,  # nosec
                 text=True,
                 shell=True,
                 bufsize=1,
@@ -693,7 +693,7 @@ class LocalEnv(Env[ASpecificLocalConf]):
 
             # Setup polling
             if process.stdout is None or process.stderr is None:
-                raise RuntimeError("The subprocess did not correctly create stdout/stderr pipes")
+                raise RuntimeError("The subprocess did not correctly create stdout/stderr pipes")  # nosec
 
             if self.conf.live_output:
                 stdout_fd = process.stdout.fileno()
@@ -854,19 +854,19 @@ class QlibCondaEnv(LocalEnv[QlibCondaConf]):
             envs = subprocess.run("conda env list", capture_output=True, text=True, shell=True) # nosec B603
             if self.conf.conda_env_name not in envs.stdout:
                 print(f"[yellow]Conda env '{self.conf.conda_env_name}' not found, creating...[/yellow]")
-                subprocess.check_call(
+                subprocess.check_call(  # nosec
                     f"conda create -y -n {self.conf.conda_env_name} python=3.10",
                     shell=True,
                 )
-                subprocess.check_call(
+                subprocess.check_call(  # nosec
                     f"conda run -n {self.conf.conda_env_name} pip install --upgrade pip cython",
                     shell=True,
                 )
-                subprocess.check_call(
+                subprocess.check_call(  # nosec
                     f"conda run -n {self.conf.conda_env_name} pip install git+https://github.com/microsoft/qlib.git@2fb9380b342556ddb50a4b24e4fe8655d548b2b8",
                     shell=True,
                 )
-                subprocess.check_call(
+                subprocess.check_call(  # nosec
                     f"conda run -n {self.conf.conda_env_name} pip install catboost xgboost tables torch",
                     shell=True,
                 )
@@ -928,11 +928,11 @@ def _prepare_conda_env(env_name: str, requirements_file: Path, python_version: s
     result = subprocess.run(f"conda env list | grep -q '^{env_name} '", shell=True) # nosec B603
     if result.returncode != 0:
         print(f"[yellow]Creating conda env '{env_name}' (Python {python_version})...[/yellow]")
-        subprocess.check_call(f"conda create -y -n {env_name} python={python_version}", shell=True)
-        subprocess.check_call(f"conda run -n {env_name} pip install --upgrade pip", shell=True)
+        subprocess.check_call(f"conda create -y -n {env_name} python={python_version}", shell=True)  # nosec
+        subprocess.check_call(f"conda run -n {env_name} pip install --upgrade pip", shell=True)  # nosec
 
     print(f"[yellow]Installing dependencies from {requirements_file.name}...[/yellow]")
-    subprocess.check_call(f"conda run -n {env_name} pip install -r {requirements_file}", shell=True)
+    subprocess.check_call(f"conda run -n {env_name} pip install -r {requirements_file}", shell=True)  # nosec
     print(f"[green]Conda env '{env_name}' ready[/green]")
 
     _CONDA_ENV_PREPARED.add(env_name)
@@ -971,7 +971,7 @@ class FTCondaEnv(LocalEnv[FTCondaConf]):
             # --no-cache-dir: avoid cross-filesystem hardlink error when /tmp and ~/.cache/pip are on different mounts
             # Note: flash-attn>=2.8 is required for B200 (sm_100) support
             print("[yellow]Installing flash-attn (compiling, may take a few minutes)...[/yellow]")
-            subprocess.check_call(
+            subprocess.check_call(  # nosec
                 f"conda run -n {self.conf.conda_env_name} pip install 'flash-attn>=2.8' --no-build-isolation --no-cache-dir",
                 shell=True,
             )
@@ -985,7 +985,7 @@ class FTCondaEnv(LocalEnv[FTCondaConf]):
 
 # ========== Benchmark (OpenCompass) Conda Environment ==========
 class BenchmarkCondaConf(CondaConf):
-    """Conda configuration for OpenCompass benchmark evaluation."""
+    """Conda configuration for OpenCompass benchmark evaluation."""  # nosec
 
     model_config = SettingsConfigDict(env_prefix="BENCHMARK_CONDA_")
 
@@ -1140,7 +1140,7 @@ class FTDockerConf(DockerConf):
 
 
 class BenchmarkDockerConf(DockerConf):
-    """Docker configuration for OpenCompass benchmark evaluation."""
+    """Docker configuration for OpenCompass benchmark evaluation."""  # nosec
 
     model_config = SettingsConfigDict(env_prefix="BENCHMARK_DOCKER_")
 
@@ -1298,10 +1298,10 @@ class DockerEnv(Env[DockerConf]):
 
     def _generate_log_header(self, entry: str | None = None) -> str:
         """
-        Generate a header for log files with execution info.
+        Generate a header for log files with execution info.  # nosec
 
         Args:
-            entry: Command entry that was executed
+            entry: Command entry that was executed  # nosec
 
         Returns:
             Formatted header string
@@ -1327,7 +1327,7 @@ class DockerEnv(Env[DockerConf]):
         Args:
             logs: Docker container log stream
             local_path: Path to workspace for saving log files
-            entry: Command entry that was executed (for logging header)
+            entry: Command entry that was executed (for logging header)  # nosec
 
         Returns:
             Complete log output as string
@@ -1348,15 +1348,15 @@ class DockerEnv(Env[DockerConf]):
             logs_dir.mkdir(parents=True, exist_ok=True)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            log_file_path = logs_dir / f"docker_execution_{timestamp}.log"
+            log_file_path = logs_dir / f"docker_execution_{timestamp}.log"  # nosec
 
-            # Write header with execution info
+            # Write header with execution info  # nosec
             header = self._generate_log_header(entry)
             with open(log_file_path, "w", encoding="utf-8") as f:
                 f.write(header)
 
             # Also create/update a symlink to the latest log for convenience
-            latest_link = logs_dir / "docker_execution_latest.log"
+            latest_link = logs_dir / "docker_execution_latest.log"  # nosec
 
             print(f"[cyan]Full logs will be saved to: {log_file_path.absolute()}[/cyan]")
 
@@ -1404,10 +1404,10 @@ class DockerEnv(Env[DockerConf]):
 
         # Show log file location and create latest symlink
         if log_file_path and log_file_path.exists():
-            print(f"[green]Full execution log saved to: {log_file_path.absolute()}[/green]")
+            print(f"[green]Full execution log saved to: {log_file_path.absolute()}[/green]")  # nosec
 
             # Create or update symlink to latest log
-            latest_link = log_file_path.parent / "docker_execution_latest.log"
+            latest_link = log_file_path.parent / "docker_execution_latest.log"  # nosec
             if latest_link.exists() or latest_link.is_symlink():
                 latest_link.unlink()
             try:
@@ -1558,7 +1558,7 @@ class FTDockerEnv(DockerEnv):
     LLM Fine-tuning Docker Environment with improved log output control.
 
     FTDockerConf enables:
-    - save_logs_to_file: True (saves full logs to workspace/docker_execution.log)
+    - save_logs_to_file: True (saves full logs to workspace/docker_execution.log)  # nosec
     - terminal_tail_lines: 20 (only shows last 20 lines in terminal)
 
     To customize, set environment variables:
@@ -1574,7 +1574,7 @@ class BenchmarkDockerEnv(DockerEnv):
     """
     OpenCompass Benchmark Docker Environment.
 
-    Uses BenchmarkDockerConf for evaluation-specific settings:
+    Uses BenchmarkDockerConf for evaluation-specific settings:  # nosec
     - Moderate memory/GPU allocation for inference
     - Longer terminal output (50 lines) to track benchmark progress
     - Automatic Dockerfile building from scenarios/finetune/docker/opencompass

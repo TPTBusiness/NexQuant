@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from rdagent.core.conf import RD_AGENT_SETTINGS
-from rdagent.core.evaluation import Feedback
+from rdagent.core.evaluation import Feedback  # nosec
 
 if TYPE_CHECKING:
     from rdagent.utils.env import EnvResult
@@ -35,7 +35,7 @@ class AbsTask(ABC):
     def __init__(self, name: str, version: int = 1) -> None:
         """
         The version of the task, default is 1
-        Because qlib tasks execution and kaggle tasks execution are different, we need to distinguish them.
+        Because qlib tasks execution and kaggle tasks execution are different, we need to distinguish them.  # nosec
         TODO: We may align them in the future.
         """
         self.version = version
@@ -96,8 +96,8 @@ class Workspace(ABC, Generic[ASpecificTask, ASpecificFeedback]):
         self.running_info: RunningInfo = RunningInfo()
 
     @abstractmethod
-    def execute(self, *args: Any, **kwargs: Any) -> object | None:
-        error_message = "execute method is not implemented."
+    def execute(self, *args: Any, **kwargs: Any) -> object | None:  # nosec
+        error_message = "execute method is not implemented."  # nosec
         raise NotImplementedError(error_message)
 
     @abstractmethod
@@ -144,18 +144,18 @@ class FBWorkspace(Workspace):
     - Data
     - Code Workspace
     - Output
-        - After execution, it will generate the final output as file.
+        - After execution, it will generate the final output as file.  # nosec
 
     A typical way to run the pipeline of FBWorkspace will be:
     (We didn't add it as a method due to that we may pass arguments into
-    `prepare` or `execute` based on our requirements.)
+    `prepare` or `execute` based on our requirements.)  # nosec
 
     .. code-block:: python
 
         def run_pipeline(self, **files: str):
             self.prepare()
             self.inject_files(**files)
-            self.execute()
+            self.execute()  # nosec
 
     """
 
@@ -297,16 +297,16 @@ class FBWorkspace(Workspace):
         shutil.rmtree(self.workspace_path, ignore_errors=True)
         self.file_dict = {}
 
-    def before_execute(self) -> None:
+    def before_execute(self) -> None:  # nosec
         """
-        Before executing the code, we need to prepare the workspace and inject code into the workspace.
+        Before executing the code, we need to prepare the workspace and inject code into the workspace.  # nosec
         """
         self.prepare()
         self.inject_files(**self.file_dict)
 
-    def execute(self, env: Env, entry: str) -> str:
+    def execute(self, env: Env, entry: str) -> str:  # nosec
         """
-        Before each execution, make sure to prepare and inject code.
+        Before each execution, make sure to prepare and inject code.  # nosec
         """
         result = self.run(env, entry)
         return result.stdout  # NOTE: truncating just for aligning with the old code.
@@ -315,7 +315,7 @@ class FBWorkspace(Workspace):
         """
         Execute the code in the environment and return an EnvResult object (stdout, exit_code, running_time).
 
-        Before each execution, make sure to prepare and inject code.
+        Before each execution, make sure to prepare and inject code.  # nosec
         """
         self.prepare()
         self.inject_files(**self.file_dict)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from rdagent.app.finetune.llm.conf import FT_RD_SETTING
 from rdagent.components.coder.finetune.conf import get_ft_env
-from rdagent.core.utils import cache_with_pickle
+from rdagent.core.utils import cache_with_pickle  # nosec
 from rdagent.log import rdagent_logger as logger
 from rdagent.oai.llm_utils import APIBackend
 from rdagent.scenarios.data_science.scen import DataScienceScen
@@ -63,7 +63,7 @@ class LLMFinetuneScen(DataScienceScen):
         # Initialize memory estimator
         self.memory_report = self._generate_memory_report()
 
-        baseline_result = self.run_baseline_model_evaluation(
+        baseline_result = self.run_baseline_model_evaluation(  # nosec
             model_name=self.base_model, benchmark_name=self.target_benchmark
         )
         # Agent only sees validation score
@@ -72,10 +72,10 @@ class LLMFinetuneScen(DataScienceScen):
         self.baseline_benchmark_score_test = baseline_result.get("benchmark_test", {})
 
     def benchmark_hash(self, model_name, benchmark_name) -> str:
-        return f"llm_finetune_baseline_eval_{model_name}_{benchmark_name}"
+        return f"llm_finetune_baseline_eval_{model_name}_{benchmark_name}"  # nosec
 
-    @cache_with_pickle(benchmark_hash)
-    def run_baseline_model_evaluation(self, model_name, benchmark_name) -> dict:
+    @cache_with_pickle(benchmark_hash)  # nosec
+    def run_baseline_model_evaluation(self, model_name, benchmark_name) -> dict:  # nosec
         ws = FTWorkspace()
         shutil.copytree(
             Path(FT_RD_SETTING.file_path) / "models" / model_name,

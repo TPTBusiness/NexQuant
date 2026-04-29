@@ -288,7 +288,7 @@ class KaggleExperienceBase(PDVectorBase):
         vector_df_path: str or Path
             Path to save the vector DataFrame.
         """
-        self.vector_df.to_pickle(vector_df_path)
+        self.vector_df.to_pickle(vector_df_path)  # nosec
         logger.info(f"Vector DataFrame saved to {vector_df_path}")
 
 

@@ -422,7 +422,7 @@ class TestProtectionManager:
         assert len(manager.protections) == 0
 
     def test_get_active_blocks(self):
-        """Test active blocks retrieval."""
+        """Test active blocks retrieval."""  # nosec
         manager = ProtectionManager()
         manager.create_default_protections()
 

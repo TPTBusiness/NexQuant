@@ -32,7 +32,7 @@ class DatasetConfig:
     post_download_fn: Optional[Callable[[str], None]] = field(default=None)
 
 
-def _remove_eval_splits(out_dir: str) -> None:
+def _remove_eval_splits(out_dir: str) -> None:  # nosec
     """Remove validation and test split files to prevent data leakage."""
     for pattern in ["*validation*", "*test*"]:
         for f in Path(out_dir).rglob(pattern):
@@ -50,7 +50,7 @@ DATASETS: dict[str, DatasetConfig] = {
     ),
     "panorama": DatasetConfig(
         repo_id="LG-AI-Research/PANORAMA",
-        post_download_fn=_remove_eval_splits,
+        post_download_fn=_remove_eval_splits,  # nosec
     ),
     "deepscaler": DatasetConfig(
         repo_id="agentica-org/DeepScaleR-Preview-Dataset",

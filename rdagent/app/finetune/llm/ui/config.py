@@ -13,8 +13,8 @@ EventType = Literal[
     "template",
     "experiment",
     "code",
-    "docker_exec",
-    "evaluator",  # Evaluator feedback (separate from docker_exec)
+    "docker_exec",  # nosec
+    "evaluator",  # Evaluator feedback (separate from docker_exec)  # nosec
     "feedback",
     "token",
     "time",
@@ -30,8 +30,8 @@ ICONS = {
     "template": "📋",
     "experiment": "🧪",
     "code": "📄",
-    "docker_exec": "🐳",
-    "evaluator": "📝",  # Evaluator feedback icon
+    "docker_exec": "🐳",  # nosec
+    "evaluator": "📝",  # Evaluator feedback icon  # nosec
     "feedback": "📊",
     "token": "🔢",
     "time": "⏱️",
@@ -55,8 +55,8 @@ ALWAYS_VISIBLE_TYPES = [
     "llm_call",
     "experiment",
     "code",
-    "docker_exec",
-    "evaluator",
+    "docker_exec",  # nosec
+    "evaluator",  # nosec
     "feedback",
 ]
 

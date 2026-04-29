@@ -13,7 +13,7 @@ Tests cover:
 - Optimization run (mocked, small trial count)
 - Result saving and loading
 - Best parameter extraction
-- Top trial retrieval
+- Top trial retrieval  # nosec
 - Edge cases and error handling
 - Strategy metadata updates
 """

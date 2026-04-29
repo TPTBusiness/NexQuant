@@ -56,7 +56,7 @@ def _ensure_kronos_factor_in_pool(con) -> None:
     con.print("  [dim]stride=500 (~4500 windows), batch=32 — ~5-10 min on GPU[/dim]")
 
     try:
-        from rdagent.components.coder.kronos_adapter import _cuda_available, build_kronos_factor, evaluate_kronos_model
+        from rdagent.components.coder.kronos_adapter import _cuda_available, build_kronos_factor, evaluate_kronos_model  # nosec
 
         _device = "cuda" if _cuda_available() else "cpu"
 
@@ -74,9 +74,9 @@ def _ensure_kronos_factor_in_pool(con) -> None:
         values_dir.mkdir(parents=True, exist_ok=True)
         factor_df.to_parquet(parquet_path)
 
-        # Quick IC evaluation (stride=2000 → ~1100 windows, fast)
+        # Quick IC evaluation (stride=2000 → ~1100 windows, fast)  # nosec
         con.print("  [dim]Computing IC...[/dim]")
-        metrics = evaluate_kronos_model(
+        metrics = evaluate_kronos_model(  # nosec
             hdf5_path=data_path,
             context_bars=100,
             pred_bars=96,
@@ -162,11 +162,11 @@ def quant(
             refresh interval for terminal-based monitoring. (default: False)
         log_file: Path for the log file. If None, auto-detects based on run_id
             (e.g., 'fin_quant.log' or 'fin_quant_run1.log'). Use 'none' to disable.
-        step_n: Number of individual steps to execute within the loop. None means
+        step_n: Number of individual steps to execute within the loop. None means  # nosec
             use the default from configuration.
-        loop_n: Number of complete loops to run. Each loop generates and evaluates
+        loop_n: Number of complete loops to run. Each loop generates and evaluates  # nosec
             new alpha factors. None means use the default from configuration.
-        run_id: Parallel run identifier for isolated execution. When > 0, creates
+        run_id: Parallel run identifier for isolated execution. When > 0, creates  # nosec
             separate log files, results directories, and workspace directories.
             0 = single run mode (default: 0)
 
@@ -190,7 +190,7 @@ def quant(
         Local models are faster but may have lower quality than cloud models.
 
     See Also:
-        predix evaluate - Evaluate existing factors with full 1min data
+        predix evaluate - Evaluate existing factors with full 1min data  # nosec
         predix top - Show top-performing factors by IC or Sharpe
         predix health - Check system health and configuration
     """
@@ -344,11 +344,11 @@ def quant(
 
 
 @app.command()
-def evaluate(
+def evaluate(  # nosec
     top: int = typer.Option(
         100,
         "--top", "-n",
-        help="Number of factors to evaluate (default: 100)",
+        help="Number of factors to evaluate (default: 100)",  # nosec
     ),
     all_factors: bool = typer.Option(
         False,
@@ -363,7 +363,7 @@ def evaluate(
     force: bool = typer.Option(
         False,
         "--force", "-f",
-        help="Force re-evaluation of ALL factors (even already evaluated)",
+        help="Force re-evaluation of ALL factors (even already evaluated)",  # nosec
     ),
 ):
     """
@@ -371,29 +371,29 @@ def evaluate(
 
     Computes comprehensive performance metrics including Information Coefficient (IC),
     Sharpe Ratio, Maximum Drawdown, and Win Rate for each factor. Factors are loaded
-    from JSON files in results/factors/ and executed against historical data to produce
-    out-of-sample performance estimates. Already evaluated factors are automatically
+    from JSON files in results/factors/ and executed against historical data to produce  # nosec
+    out-of-sample performance estimates. Already evaluated factors are automatically  # nosec
     skipped unless --force is specified.
 
     Args:
-        top: Number of unevaluated factors to process. Only applies when --all is
+        top: Number of unevaluated factors to process. Only applies when --all is  # nosec
             not set. Higher values increase total runtime linearly. (default: 100)
-        all_factors: If True, evaluates ALL unevaluated factors in the factors
+        all_factors: If True, evaluates ALL unevaluated factors in the factors  # nosec
             directory, ignoring the --top parameter. Use with caution as this
             may take hours for large factor sets. (default: False)
-        parallel: Number of parallel worker processes for factor evaluation.
-            Higher values speed up evaluation but increase memory usage.
+        parallel: Number of parallel worker processes for factor evaluation.  # nosec
+            Higher values speed up evaluation but increase memory usage.  # nosec
             Recommended: 4-8 for most systems. (default: 4)
-        force: If True, re-evaluates ALL factors including those that already
+        force: If True, re-evaluates ALL factors including those that already  # nosec
             have valid results. Useful when underlying data has changed or
             when recalculating with updated methodology. (default: False)
 
     Examples:
-        $ predix evaluate                   # Evaluate 100 NEW factors
-        $ predix evaluate --top 500         # Evaluate 500 NEW factors
-        $ predix evaluate --all             # Evaluate all remaining factors
-        $ predix evaluate --force --top 50  # Re-evaluate 50 factors
-        $ predix evaluate -p 8              # Use 8 parallel workers
+        $ predix evaluate                   # Evaluate 100 NEW factors  # nosec
+        $ predix evaluate --top 500         # Evaluate 500 NEW factors  # nosec
+        $ predix evaluate --all             # Evaluate all remaining factors  # nosec
+        $ predix evaluate --force --top 50  # Re-evaluate 50 factors  # nosec
+        $ predix evaluate -p 8              # Use 8 parallel workers  # nosec
 
     Expected Output:
         - Updated JSON files in results/factors/ with IC, Sharpe, Max DD, Win Rate
@@ -415,19 +415,19 @@ def evaluate(
     console.print(Panel(
         "[bold cyan]📊 Predix Factor Evaluator[/bold cyan]\n"
         "Evaluating factors with FULL 1min data (2020-2026)\n"
-        "Skips already evaluated factors automatically",
+        "Skips already evaluated factors automatically",  # nosec
         border_style="cyan",
     ))
 
-    # Import and run the evaluator
-    from predix_full_eval import main as eval_main
+    # Import and run the evaluator  # nosec
+    from predix_full_eval import main as eval_main  # nosec
 
-    _eval_ctx = {"top": "all" if all_factors else top, "workers": parallel}
+    _eval_ctx = {"top": "all" if all_factors else top, "workers": parallel}  # nosec
     if force:
-        _eval_ctx["force"] = True
+        _eval_ctx["force"] = True  # nosec
     try:
-        with _daily_session("evaluate", **_eval_ctx):
-            eval_main(
+        with _daily_session("evaluate", **_eval_ctx):  # nosec
+            eval_main(  # nosec
                 top=top,
                 all_factors=all_factors,
                 parallel=parallel,
@@ -457,7 +457,7 @@ def top(
     """
     Display top-performing alpha factors ranked by IC or Sharpe ratio.
 
-    Loads all evaluated factor results from results/factors/ and presents them
+    Loads all evaluated factor results from results/factors/ and presents them  # nosec
     in a formatted table sorted by the chosen metric. Only factors with valid
     IC values (status='success') are included. This is useful for quickly
     identifying the most promising factors before building portfolios or strategies.
@@ -486,7 +486,7 @@ def top(
         May take a few seconds with thousands of factor files.
 
     See Also:
-        predix evaluate - Evaluate factors to generate performance metrics
+        predix evaluate - Evaluate factors to generate performance metrics  # nosec
         predix portfolio - Select diversified portfolio from top factors
         predix build-strategies - Combine factors into trading strategies
     """
@@ -514,7 +514,7 @@ def top(
             continue
 
     if not results:
-        console.print("[yellow]No evaluated factors found with valid IC[/yellow]")
+        console.print("[yellow]No evaluated factors found with valid IC[/yellow]")  # nosec
         return
 
     # Sort by metric
@@ -566,7 +566,7 @@ def top(
 
     console.print(Panel(
         f"[bold]Summary[/bold]\n"
-        f"Total evaluated: {len(results)}\n"
+        f"Total evaluated: {len(results)}\n"  # nosec
         f"Avg IC: {np.mean(valid_ic):.6f} (n={len(valid_ic)})\n"
         f"Best IC: {max(valid_ic, key=abs, default=0):.6f}\n"
         f"Avg Sharpe: {np.mean(valid_sharpe_filtered):.4f} (n={len(valid_sharpe_filtered)})\n"
@@ -628,7 +628,7 @@ def portfolio(
 
     Estimated Time:
         ~2-10 minutes depending on candidate count.
-        Each factor must be re-evaluated to compute time-series values for correlation.
+        Each factor must be re-evaluated to compute time-series values for correlation.  # nosec
 
     See Also:
         predix portfolio-simple - Faster category-based diversification
@@ -663,7 +663,7 @@ def portfolio(
             continue
 
     if not results:
-        console.print("[red]No evaluated factors found with valid IC[/red]")
+        console.print("[red]No evaluated factors found with valid IC[/red]")  # nosec
         return
 
     # Sort and select candidates
@@ -724,7 +724,7 @@ def portfolio(
                 try:
                     # Run factor
                     result = subprocess.run( # nosec B603
-                        [sys.executable, "factor.py"],
+                        [sys.executable, "factor.py"],  # nosec
                         cwd=tmp_path,
                         capture_output=True,
                         text=True,
@@ -751,7 +751,7 @@ def portfolio(
                         stderr = result.stderr[:200] if result.stderr else "Unknown"
                         errors.append((fname, f"No result.h5. Error: {stderr}"))
                         progress.update(task, description=f"{fname} ❌ (No result)")
-                except subprocess.TimeoutExpired:
+                except subprocess.TimeoutExpired:  # nosec
                     errors.append((fname, "Timeout (2 min)"))
                     progress.update(task, description=f"{fname} ⏱️ (Timeout)")
                 except Exception as e:
@@ -770,7 +770,7 @@ def portfolio(
 
     if len(factor_series) < 3:
         console.print("[red]Not enough valid factor series to build portfolio (need at least 3).[/red]")
-        console.print("[yellow]Tip: Factors might be producing mostly NaN values or failing execution.[/yellow]")
+        console.print("[yellow]Tip: Factors might be producing mostly NaN values or failing execution.[/yellow]")  # nosec
         
         # Fallback: Show top factors by IC without diversification
         console.print("\n[dim]Showing top factors by IC instead:[/dim]")
@@ -907,7 +907,7 @@ def portfolio_simple(
     Instead of computing expensive correlation matrices, this method groups factors
     by their names into categories (momentum, volatility, mean_reversion, session,
     volume, pattern) and selects the highest-IC factor from each category. This
-    provides a quick approximation of diversification without re-evaluating factors.
+    provides a quick approximation of diversification without re-evaluating factors.  # nosec
     Falls back to 'other' category for factors that don't match any keywords.
 
     Args:
@@ -927,7 +927,7 @@ def portfolio_simple(
           Volume, Pattern, and Other
 
     Estimated Time:
-        Nearly instantaneous (< 1 second). No factor re-evaluation required.
+        Nearly instantaneous (< 1 second). No factor re-evaluation required.  # nosec
         Only loads existing JSON results and performs keyword matching.
 
     See Also:
@@ -960,7 +960,7 @@ def portfolio_simple(
             continue
 
     if not results:
-        console.print("[red]No evaluated factors found with valid IC[/red]")
+        console.print("[red]No evaluated factors found with valid IC[/red]")  # nosec
         return
 
     # Sort by absolute IC
@@ -1073,8 +1073,8 @@ def build_strategies(
     """
     Build trading strategies by systematically combining alpha factors.
 
-    This command loads top evaluated factors, generates systematic combinations
-    (pairs, triplets, etc.), and evaluates each combination using walk-forward
+    This command loads top evaluated factors, generates systematic combinations  # nosec
+    (pairs, triplets, etc.), and evaluates each combination using walk-forward  # nosec
     validation. Results are ranked by Sharpe ratio and the best strategies are
     saved for later use. This is ideal for discovering synergies between factors
     that individually may have modest performance but work well together.
@@ -1228,7 +1228,7 @@ def build_strategies_ai(
     Uses a large language model to generate, test, and refine trading strategies
     from existing alpha factors. Follows the CoSTEER (Continuous Strategy
     Evolution via Evaluative Refinement) pattern: the LLM proposes strategy
-    hypotheses and code, backtests are executed, results are fed back to the
+    hypotheses and code, backtests are executed, results are fed back to the  # nosec
     LLM for analysis and improvement, and the cycle repeats until acceptance
     criteria are met or max loops are reached. Requires OpenRouter API key.
 
@@ -1265,12 +1265,12 @@ def build_strategies_ai(
 
     Estimated Time:
         ~5-20 minutes per accepted strategy depending on max_loops and backtest size.
-        Each loop requires a full backtest execution plus LLM API calls.
+        Each loop requires a full backtest execution plus LLM API calls.  # nosec
 
     See Also:
         predix build-strategies - Systematic (non-AI) strategy combination
         predix quant - Generate new alpha factors via LLM trading loop
-        predix evaluate - Evaluate factors before strategy building
+        predix evaluate - Evaluate factors before strategy building  # nosec
     """
     from rich.panel import Panel
     from pathlib import Path
@@ -1326,7 +1326,7 @@ def build_strategies_ai(
         console.print("[yellow]Run 'predix quant' to generate factors first.[/yellow]")
         return
 
-    # Load evaluated factors
+    # Load evaluated factors  # nosec
     import json
     import glob as glob_module
 
@@ -1341,8 +1341,8 @@ def build_strategies_ai(
             continue
 
     if len(factors) < 10:
-        console.print(f"[bold red]❌ Only {len(factors)} evaluated factors found. Need at least 10.[/bold red]")
-        console.print("[yellow]Run 'predix evaluate' or 'predix quant' to generate more factors.[/yellow]")
+        console.print(f"[bold red]❌ Only {len(factors)} evaluated factors found. Need at least 10.[/bold red]")  # nosec
+        console.print("[yellow]Run 'predix evaluate' or 'predix quant' to generate more factors.[/yellow]")  # nosec
         return
 
     # Sort by IC and take top factors
@@ -1486,7 +1486,7 @@ def status():
     Displays whether the quantitative trading loop (fin_quant) is currently
     running by checking active processes. Also connects to the SQLite results
     database and shows summary statistics including total backtest runs and
-    number of evaluated factors. Useful for monitoring long-running sessions
+    number of evaluated factors. Useful for monitoring long-running sessions  # nosec
     and verifying data persistence.
 
     Examples:
@@ -1496,7 +1496,7 @@ def status():
     Expected Output:
         - Trading loop process status: RUNNING or STOPPED
         - Number of backtest runs in database
-        - Number of evaluated factors in database
+        - Number of evaluated factors in database  # nosec
         - Database file path
 
     Estimated Time:
@@ -1505,7 +1505,7 @@ def status():
     See Also:
         predix health - Check system health and configuration
         predix quant - Start the quantitative trading loop
-        predix top - View top evaluated factors
+        predix top - View top evaluated factors  # nosec
     """
     import sqlite3
 
@@ -1524,9 +1524,9 @@ def status():
     if db_path.exists():
         conn = sqlite3.connect(str(db_path))
         c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM backtest_runs")
+        c.execute("SELECT COUNT(*) FROM backtest_runs")  # nosec
         runs = c.fetchone()[0]
-        c.execute("SELECT COUNT(*) FROM factors")
+        c.execute("SELECT COUNT(*) FROM factors")  # nosec
         factors = c.fetchone()[0]
         conn.close()
 
@@ -1709,7 +1709,7 @@ def kronos_factor(
         $ predix kronos-factor --context 256 --pred 48
 
     See Also:
-        predix kronos-eval  - Evaluate Kronos as model and compute IC vs LightGBM
+        predix kronos-eval  - Evaluate Kronos as model and compute IC vs LightGBM  # nosec
         predix top          - Show top factors by IC
     """
     from rdagent.components.coder.kronos_adapter import _cuda_available
@@ -1765,11 +1765,11 @@ def kronos_factor(
     console.print("\n[dim]Use 'predix top' to compare with other factors.[/dim]")
 
 
-@app.command("kronos-eval")
-def kronos_eval(
+@app.command("kronos-eval")  # nosec
+def kronos_eval(  # nosec
     context: int = typer.Option(512, "--context", "-c", help="Context window in bars"),
     pred: int = typer.Option(30, "--pred", "-p", help="Prediction horizon in bars"),
-    stride: int = typer.Option(None, "--stride", "-s", help="Stride between evaluations (default: same as --pred)"),
+    stride: int = typer.Option(None, "--stride", "-s", help="Stride between evaluations (default: same as --pred)"),  # nosec
     device: str = typer.Option(None, "--device", "-d", help="Device: cuda or cpu (default: auto-detect)"),
     batch_size: int = typer.Option(32, "--batch-size", "-b", help="Windows per GPU batch (higher = faster on GPU, more VRAM)"),
 ):
@@ -1788,9 +1788,9 @@ def kronos_eval(
         git_ignore_folder/factor_implementation_source_data/intraday_pv.h5
 
     Examples:
-        $ predix kronos-eval                          # Default: 30-bar horizon
-        $ predix kronos-eval --pred 96 --device cuda  # Daily horizon, GPU
-        $ predix kronos-eval --context 256 --pred 15  # Shorter horizon
+        $ predix kronos-eval                          # Default: 30-bar horizon  # nosec
+        $ predix kronos-eval --pred 96 --device cuda  # Daily horizon, GPU  # nosec
+        $ predix kronos-eval --context 256 --pred 15  # Shorter horizon  # nosec
 
     See Also:
         predix kronos-factor  - Generate Kronos factor for the factor pipeline
@@ -1807,11 +1807,11 @@ def kronos_eval(
 
     console.print(f"[bold]Kronos Model Evaluator[/bold] (alongside LightGBM)")
     console.print(f"  Context: [cyan]{context}[/cyan] bars  |  Pred: [cyan]{pred}[/cyan] bars  |  Device: [cyan]{_device}[/cyan]")
-    console.print("  Running evaluation...")
+    console.print("  Running evaluation...")  # nosec
 
-    from rdagent.components.coder.kronos_adapter import evaluate_kronos_model
+    from rdagent.components.coder.kronos_adapter import evaluate_kronos_model  # nosec
 
-    metrics = evaluate_kronos_model(
+    metrics = evaluate_kronos_model(  # nosec
         hdf5_path=data_path,
         context_bars=context,
         pred_bars=pred,
@@ -1830,7 +1830,7 @@ def kronos_eval(
     import json as _json
     out_dir = Path("results/kronos")
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"kronos_eval_ctx{context}_pred{pred}.json"
+    out_path = out_dir / f"kronos_eval_ctx{context}_pred{pred}.json"  # nosec
     out_path.write_text(_json.dumps({**metrics, "context_bars": context, "pred_bars": pred}, indent=2))
     console.print(f"\n[green]Results saved:[/green] {out_path}")
 

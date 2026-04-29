@@ -89,23 +89,23 @@ class DSExperiment2Feedback(Experiment2Feedback):
             )
         )
 
-        if evaluation_not_aligned := dict_get_with_warning(resp_dict, "Evaluation Aligned With Task", "no") == "no":
+        if evaluation_not_aligned := dict_get_with_warning(resp_dict, "Evaluation Aligned With Task", "no") == "no":  # nosec
             exp.result = None
 
-        # Currently, we do not use `observations`, `hypothesis_evaluation`, and `new_hypothesis` in the framework.
+        # Currently, we do not use `observations`, `hypothesis_evaluation`, and `new_hypothesis` in the framework.  # nosec
         # `new_hypothesis` should not exist in the feedback.
         hypothesis_feedback = HypothesisFeedback(
             observations=dict_get_with_warning(resp_dict, "Observations", "No observations provided"),
-            hypothesis_evaluation=dict_get_with_warning(resp_dict, "Feedback for Hypothesis", "No feedback provided"),
+            hypothesis_evaluation=dict_get_with_warning(resp_dict, "Feedback for Hypothesis", "No feedback provided"),  # nosec
             new_hypothesis=dict_get_with_warning(resp_dict, "New Hypothesis", "No new hypothesis provided"),
             reason=dict_get_with_warning(resp_dict, "Reasoning", "No reasoning provided")
-            + ("\nRejected because evaluation code not aligned with task." if evaluation_not_aligned else ""),
+            + ("\nRejected because evaluation code not aligned with task." if evaluation_not_aligned else ""),  # nosec
             code_change_summary=dict_get_with_warning(
                 resp_dict, "Code Change Summary", "No code change summary provided"
             ),
             decision=(
                 False
-                if evaluation_not_aligned
+                if evaluation_not_aligned  # nosec
                 else convert2bool(dict_get_with_warning(resp_dict, "Replace Best Result", "no"))
             ),
             eda_improvement=dict_get_with_warning(resp_dict, "EDA Improvement", "no"),  # EDA improvement suggestion

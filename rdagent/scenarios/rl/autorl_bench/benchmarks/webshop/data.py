@@ -45,7 +45,7 @@ def _ensure_repo_in_path():
     if repo_str not in sys.path:
         sys.path.insert(0, repo_str)
 
-    # Write a .pth file so subprocesses inherit the path without extra setup.
+    # Write a .pth file so subprocesses inherit the path without extra setup.  # nosec
     pth_content = repo_str + "\n"
     for sp in site.getsitepackages():
         pth_file = Path(sp) / "webshop.pth"
@@ -83,7 +83,7 @@ def _download_webshop_data():
             try:
                 subprocess.run(["gdown", file_id, "-O", str(filepath)], check=True, timeout=120) # nosec B603
                 logger.info(f"Downloaded {filename}")
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:  # nosec
                 logger.warning(f"Failed to download {filename}: {e}")
 
     # 构建搜索引擎索引
@@ -120,7 +120,7 @@ def _build_search_index():
 
         marker.touch()
         logger.info("Search index built successfully")
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:  # nosec
         raise RuntimeError(f"Failed to build search index: {e}") from e
 
 

@@ -1,7 +1,7 @@
 from rdagent.components.coder.CoSTEER import CoSTEER
 from rdagent.components.coder.CoSTEER.config import CoSTEER_SETTINGS
-from rdagent.components.coder.CoSTEER.evaluators import CoSTEERMultiEvaluator
-from rdagent.components.coder.model_coder.evaluators import ModelCoSTEEREvaluator
+from rdagent.components.coder.CoSTEER.evaluators import CoSTEERMultiEvaluator  # nosec
+from rdagent.components.coder.model_coder.evaluators import ModelCoSTEEREvaluator  # nosec
 from rdagent.components.coder.model_coder.evolving_strategy import (
     ModelMultiProcessEvolvingStrategy,
 )

@@ -104,14 +104,14 @@ class QlibFactorExperiment2Feedback(Experiment2Feedback):
 
         # Extract fields from JSON response
         observations = response_json.get("Observations", "No observations provided")
-        hypothesis_evaluation = response_json.get("Feedback for Hypothesis", "No feedback provided")
+        hypothesis_evaluation = response_json.get("Feedback for Hypothesis", "No feedback provided")  # nosec
         new_hypothesis = response_json.get("New Hypothesis", "No new hypothesis provided")
         reason = response_json.get("Reasoning", "No reasoning provided")
         decision = convert2bool(response_json.get("Replace Best Result", "no"))
 
         return HypothesisFeedback(
             observations=observations,
-            hypothesis_evaluation=hypothesis_evaluation,
+            hypothesis_evaluation=hypothesis_evaluation,  # nosec
             new_hypothesis=new_hypothesis,
             reason=reason,
             decision=decision,
@@ -153,7 +153,7 @@ class QlibModelExperiment2Feedback(Experiment2Feedback):
             sota_result=SOTA_experiment.result.loc[IMPORTANT_METRICS] if SOTA_hypothesis else None,
             hypothesis=hypothesis,
             exp=exp,
-            exp_result=exp.result.loc[IMPORTANT_METRICS] if exp.result is not None else "execution failed",
+            exp_result=exp.result.loc[IMPORTANT_METRICS] if exp.result is not None else "execution failed",  # nosec
         )
 
         # Call the APIBackend to generate the response for hypothesis feedback
@@ -179,7 +179,7 @@ class QlibModelExperiment2Feedback(Experiment2Feedback):
         response_json_hypothesis = json.loads(response_hypothesis)
         return HypothesisFeedback(
             observations=response_json_hypothesis.get("Observations", "No observations provided"),
-            hypothesis_evaluation=response_json_hypothesis.get("Feedback for Hypothesis", "No feedback provided"),
+            hypothesis_evaluation=response_json_hypothesis.get("Feedback for Hypothesis", "No feedback provided"),  # nosec
             new_hypothesis=response_json_hypothesis.get("New Hypothesis", "No new hypothesis provided"),
             reason=response_json_hypothesis.get("Reasoning", "No reasoning provided"),
             decision=convert2bool(response_json_hypothesis.get("Decision", "false")),

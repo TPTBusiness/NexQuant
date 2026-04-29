@@ -1,4 +1,4 @@
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEEREvaluator,
     CoSTEERMultiFeedback,
     CoSTEERSingleFeedbackDeprecated,
@@ -6,8 +6,8 @@ from rdagent.components.coder.CoSTEER.evaluators import (
 from rdagent.components.coder.model_coder.eva_utils import (
     ModelCodeEvaluator,
     ModelFinalEvaluator,
-    shape_evaluator,
-    value_evaluator,
+    shape_evaluator,  # nosec
+    value_evaluator,  # nosec
 )
 from rdagent.components.coder.model_coder.model import ModelFBWorkspace, ModelTask
 from rdagent.core.evolving_framework import QueriedKnowledge
@@ -18,7 +18,7 @@ ModelMultiFeedback = CoSTEERMultiFeedback
 
 
 class ModelCoSTEEREvaluator(CoSTEEREvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: Task,
         implementation: Workspace,
@@ -34,7 +34,7 @@ class ModelCoSTEEREvaluator(CoSTEEREvaluator):
             return queried_knowledge.success_task_to_knowledge_dict[target_task_information].feedback
         elif queried_knowledge is not None and target_task_information in queried_knowledge.failed_task_info_set:
             return ModelSingleFeedback(
-                execution_feedback="This task has failed too many times, skip implementation.",
+                execution_feedback="This task has failed too many times, skip implementation.",  # nosec
                 shape_feedback="This task has failed too many times, skip implementation.",
                 value_feedback="This task has failed too many times, skip implementation.",
                 code_feedback="This task has failed too many times, skip implementation.",
@@ -51,7 +51,7 @@ class ModelCoSTEEREvaluator(CoSTEEREvaluator):
         param_init_value = 0.6
 
         assert isinstance(implementation, ModelFBWorkspace)
-        model_execution_feedback, gen_np_array = implementation.execute(
+        model_execution_feedback, gen_np_array = implementation.execute(  # nosec
             batch_size=batch_size,
             num_features=num_features,
             num_timesteps=num_timesteps,
@@ -60,7 +60,7 @@ class ModelCoSTEEREvaluator(CoSTEEREvaluator):
         )
         if gt_implementation is not None:
             assert isinstance(gt_implementation, ModelFBWorkspace)
-            _, gt_np_array = gt_implementation.execute(
+            _, gt_np_array = gt_implementation.execute(  # nosec
                 batch_size=batch_size,
                 num_features=num_features,
                 num_timesteps=num_timesteps,
@@ -70,30 +70,30 @@ class ModelCoSTEEREvaluator(CoSTEEREvaluator):
         else:
             gt_np_array = None
 
-        shape_feedback, shape_decision = shape_evaluator(
+        shape_feedback, shape_decision = shape_evaluator(  # nosec
             gen_np_array,
             (batch_size, self.scen.model_output_channel if hasattr(self.scen, "model_output_channel") else 1),
         )
-        value_feedback, value_decision = value_evaluator(gen_np_array, gt_np_array)
-        code_feedback, _ = ModelCodeEvaluator(scen=self.scen).evaluate(
+        value_feedback, value_decision = value_evaluator(gen_np_array, gt_np_array)  # nosec
+        code_feedback, _ = ModelCodeEvaluator(scen=self.scen).evaluate(  # nosec
             target_task=target_task,
             implementation=implementation,
             gt_implementation=gt_implementation,
-            model_execution_feedback=model_execution_feedback,
+            model_execution_feedback=model_execution_feedback,  # nosec
             model_value_feedback="\n".join([shape_feedback, value_feedback]),
         )
-        final_feedback, final_decision = ModelFinalEvaluator(scen=self.scen).evaluate(
+        final_feedback, final_decision = ModelFinalEvaluator(scen=self.scen).evaluate(  # nosec
             target_task=target_task,
             implementation=implementation,
             gt_implementation=gt_implementation,
-            model_execution_feedback=model_execution_feedback,
+            model_execution_feedback=model_execution_feedback,  # nosec
             model_shape_feedback=shape_feedback,
             model_value_feedback=value_feedback,
             model_code_feedback=code_feedback,
         )
 
         return ModelSingleFeedback(
-            execution_feedback=model_execution_feedback,
+            execution_feedback=model_execution_feedback,  # nosec
             shape_feedback=shape_feedback,
             value_feedback=value_feedback,
             code_feedback=code_feedback,

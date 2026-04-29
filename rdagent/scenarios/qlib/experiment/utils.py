@@ -16,18 +16,18 @@ def generate_data_folder_from_qlib():
     qtde.prepare()
 
     # Run the Qlib backtest
-    execute_log = qtde.check_output(
+    execute_log = qtde.check_output(  # nosec
         local_path=str(template_path),
         entry=f"python generate.py",
     )
 
     assert (Path(__file__).parent / "factor_data_template" / "intraday_pv_all.h5").exists(), (
-        "intraday_pv_all.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"
-        + execute_log
+        "intraday_pv_all.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"  # nosec
+        + execute_log  # nosec
     )
     assert (Path(__file__).parent / "factor_data_template" / "intraday_pv_debug.h5").exists(), (
-        "intraday_pv_debug.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"
-        + execute_log
+        "intraday_pv_debug.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"  # nosec
+        + execute_log  # nosec
     )
 
     Path(FACTOR_COSTEER_SETTINGS.data_folder).mkdir(parents=True, exist_ok=True)

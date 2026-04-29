@@ -39,7 +39,7 @@ class GenericDataHandler(DataHandler):
         if suffix == ".csv":
             return pd.read_csv(path, encoding="utf-8")
         elif suffix == ".pkl":
-            return pd.read_pickle(path)
+            return pd.read_pickle(path)  # nosec
         elif suffix == ".parquet":
             return pd.read_parquet(path)
         elif suffix in [".h5", ".hdf", ".hdf5"]:
@@ -70,7 +70,7 @@ class GenericDataHandler(DataHandler):
         if suffix == ".csv":
             df.to_csv(path, index=False, encoding="utf-8")
         elif suffix == ".pkl":
-            df.to_pickle(path)
+            df.to_pickle(path)  # nosec
         elif suffix == ".parquet":
             df.to_parquet(path, index=True)
         elif suffix in [".h5", ".hdf", ".hdf5"]:

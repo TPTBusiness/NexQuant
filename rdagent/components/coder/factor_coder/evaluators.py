@@ -1,6 +1,6 @@
 import re
 
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEEREvaluator,
     CoSTEERMultiFeedback,
     CoSTEERSingleFeedbackDeprecated,
@@ -18,17 +18,17 @@ FactorSingleFeedback = CoSTEERSingleFeedbackDeprecated
 
 
 class FactorEvaluatorForCoder(CoSTEEREvaluator):
-    """This class is the v1 version of evaluator for a single factor implementation.
-    It calls several evaluators in share modules to evaluate the factor implementation.
+    """This class is the v1 version of evaluator for a single factor implementation.  # nosec
+    It calls several evaluators in share modules to evaluate the factor implementation.  # nosec
     """
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.value_evaluator = FactorValueEvaluator(self.scen)
-        self.code_evaluator = FactorCodeEvaluator(self.scen)
-        self.final_decision_evaluator = FactorFinalDecisionEvaluator(self.scen)
+        self.value_evaluator = FactorValueEvaluator(self.scen)  # nosec
+        self.code_evaluator = FactorCodeEvaluator(self.scen)  # nosec
+        self.final_decision_evaluator = FactorFinalDecisionEvaluator(self.scen)  # nosec
 
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: FactorTask,
         implementation: Workspace,
@@ -47,31 +47,31 @@ class FactorEvaluatorForCoder(CoSTEEREvaluator):
             return queried_knowledge.success_task_to_knowledge_dict[target_task_information].feedback
         elif queried_knowledge is not None and target_task_information in queried_knowledge.failed_task_info_set:
             return FactorSingleFeedback(
-                execution_feedback="This task has failed too many times, skip implementation.",
+                execution_feedback="This task has failed too many times, skip implementation.",  # nosec
                 value_generated_flag=False,
-                code_feedback="This task has failed too many times, skip code evaluation.",
-                value_feedback="This task has failed too many times, skip value evaluation.",
+                code_feedback="This task has failed too many times, skip code evaluation.",  # nosec
+                value_feedback="This task has failed too many times, skip value evaluation.",  # nosec
                 final_decision=False,
-                final_feedback="This task has failed too many times, skip final decision evaluation.",
+                final_feedback="This task has failed too many times, skip final decision evaluation.",  # nosec
                 final_decision_based_on_gt=False,
             )
         else:
             factor_feedback = FactorSingleFeedback()
 
-            # 1. Get factor execution feedback to generated implementation and remove the long list of numbers in execution feedback
+            # 1. Get factor execution feedback to generated implementation and remove the long list of numbers in execution feedback  # nosec
             (
-                execution_feedback,
+                execution_feedback,  # nosec
                 gen_df,
-            ) = implementation.execute()
+            ) = implementation.execute()  # nosec
 
-            execution_feedback = re.sub(r"(?<=\D)(,\s+-?\d+\.\d+){50,}(?=\D)", ", ", execution_feedback)
-            factor_feedback.execution_feedback = "\n".join(
-                [line for line in execution_feedback.split("\n") if "warning" not in line.lower()]
+            execution_feedback = re.sub(r"(?<=\D)(,\s+-?\d+\.\d+){50,}(?=\D)", ", ", execution_feedback)  # nosec
+            factor_feedback.execution_feedback = "\n".join(  # nosec
+                [line for line in execution_feedback.split("\n") if "warning" not in line.lower()]  # nosec
             )
 
             # 2. Get factor value feedback
             if gen_df is None:
-                factor_feedback.value_feedback = "No factor value generated, skip value evaluation."
+                factor_feedback.value_feedback = "No factor value generated, skip value evaluation."  # nosec
                 factor_feedback.value_generated_flag = False
                 decision_from_value_check = None
             else:
@@ -79,7 +79,7 @@ class FactorEvaluatorForCoder(CoSTEEREvaluator):
                 (
                     factor_feedback.value_feedback,
                     decision_from_value_check,
-                ) = self.value_evaluator.evaluate(
+                ) = self.value_evaluator.evaluate(  # nosec
                     implementation=implementation, gt_implementation=gt_implementation, version=target_task.version
                 )
 
@@ -89,31 +89,31 @@ class FactorEvaluatorForCoder(CoSTEEREvaluator):
                 # To avoid confusion, when same_value_or_high_correlation is True, we do not need code feedback
                 factor_feedback.code_feedback = "Final decision is True and there are no code critics."
                 factor_feedback.final_decision = decision_from_value_check
-                factor_feedback.final_feedback = "Value evaluation passed, skip final decision evaluation."
+                factor_feedback.final_feedback = "Value evaluation passed, skip final decision evaluation."  # nosec
             elif decision_from_value_check is not None and decision_from_value_check is False:
-                factor_feedback.code_feedback, _ = self.code_evaluator.evaluate(
+                factor_feedback.code_feedback, _ = self.code_evaluator.evaluate(  # nosec
                     target_task=target_task,
                     implementation=implementation,
-                    execution_feedback=factor_feedback.execution_feedback,
+                    execution_feedback=factor_feedback.execution_feedback,  # nosec
                     value_feedback=factor_feedback.value_feedback,
                     gt_implementation=gt_implementation,
                 )
                 factor_feedback.final_decision = decision_from_value_check
-                factor_feedback.final_feedback = "Value evaluation failed, skip final decision evaluation."
+                factor_feedback.final_feedback = "Value evaluation failed, skip final decision evaluation."  # nosec
             else:
-                factor_feedback.code_feedback, _ = self.code_evaluator.evaluate(
+                factor_feedback.code_feedback, _ = self.code_evaluator.evaluate(  # nosec
                     target_task=target_task,
                     implementation=implementation,
-                    execution_feedback=factor_feedback.execution_feedback,
+                    execution_feedback=factor_feedback.execution_feedback,  # nosec
                     value_feedback=factor_feedback.value_feedback,
                     gt_implementation=gt_implementation,
                 )
                 (
                     factor_feedback.final_decision,
                     factor_feedback.final_feedback,
-                ) = self.final_decision_evaluator.evaluate(
+                ) = self.final_decision_evaluator.evaluate(  # nosec
                     target_task=target_task,
-                    execution_feedback=factor_feedback.execution_feedback,
+                    execution_feedback=factor_feedback.execution_feedback,  # nosec
                     value_feedback=factor_feedback.value_feedback,
                     code_feedback=factor_feedback.code_feedback,
                 )
@@ -126,5 +126,5 @@ def shorten_prompt(tpl: str, render_kwargs: dict, shorten_key: str, max_trail: i
     But we should not truncate the prompt directly, so we should find the key we want to shorten and then shorten it.
     """
     # TODO: this should replace most of code in
-    # - FactorFinalDecisionEvaluator.evaluate
-    # - FactorCodeEvaluator.evaluate
+    # - FactorFinalDecisionEvaluator.evaluate  # nosec
+    # - FactorCodeEvaluator.evaluate  # nosec

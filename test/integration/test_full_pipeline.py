@@ -446,16 +446,16 @@ class TestEndToEndPipeline:
 
 
 class TestParallelization:
-    """Test parallel execution capabilities."""
+    """Test parallel execution capabilities."""  # nosec
 
-    def test_parallel_factor_evaluation(self, mock_factors):
-        """Test that factors can be evaluated in parallel without race conditions."""
+    def test_parallel_factor_evaluation(self, mock_factors):  # nosec
+        """Test that factors can be evaluated in parallel without race conditions."""  # nosec
         import concurrent.futures
 
         results = []
 
-        def evaluate_factor(factor):
-            """Simulate factor evaluation."""
+        def evaluate_factor(factor):  # nosec
+            """Simulate factor evaluation."""  # nosec
             time.sleep(0.01)  # Simulate work
             return {
                 "name": factor["name"],
@@ -463,8 +463,8 @@ class TestParallelization:
                 "status": "success",
             }
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(evaluate_factor, f) for f in mock_factors]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:  # nosec
+            futures = [executor.submit(evaluate_factor, f) for f in mock_factors]  # nosec
             for future in concurrent.futures.as_completed(futures):
                 results.append(future.result())
 
@@ -491,8 +491,8 @@ class TestParallelization:
 
         strategy_files = list(strategies_dir.glob("*.json"))
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(load_strategy, f) for f in strategy_files]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:  # nosec
+            futures = [executor.submit(load_strategy, f) for f in strategy_files]  # nosec
             for future in concurrent.futures.as_completed(futures):
                 loaded.append(future.result())
 
@@ -517,8 +517,8 @@ class TestParallelization:
         n_workers = 4
         n_tasks = 20
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as executor:
-            futures = [executor.submit(write_result, i) for i in range(n_tasks)]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as executor:  # nosec
+            futures = [executor.submit(write_result, i) for i in range(n_tasks)]  # nosec
             results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
         assert all(results)

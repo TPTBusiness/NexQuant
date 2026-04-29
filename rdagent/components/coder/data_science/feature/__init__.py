@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEERMultiEvaluator,
     CoSTEERSingleFeedback,
 )
@@ -12,7 +12,7 @@ from rdagent.components.coder.CoSTEER.knowledge_management import (
     CoSTEERQueriedKnowledge,
 )
 from rdagent.components.coder.data_science.conf import DSCoderCoSTEERSettings
-from rdagent.components.coder.data_science.feature.eval import FeatureCoSTEEREvaluator
+from rdagent.components.coder.data_science.feature.eval import FeatureCoSTEEREvaluator  # nosec
 from rdagent.components.coder.data_science.feature.exp import FeatureTask
 from rdagent.components.coder.data_science.share.ds_costeer import DSCoSTEER
 from rdagent.core.exception import CoderError
@@ -71,7 +71,7 @@ class FeatureMultiProcessEvolvingStrategy(MultiProcessEvolvingStrategy):
             if DS_RD_SETTING.spec_enabled
             else T("scenarios.data_science.share:component_spec.general").r(
                 spec=T("scenarios.data_science.share:component_spec.FeatureEng").r(),
-                test_code=(DIRNAME / "eval_tests" / "feature_test.txt").read_text(),
+                test_code=(DIRNAME / "eval_tests" / "feature_test.txt").read_text(),  # nosec
             )
         )
         user_prompt = T(".prompts:feature_coder.user").r(

@@ -402,7 +402,7 @@ class EURUSDResearchManager:
     def __init__(self, llm: Optional[MultiProviderLLM] = None):
         self.llm = llm or MultiProviderLLM()
     
-    def evaluate(
+    def evaluate(  # nosec
         self,
         bull_signal: TradingSignal,
         bear_signal: TradingSignal,
@@ -428,7 +428,7 @@ class EURUSDResearchManager:
         TradingSignal
             Finale Trading-Entscheidung
         """
-        prompt = self._build_evaluation_prompt(
+        prompt = self._build_evaluation_prompt(  # nosec
             bull_signal, bear_signal, neutral_signal, market_data
         )
         
@@ -477,7 +477,7 @@ class EURUSDResearchManager:
                 entry_price=market_data.get("price")
             )
     
-    def _build_evaluation_prompt(
+    def _build_evaluation_prompt(  # nosec
         self,
         bull: TradingSignal,
         bear: TradingSignal,
@@ -563,7 +563,7 @@ class EURUSDDebateTeam:
         neutral_signal = self.neutral.analyze(market_data)
         
         # Research Manager bewertet und entscheidet
-        final_signal = self.manager.evaluate(
+        final_signal = self.manager.evaluate(  # nosec
             bull_signal, bear_signal, neutral_signal, market_data
         )
         

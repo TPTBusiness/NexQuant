@@ -12,7 +12,7 @@ raw_feature_path = CURRENT_DIR / "X.npz"
 raw_label_path = CURRENT_DIR / "ARF_12h.csv"
 
 public = ROOT_DIR / "arf-12-hours-prediction-task"
-private = ROOT_DIR / "eval" / "arf-12-hours-prediction-task"
+private = ROOT_DIR / "eval" / "arf-12-hours-prediction-task"  # nosec
 
 if not (public / "test").exists():
     (public / "test").mkdir(parents=True, exist_ok=True)

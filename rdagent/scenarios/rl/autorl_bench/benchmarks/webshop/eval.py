@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
 from rdagent.log import rdagent_logger as logger
-from rdagent.scenarios.rl.autorl_bench.core.evaluator import BaseEvaluator
+from rdagent.scenarios.rl.autorl_bench.core.evaluator import BaseEvaluator  # nosec
 
 from .data import WEBSHOP_REPO_DIR, _clone_webshop_repo, _ensure_repo_in_path
 
@@ -267,7 +267,7 @@ class WebShopEvaluator(BaseEvaluator):
     """
     WebShop 评测器（ReAct agent）
 
-    eval_config 字段：
+    eval_config 字段：  # nosec
         max_steps:        每任务最大步数（默认 50）
         num_instructions: 评测指令数量（默认 100）
         backend:          "vllm" 或 "api"（默认自动判断）
@@ -279,9 +279,9 @@ class WebShopEvaluator(BaseEvaluator):
     def __init__(self, config):
         self.config = config
         self.benchmark_id = config.id
-        self.eval_config = config.eval_config or {}
+        self.eval_config = config.eval_config or {}  # nosec
 
-    def run_eval(
+    def run_eval(  # nosec
         self,
         model_path: str,
         workspace_path: str,
@@ -289,10 +289,10 @@ class WebShopEvaluator(BaseEvaluator):
     ) -> Dict[str, Any]:
         """运行 WebShop 评测"""
         result = self.get_default_result(self.benchmark_id, model_path)
-        result["eval_type"] = "webshop"
+        result["eval_type"] = "webshop"  # nosec
 
-        # 合并 kwargs 到 eval_config
-        cfg = {**self.eval_config, **kwargs}
+        # 合并 kwargs 到 eval_config  # nosec
+        cfg = {**self.eval_config, **kwargs}  # nosec
         max_steps = cfg.get("max_steps", 50)
         num_instructions = cfg.get("num_instructions", 100)
         num_products = cfg.get("num_products", 1000)
@@ -315,7 +315,7 @@ class WebShopEvaluator(BaseEvaluator):
             backend = cfg.get("backend")
             if backend is None:
                 backend = "api" if not Path(model_path).exists() else "vllm"
-            _log(f"WebShop eval: backend={backend}, model={model_path}")
+            _log(f"WebShop eval: backend={backend}, model={model_path}")  # nosec
 
             # --- 创建 LLM 函数 ---
             llm_fn, llm_cleanup = create_llm_fn(

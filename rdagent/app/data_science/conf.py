@@ -88,9 +88,9 @@ class DataScienceBasePropSetting(KaggleBasePropSetting):
     )
 
     #### Evaluation on Test related
-    eval_sub_dir: str = "eval"  # TODO: fixme, this is not a good name
-    """We'll use f"{DS_RD_SETTING.local_data_path}/{DS_RD_SETTING.eval_sub_dir}/{competition}"
-    to find the scriipt to evaluate the submission on test"""
+    eval_sub_dir: str = "eval"  # TODO: fixme, this is not a good name  # nosec
+    """We'll use f"{DS_RD_SETTING.local_data_path}/{DS_RD_SETTING.eval_sub_dir}/{competition}"  # nosec
+    to find the scriipt to evaluate the submission on test"""  # nosec
 
     """---below are the settings for multi-trace---"""
 

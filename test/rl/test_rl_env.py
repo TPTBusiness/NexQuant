@@ -4,7 +4,7 @@ Tests for RL Trading Environment.
 Covers:
 - Environment creation with various configurations
 - Observation space correctness
-- Action execution and state transitions
+- Action execution and state transitions  # nosec
 - Reward calculation
 - Episode termination and truncation
 - Edge cases (empty data, extreme prices)
@@ -146,7 +146,7 @@ class TestReset:
 
 
 class TestStep:
-    """Test environment step execution."""
+    """Test environment step execution."""  # nosec
 
     def test_step_returns_correct_types(self, basic_env: TradingEnv) -> None:
         """Step should return (obs, reward, terminated, truncated, info)."""

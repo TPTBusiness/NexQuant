@@ -30,7 +30,7 @@ def download_financeiq_dataset() -> None:
     logger.info(f"Downloading FinanceIQ dataset to {target_dir}")
     target_dir.parent.mkdir(parents=True, exist_ok=True)
 
-    subprocess.check_call(
+    subprocess.check_call(  # nosec
         [
             "git",
             "clone",

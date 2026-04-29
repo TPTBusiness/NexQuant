@@ -96,7 +96,7 @@ def run_benchmark_simple(
     env = get_benchmark_env()
     env.conf.enable_cache = True
 
-    # Environment variables for LLM judge (required for cascade eval benchmarks like AIME25)
+    # Environment variables for LLM judge (required for cascade eval benchmarks like AIME25)  # nosec
     env_vars = {
         "OC_JUDGE_MODEL": "gpt-5.1",
         "OC_JUDGE_API_KEY": "sk-1234",
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         # General Knowledge
         # "mmlu",
         # Code Generation
-        # "humaneval",
+        # "humaneval",  # nosec
         # "mbpp",
         # PANORAMA - Patent Analysis (zero-shot)
         # "panorama",

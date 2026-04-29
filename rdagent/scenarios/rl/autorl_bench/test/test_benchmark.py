@@ -74,7 +74,7 @@ def main():
 
     # 提交评测
     print("-" * 50)
-    print("Submitting model for evaluation...")
+    print("Submitting model for evaluation...")  # nosec
     print(f"POST {grading_url}/submit")
 
     start_time = time.time()

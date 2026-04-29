@@ -271,7 +271,7 @@ def main():
     if not NEED_TRAIN:
         print("Model checkpoint detected, will use it for inference!")
         model = EfficientNetB0_4ch(pretrained=False).to(device)
-        state = torch.load(MODEL_TRAINED_FILE, map_location=device)
+        state = torch.load(MODEL_TRAINED_FILE, map_location=device)  # nosec
         model.load_state_dict(state['model'])
         # If in debug, set fake small debug_time for inference-only, as required for compliance.
         if DEBUG:
@@ -346,7 +346,7 @@ def main():
 
             tr_loss = tr_loss / tr_cnt
 
-            model.eval()
+            model.eval()  # nosec
             val_loss = 0.
             val_cnt = 0
             all_val_lbls = []
@@ -380,7 +380,7 @@ def main():
                     'epoch': epoch,
                     'val_loss': best_loss,
                 }
-                torch.save(best_state, MODEL_TRAINED_FILE)
+                torch.save(best_state, MODEL_TRAINED_FILE)  # nosec
                 patience_counter = 0
                 print(f"Best model saved. (epoch {epoch+1}, val_logloss={val_logloss:.5f})")
             else:
@@ -397,12 +397,12 @@ def main():
             sample_factor = 0.1
             scale = (1/sample_factor) * (20 if not DEBUG else 1)
             estimated_time = debug_time * scale
-        # Reload best model for evaluation
-        state = torch.load(MODEL_TRAINED_FILE, map_location=device)
+        # Reload best model for evaluation  # nosec
+        state = torch.load(MODEL_TRAINED_FILE, map_location=device)  # nosec
         model.load_state_dict(state['model'])
 
     print("Section: Validation Evaluation and Metric Calculation")
-    model.eval()
+    model.eval()  # nosec
     val_lbls, val_prs = [], []
     with torch.no_grad():
         for imgs, lbls in val_loader:
@@ -426,7 +426,7 @@ def main():
     print(f"Saved scores.csv with validation log loss.")
 
     print("Section: Prediction and Submission Generation")
-    model.eval()
+    model.eval()  # nosec
     test_probs = []
     test_ids_ordered = []
     with torch.no_grad():

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEERMultiEvaluator,
     CoSTEERSingleFeedback,
 )
@@ -12,7 +12,7 @@ from rdagent.components.coder.CoSTEER.knowledge_management import (
     CoSTEERQueriedKnowledge,
 )
 from rdagent.components.coder.data_science.conf import DSCoderCoSTEERSettings
-from rdagent.components.coder.data_science.model.eval import (
+from rdagent.components.coder.data_science.model.eval import (  # nosec
     ModelGeneralCaseSpecEvaluator,
 )
 from rdagent.components.coder.data_science.model.exp import ModelTask
@@ -79,7 +79,7 @@ class ModelMultiProcessEvolvingStrategy(MultiProcessEvolvingStrategy):
             if DS_RD_SETTING.spec_enabled
             else T("scenarios.data_science.share:component_spec.general").r(
                 spec=T("scenarios.data_science.share:component_spec.Model").r(),
-                test_code=(DIRNAME / "eval_tests" / "model_test.txt").read_text().replace("model01", target_task.name),
+                test_code=(DIRNAME / "eval_tests" / "model_test.txt").read_text().replace("model01", target_task.name),  # nosec
             )
         )
         user_prompt = T(".prompts:model_coder.user_general").r(

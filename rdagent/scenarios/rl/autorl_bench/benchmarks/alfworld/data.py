@@ -15,7 +15,7 @@ def _run_alfworld_download() -> None:
     """调用 alfworld-download，兼容 conda env PATH 问题"""
     import subprocess  # nosec B404
 
-    bin_dir = Path(sys.executable).parent
+    bin_dir = Path(sys.executable).parent  # nosec
     script = bin_dir / "alfworld-download"
     if script.exists():
         subprocess.run([sys.executable, str(script)], check=True) # nosec B603

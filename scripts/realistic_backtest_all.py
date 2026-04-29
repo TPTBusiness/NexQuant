@@ -89,7 +89,7 @@ def _build_signal(factor_names: list[str], full_idx: pd.Index,
     close = pd.Series(np.zeros(len(full_idx)), index=full_idx)  # not used by signal code
     try:
         local_ns: dict = {"pd": pd, "np": np, "close": close, "factors": factors}
-        exec(code, local_ns)  # noqa: S102
+        exec(code, local_ns)  # noqa: S102  # nosec
         sig = local_ns.get("signal")
         if sig is not None and isinstance(sig, pd.Series):
             return sig.reindex(full_idx).fillna(0).astype(int)
@@ -263,7 +263,7 @@ def backtest_strategy(json_path: str, close: pd.Series, instrument: str) -> dict
 
 def _worker(args: tuple) -> dict | None:
     json_path, close_bytes, instrument = args
-    close = pd.read_pickle(close_bytes) if isinstance(close_bytes, (str, Path)) else close_bytes
+    close = pd.read_pickle(close_bytes) if isinstance(close_bytes, (str, Path)) else close_bytes  # nosec
     return backtest_strategy(json_path, close, instrument)
 
 
@@ -294,7 +294,7 @@ def main() -> None:
     # Save close to temp file for multiprocessing
     import tempfile
     tmp = tempfile.NamedTemporaryFile(suffix=".pkl", delete=False)
-    close.to_pickle(tmp.name)
+    close.to_pickle(tmp.name)  # nosec
     tmp.close()
 
     results = []

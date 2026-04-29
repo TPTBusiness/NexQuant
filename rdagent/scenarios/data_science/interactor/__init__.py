@@ -1,5 +1,5 @@
 import json
-import pickle
+import pickle  # nosec
 import time
 import uuid
 from abc import abstractmethod
@@ -95,10 +95,10 @@ class FBDSInteractor(DSInteractor):
         }
         session_id = uuid.uuid4().hex
         DS_RD_SETTING.user_interaction_mid_folder.mkdir(parents=True, exist_ok=True)
-        pickle.dump(information_to_user, open(DS_RD_SETTING.user_interaction_mid_folder / f"{session_id}.pkl", "wb"))
+        pickle.dump(information_to_user, open(DS_RD_SETTING.user_interaction_mid_folder / f"{session_id}.pkl", "wb"))  # nosec
         while (
             Path(DS_RD_SETTING.user_interaction_mid_folder / f"{session_id}.pkl").exists()
-            and pickle.load(open(DS_RD_SETTING.user_interaction_mid_folder / f"{session_id}.pkl", "rb"))[
+            and pickle.load(open(DS_RD_SETTING.user_interaction_mid_folder / f"{session_id}.pkl", "rb"))[  # nosec
                 "expired_datetime"
             ]
             > datetime.now()

@@ -146,7 +146,7 @@ def backtest_signal(
     signal = pd.to_numeric(signal, errors="coerce")
     signal = signal.reindex(close.index).fillna(0).clip(-1, 1).astype(float)
 
-    # Position is lagged by one bar: signal generated at t executes at t+1.
+    # Position is lagged by one bar: signal generated at t executes at t+1.  # nosec
     position = signal.shift(1).fillna(0)
 
     # Bar returns from close prices, aligned to position index.

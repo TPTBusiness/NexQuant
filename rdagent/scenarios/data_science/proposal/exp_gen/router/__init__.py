@@ -69,7 +69,7 @@ class ParallelMultiTraceExpGen(ExpGen):
 
     async def async_gen(self, trace: DSTrace, loop: LoopBase) -> DSExperiment:
         """
-        Waits for a free execution slot, selects a parent trace using the
+        Waits for a free execution slot, selects a parent trace using the  # nosec
         scheduler, generates a new experiment, and injects the parent context
         into it before returning.
         """

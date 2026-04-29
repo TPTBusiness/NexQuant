@@ -9,7 +9,7 @@ class Feedback:
     """
     Design Principle:
         It will be more like a **dataclass**.
-        The building process of feedback will should be in evaluator
+        The building process of feedback will should be in evaluator  # nosec
     """
 
     def is_acceptable(self) -> bool:
@@ -32,7 +32,7 @@ class Feedback:
 
 class EvaluableObj:
     """
-    A set of information that is evaluable. Following things can be included.
+    A set of information that is evaluable. Following things can be included.  # nosec
     - Task
     - Solution
     - Ground Truth
@@ -46,11 +46,11 @@ class Evaluator(ABC):
         It should cover the building process of feedback from raw information.
             Typically the building of feedback will be two phases.
             1. raw information including stdout & workspace  (feedback itself will handle this)
-            2. advanced/summarized feedback information. (evaluate will handle this)
+            2. advanced/summarized feedback information. (evaluate will handle this)  # nosec
     """
 
     @abstractmethod
-    def evaluate(
+    def evaluate(  # nosec
         self,
         eo: EvaluableObj,
     ) -> Feedback:

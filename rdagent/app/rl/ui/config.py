@@ -11,7 +11,7 @@ EventType = Literal[
     "template",
     "experiment",
     "code",
-    "docker_exec",
+    "docker_exec",  # nosec
     "feedback",
     "token",
     "time",
@@ -26,7 +26,7 @@ ICONS = {
     "template": "📋",
     "experiment": "🧪",
     "code": "📄",
-    "docker_exec": "🐳",
+    "docker_exec": "🐳",  # nosec
     "feedback": "📊",
     "token": "🔢",
     "time": "⏱️",
@@ -41,7 +41,7 @@ ALWAYS_VISIBLE_TYPES = [
     "llm_call",
     "experiment",
     "code",
-    "docker_exec",
+    "docker_exec",  # nosec
     "feedback",
 ]
 

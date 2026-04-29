@@ -214,13 +214,13 @@ class ExpGen2Hypothesis(DSProposalV2ExpGen):
         )
 
         all_problems = {}
-        pickled_problem_name, new_hypothesis = self.hypothesis_rank(
+        pickled_problem_name, new_hypothesis = self.hypothesis_rank(  # nosec
             hypothesis_dict=hypothesis_dict,
             problem_dict=all_problems,
             selected_idx=0,
         )
         if DS_RD_SETTING.enable_knowledge_base:
-            trace.knowledge_base.update_pickled_problem(all_problems, pickled_problem_name)
+            trace.knowledge_base.update_pickled_problem(all_problems, pickled_problem_name)  # nosec
 
         scenario_desc = trace.scen.get_scenario_all_desc(eda_output=eda_output)
 

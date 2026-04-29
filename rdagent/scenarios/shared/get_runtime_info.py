@@ -10,7 +10,7 @@ def get_runtime_environment_by_env(env: Env) -> str:
     implementation = FBWorkspace()
     fname = "runtime_info.py"
     implementation.inject_files(**{fname: (Path(__file__).absolute().resolve().parent / "runtime_info.py").read_text()})
-    stdout = implementation.execute(env=env, entry=f"python {fname}")
+    stdout = implementation.execute(env=env, entry=f"python {fname}")  # nosec
     # Extract JSON from stdout (skip CUDA/container warnings)
     json_match = re.search(r"\{.*\}", stdout, re.DOTALL)
     return json.dumps(json.loads(json_match.group()), indent=2)
@@ -19,11 +19,11 @@ def get_runtime_environment_by_env(env: Env) -> str:
 def check_runtime_environment(env: Env) -> str:
     implementation = FBWorkspace()
     # 1) Check if strace exists in env
-    strace_check = implementation.execute(env=env, entry="which strace || echo MISSING").strip()
+    strace_check = implementation.execute(env=env, entry="which strace || echo MISSING").strip()  # nosec
     if strace_check.endswith("MISSING"):
         raise RuntimeError("`strace` not found in the target environment.")
 
     # 2) Check if coverage module works in env
-    coverage_check = implementation.execute(env=env, entry="python -m coverage --version || echo MISSING").strip()
+    coverage_check = implementation.execute(env=env, entry="python -m coverage --version || echo MISSING").strip()  # nosec
     if coverage_check.endswith("MISSING"):
         raise RuntimeError("`coverage` module not found or not runnable in the target environment.")

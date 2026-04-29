@@ -6,7 +6,7 @@ import pandas as pd
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
 from rdagent.components.coder.CoSTEER import CoSTEERMultiFeedback
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEEREvaluator,
     CoSTEERSingleFeedback,
 )
@@ -27,13 +27,13 @@ NO_SCORE = "<No scores.csv file found.>"
 
 
 class ModelDumpEvaluator(CoSTEEREvaluator):
-    """This evaluator assumes that it runs after the model"""
+    """This evaluator assumes that it runs after the model"""  # nosec
 
     def __init__(self, scen: Scenario, data_type: Literal["sample", "full"]):
         super().__init__(scen)
         self.data_type = data_type
 
-    def evaluate(
+    def evaluate(  # nosec
         self, target_task: Task, implementation: FBWorkspace, gt_implementation: FBWorkspace, *kargs, **kwargs
     ) -> CoSTEERSingleFeedback:
 
@@ -42,7 +42,7 @@ class ModelDumpEvaluator(CoSTEEREvaluator):
         if not model_folder.exists() or not any(model_folder.iterdir()):
             err_msg = "Model folder (`models` sub folder) is empty or does not exist. The model is not dumped."
             return CoSTEERSingleFeedback(
-                execution=err_msg,
+                execution=err_msg,  # nosec
                 return_checking=err_msg,
                 code=err_msg,
                 final_decision=False,
@@ -62,7 +62,7 @@ class ModelDumpEvaluator(CoSTEEREvaluator):
 
         # 2) check the result and stdout after reruning the model.
 
-        # Read the content of files submission.csv and scores.csv before execution
+        # Read the content of files submission.csv and scores.csv before execution  # nosec
         submission_content_before = (
             (implementation.workspace_path / "submission.csv").read_text()
             if (implementation.workspace_path / "submission.csv").exists()
@@ -75,11 +75,11 @@ class ModelDumpEvaluator(CoSTEEREvaluator):
         )
 
         # Remove the files submission.csv and scores.csv
-        implementation.execute(env=env, entry=get_clear_ws_cmd(stage="before_inference"))
+        implementation.execute(env=env, entry=get_clear_ws_cmd(stage="before_inference"))  # nosec
 
         # Execute the main script
         stdout = remove_eda_part(
-            implementation.execute(env=env, entry="strace -e trace=file -f -o trace.log python main.py --inference")
+            implementation.execute(env=env, entry="strace -e trace=file -f -o trace.log python main.py --inference")  # nosec
         )
 
         # walk model_folder and list the files
@@ -117,7 +117,7 @@ class ModelDumpEvaluator(CoSTEEREvaluator):
             if not (implementation.workspace_path / f).exists():
                 err_msg = f"{f} does not exist. The model is not dumped. Make sure that the required files, like submission.csv and scores.csv, are created even if you bypass the model training step by loading the saved model file directly."
                 return CoSTEERSingleFeedback(
-                    execution=err_msg,
+                    execution=err_msg,  # nosec
                     return_checking=err_msg,
                     code=err_msg,
                     final_decision=False,
@@ -129,7 +129,7 @@ class ModelDumpEvaluator(CoSTEEREvaluator):
             nan_locations = score_df[score_df.isnull().any(axis=1)]
             err_msg = f"\n[Error] The scores dataframe contains NaN values at the following locations:\n{nan_locations}"
             return CoSTEERSingleFeedback(
-                execution=err_msg,
+                execution=err_msg,  # nosec
                 return_checking=err_msg,
                 code=err_msg,
                 final_decision=False,
@@ -146,8 +146,8 @@ class ModelDumpEvaluator(CoSTEEREvaluator):
             else NO_SCORE
         )
 
-        system_prompt = T(".prompts:dump_model_eval.system").r()
-        user_prompt = T(".prompts:dump_model_eval.user").r(
+        system_prompt = T(".prompts:dump_model_eval.system").r()  # nosec
+        user_prompt = T(".prompts:dump_model_eval.user").r(  # nosec
             stdout=stdout.strip(),
             code=implementation.all_codes,
             model_folder_files=model_folder_files,
@@ -163,7 +163,7 @@ class ModelDumpEvaluator(CoSTEEREvaluator):
         )
 
         if DS_RD_SETTING.model_dump_check_level == "high":
-            # Read the content of files submission.csv and scores.csv after execution
+            # Read the content of files submission.csv and scores.csv after execution  # nosec
             # Check if the content has changed
             # excactly same checking. But it will take more user's time
             if scores_content_before != scores_content_after:

@@ -23,7 +23,7 @@ class CoSTEERSettings(ExtendedBaseSettings):
     v2_query_component_limit: int = 1
     v2_query_error_limit: int = 1
     v2_query_former_trace_limit: int = 3
-    v2_add_fail_attempt_to_latest_successful_execution: bool = False
+    v2_add_fail_attempt_to_latest_successful_execution: bool = False  # nosec
     v2_error_summary: bool = False
     v2_knowledge_sampler: float = 1.0
 

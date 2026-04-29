@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEEREvaluator,
     CoSTEERSingleFeedback,
 )
@@ -11,12 +11,12 @@ from rdagent.utils.agent.workflow import build_cls_from_json_with_retry
 
 
 class PrevModelLoadEvaluator(CoSTEEREvaluator):
-    """This evaluator checks whether the code actually loads a model from `prev_model`."""
+    """This evaluator checks whether the code actually loads a model from `prev_model`."""  # nosec
 
     def __init__(self, scen: Scenario):
         super().__init__(scen)
 
-    def evaluate(
+    def evaluate(  # nosec
         self, target_task: Task, implementation: FBWorkspace, gt_implementation: FBWorkspace, *args, **kwargs
     ) -> CoSTEERSingleFeedback:
         data_source_path = T("scenarios.data_science.share:scen.input_path").r()
@@ -33,14 +33,14 @@ class PrevModelLoadEvaluator(CoSTEEREvaluator):
                 f"and pointing it to the `{prev_model_dir}` directory."
             )
             return CoSTEERSingleFeedback(
-                execution=err,
+                execution=err,  # nosec
                 return_checking=err,
                 code=err,
                 final_decision=False,
             )
 
-        system_prompt = T(".prompts:prev_model_eval.system").r()
-        user_prompt = T(".prompts:prev_model_eval.user").r(
+        system_prompt = T(".prompts:prev_model_eval.system").r()  # nosec
+        user_prompt = T(".prompts:prev_model_eval.user").r(  # nosec
             code=implementation.all_codes,
         )
 

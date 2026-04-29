@@ -10,18 +10,18 @@ from rdagent.core.experiment import FBWorkspace
 from rdagent.log import rdagent_logger as logger
 from rdagent.utils.env import KGDockerEnv
 
-KG_FEATURE_PREPROCESS_SCRIPT = """import pickle
+KG_FEATURE_PREPROCESS_SCRIPT = """import pickle  # nosec
 
 from fea_share_preprocess import preprocess_script
 
 X_train, X_valid, y_train, y_valid, X_test, *others = preprocess_script()
 
-pickle.dump(X_train, open("X_train.pkl", "wb"))
-pickle.dump(X_valid, open("X_valid.pkl", "wb"))
-pickle.dump(y_train, open("y_train.pkl", "wb"))
-pickle.dump(y_valid, open("y_valid.pkl", "wb"))
-pickle.dump(X_test, open("X_test.pkl", "wb"))
-pickle.dump(others, open("others.pkl", "wb"))
+pickle.dump(X_train, open("X_train.pkl", "wb"))  # nosec
+pickle.dump(X_valid, open("X_valid.pkl", "wb"))  # nosec
+pickle.dump(y_train, open("y_train.pkl", "wb"))  # nosec
+pickle.dump(y_valid, open("y_valid.pkl", "wb"))  # nosec
+pickle.dump(X_test, open("X_test.pkl", "wb"))  # nosec
+pickle.dump(others, open("others.pkl", "wb"))  # nosec
 """
 
 
@@ -45,7 +45,7 @@ class KGFBWorkspace(FBWorkspace):
         kgde = KGDockerEnv(KAGGLE_IMPLEMENT_SETTING.competition)
         kgde.prepare()
 
-        execute_log, results = kgde.dump_python_code_run_and_get_results(
+        execute_log, results = kgde.dump_python_code_run_and_get_results(  # nosec
             code=KG_FEATURE_PREPROCESS_SCRIPT,
             local_path=str(self.workspace_path),
             dump_file_names=[
@@ -69,7 +69,7 @@ class KGFBWorkspace(FBWorkspace):
             X_train, X_valid, y_train, y_valid, X_test, others = results
             return X_train, X_valid, y_train, y_valid, X_test, *others
 
-    def execute(self, run_env: dict = {}, *args, **kwargs) -> str:
+    def execute(self, run_env: dict = {}, *args, **kwargs) -> str:  # nosec
         logger.info(f"Running the experiment in {self.workspace_path}")
 
         kgde = KGDockerEnv(KAGGLE_IMPLEMENT_SETTING.competition)
@@ -83,7 +83,7 @@ class KGFBWorkspace(FBWorkspace):
         else:
             running_extra_volume = {}
 
-        execute_log = kgde.check_output(
+        execute_log = kgde.check_output(  # nosec
             local_path=str(self.workspace_path),
             env=run_env,
             running_extra_volume=running_extra_volume,

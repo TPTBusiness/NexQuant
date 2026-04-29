@@ -65,7 +65,7 @@ def fit(X_train, y_train, X_valid, y_valid):
 
 # Prediction function
 def predict(model, X):
-    model.eval()
+    model.eval()  # nosec
     predictions = []
     with torch.no_grad():
         X_tensor = torch.tensor(X.values, dtype=torch.float32).to(device)  # Move data to the device

@@ -10,7 +10,7 @@ class PydanticTest(unittest.TestCase):
 
     How it works:
     1. Agent wraps query() with @task(cache_policy=INPUTS) when enable_cache=True
-    2. First call: executes and caches to Prefect server
+    2. First call: executes and caches to Prefect server  # nosec
     3. Second call with same input: instant cache hit
     """
 
@@ -25,8 +25,8 @@ class PydanticTest(unittest.TestCase):
         # Create agent once - caching enabled by CONTEXT7_ENABLE_CACHE
         agent = Agent()
 
-        # First query - will execute and cache
-        print("First query (will execute):")
+        # First query - will execute and cache  # nosec
+        print("First query (will execute):")  # nosec
         start1 = time.time()
         res1 = agent.query(query)
         time1 = time.time() - start1

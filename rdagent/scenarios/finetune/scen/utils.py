@@ -9,7 +9,7 @@ import pandas as pd
 import tiktoken
 
 from rdagent.app.finetune.llm.conf import FT_RD_SETTING
-from rdagent.core.utils import cache_with_pickle
+from rdagent.core.utils import cache_with_pickle  # nosec
 from rdagent.log import rdagent_logger as logger
 from rdagent.scenarios.data_science.scen.utils import FileTreeGenerator
 from rdagent.utils import md5_hash
@@ -344,7 +344,7 @@ class FinetuneDatasetDescriptor:
         key_parts.append(str(include_dataset_readme))
         return md5_hash("|".join(key_parts))
 
-    @cache_with_pickle(hash_dataset_path)
+    @cache_with_pickle(hash_dataset_path)  # nosec
     def describe_dataset_folder(
         self, dataset_path: Path, dataset_name: str | None = None, include_dataset_readme: bool = False
     ) -> FinetuneDatasetDescription:

@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEEREvaluator,
     CoSTEERSingleFeedback,
 )
@@ -24,7 +24,7 @@ DataLoaderEvalFeedback = CoSTEERSingleFeedback
 
 
 class DataLoaderCoSTEEREvaluator(CoSTEEREvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: Task,
         implementation: FBWorkspace,
@@ -40,7 +40,7 @@ class DataLoaderCoSTEEREvaluator(CoSTEEREvaluator):
             return queried_knowledge.success_task_to_knowledge_dict[target_task_information].feedback
         elif queried_knowledge is not None and target_task_information in queried_knowledge.failed_task_info_set:
             return DataLoaderEvalFeedback(
-                execution="This task has failed too many times, skip implementation.",
+                execution="This task has failed too many times, skip implementation.",  # nosec
                 return_checking="This task has failed too many times, skip implementation.",
                 code="This task has failed too many times, skip implementation.",
                 final_decision=False,
@@ -53,7 +53,7 @@ class DataLoaderCoSTEEREvaluator(CoSTEEREvaluator):
 
         # TODO: do we need to clean the generated temporary content?
         fname = "test/data_loader_test.py"
-        test_code = (DIRNAME / "eval_tests" / "data_loader_test.txt").read_text()
+        test_code = (DIRNAME / "eval_tests" / "data_loader_test.txt").read_text()  # nosec
         implementation.inject_files(**{fname: test_code})
         result = implementation.run(env=env, entry=f"python {fname}")
         stdout = result.stdout
@@ -65,19 +65,19 @@ class DataLoaderCoSTEEREvaluator(CoSTEEREvaluator):
             eda_output += "Length of EDA output is too long, truncated. Please reject this implementation and motivate it to reduce the length of EDA output."
 
         if "main.py" in implementation.file_dict and ret_code == 0:
-            workflow_stdout = implementation.execute(env=env, entry="python main.py")
+            workflow_stdout = implementation.execute(env=env, entry="python main.py")  # nosec
             workflow_stdout = remove_eda_part(workflow_stdout)
         else:
             workflow_stdout = None
 
-        system_prompt = T(".prompts:data_loader_eval.system").r(
+        system_prompt = T(".prompts:data_loader_eval.system").r(  # nosec
             task_desc=target_task.get_task_information(),
             test_code=test_code,
             code=implementation.file_dict["load_data.py"],
             workflow_stdout=workflow_stdout,
             workflow_code=implementation.all_codes,
         )
-        user_prompt = T(".prompts:data_loader_eval.user").r(
+        user_prompt = T(".prompts:data_loader_eval.user").r(  # nosec
             stdout=stdout,
             eda_output=eda_output,
             workflow_stdout=workflow_stdout,

@@ -5,7 +5,7 @@ from pathlib import Path
 from jinja2 import Environment, StrictUndefined, select_autoescape
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEEREvaluator,
     CoSTEERSingleFeedback,
 )
@@ -22,7 +22,7 @@ EnsembleEvalFeedback = CoSTEERSingleFeedback
 
 
 class EnsembleCoSTEEREvaluator(CoSTEEREvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: Task,
         implementation: FBWorkspace,
@@ -41,7 +41,7 @@ class EnsembleCoSTEEREvaluator(CoSTEEREvaluator):
             return queried_knowledge.success_task_to_knowledge_dict[target_task_information].feedback
         elif queried_knowledge is not None and target_task_information in queried_knowledge.failed_task_info_set:
             return EnsembleEvalFeedback(
-                execution="This task has failed too many times, skip implementation.",
+                execution="This task has failed too many times, skip implementation.",  # nosec
                 code="This task has failed too many times, skip implementation.",
                 return_checking="This task has failed too many times, skip implementation.",
                 final_decision=False,
@@ -53,7 +53,7 @@ class EnsembleCoSTEEREvaluator(CoSTEEREvaluator):
         )
 
         fname = "test/ensemble_test.txt"
-        test_code = (DIRNAME / "eval_tests" / "ensemble_test.txt").read_text()
+        test_code = (DIRNAME / "eval_tests" / "ensemble_test.txt").read_text()  # nosec
         test_code = (
             Environment(autoescape=select_autoescape(["html", "xml"]), undefined=StrictUndefined)
             .from_string(test_code)
@@ -73,12 +73,12 @@ class EnsembleCoSTEEREvaluator(CoSTEEREvaluator):
         stdout += f"\nNOTE: the above scripts run with return code {ret_code}"
 
         if "main.py" in implementation.file_dict and ret_code == 0:
-            workflow_stdout = implementation.execute(env=env, entry="python main.py")
+            workflow_stdout = implementation.execute(env=env, entry="python main.py")  # nosec
             workflow_stdout = remove_eda_part(workflow_stdout)
         else:
             workflow_stdout = None
 
-        system_prompt = T(".prompts:ensemble_eval.system").r(
+        system_prompt = T(".prompts:ensemble_eval.system").r(  # nosec
             task_desc=target_task_information,
             test_code=test_code,
             metric_name=metric_name,
@@ -86,7 +86,7 @@ class EnsembleCoSTEEREvaluator(CoSTEEREvaluator):
             workflow_stdout=workflow_stdout,
             workflow_code=implementation.all_codes,
         )
-        user_prompt = T(".prompts:ensemble_eval.user").r(
+        user_prompt = T(".prompts:ensemble_eval.user").r(  # nosec
             stdout=stdout,
             workflow_stdout=workflow_stdout,
         )

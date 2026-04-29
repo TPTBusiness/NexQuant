@@ -20,13 +20,13 @@ def run(competition: str, cmd: str, local_path: str = "./", mount_path: str | No
         dotenv run -- python -m rdagent.app.utils.ws nomad2018-predict-transparent-conductors "sleep 3600" --local-path your_workspace
 
         2) then run the following command to enter the latest container:
-        - docker exec -it `docker ps --filter 'status=running' -l --format '{{.Names}}'` bash
+        - docker exec -it `docker ps --filter 'status=running' -l --format '{{.Names}}'` bash  # nosec
         Or you can attach to the container by specifying the container name (find it in the run info)
-        - docker exec -it sweet_robinson bash
+        - docker exec -it sweet_robinson bash  # nosec
 
     Arguments:
         competition: The competition slug/folder name.
-        cmd: The shell command or script entry point to execute inside
+        cmd: The shell command or script entry point to execute inside  # nosec
              the environment.
     """
     data_path = DS_RD_SETTING.local_data_path

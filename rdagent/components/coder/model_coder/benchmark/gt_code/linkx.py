@@ -185,4 +185,4 @@ if __name__ == "__main__":
     output = model(node_features, edge_index)
 
     # Save output to a file
-    torch.save(output, "gt_output.pt")
+    torch.save(output, "gt_output.pt")  # nosec

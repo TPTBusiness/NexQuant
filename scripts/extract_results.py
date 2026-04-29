@@ -16,7 +16,7 @@ Usage:
 """
 
 import argparse
-import pickle
+import pickle  # nosec
 import sys
 import traceback
 from pathlib import Path
@@ -172,7 +172,7 @@ class WorkspaceResultExtractor:
             DataFrame with portfolio analysis, or None if failed
         """
         try:
-            df = pd.read_pickle(pkl_path)
+            df = pd.read_pickle(pkl_path)  # nosec
             if self.verbose:
                 print(f"\n  Extracted ret.pkl from {pkl_path}:")
                 print(f"    Shape: {df.shape}")

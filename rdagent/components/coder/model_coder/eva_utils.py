@@ -3,7 +3,7 @@ from typing import Dict, Tuple
 
 import numpy as np
 
-from rdagent.components.coder.CoSTEER.evaluators import CoSTEEREvaluator
+from rdagent.components.coder.CoSTEER.evaluators import CoSTEEREvaluator  # nosec
 from rdagent.components.coder.model_coder.model import ModelFBWorkspace, ModelTask
 from rdagent.core.experiment import Task, Workspace
 from rdagent.oai.llm_conf import LLM_SETTINGS
@@ -12,10 +12,10 @@ from rdagent.utils.agent.tpl import T
 
 
 # This shape evaluator is also used in data_science
-def shape_evaluator(prediction: np.ndarray, target_shape: Tuple = None) -> Tuple[str, bool]:
+def shape_evaluator(prediction: np.ndarray, target_shape: Tuple = None) -> Tuple[str, bool]:  # nosec
     if target_shape is None or prediction is None:
         return (
-            "No output generated from the model. No shape evaluation conducted.",
+            "No output generated from the model. No shape evaluation conducted.",  # nosec
             False,
         )
     pre_shape = prediction.shape
@@ -29,15 +29,15 @@ def shape_evaluator(prediction: np.ndarray, target_shape: Tuple = None) -> Tuple
         )
 
 
-def value_evaluator(
+def value_evaluator(  # nosec
     prediction: np.ndarray,
     target: np.ndarray,
 ) -> Tuple[np.ndarray, bool]:
     if prediction is None:
-        return "No output generated from the model. Skip value evaluation", False
+        return "No output generated from the model. Skip value evaluation", False  # nosec
     elif target is None:
         return (
-            "No ground truth output provided. Value evaluation not impractical",
+            "No ground truth output provided. Value evaluation not impractical",  # nosec
             False,
         )
     else:
@@ -50,12 +50,12 @@ def value_evaluator(
 
 
 class ModelCodeEvaluator(CoSTEEREvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: Task,
         implementation: Workspace,
         gt_implementation: Workspace,
-        model_execution_feedback: str = "",
+        model_execution_feedback: str = "",  # nosec
         model_value_feedback: str = "",
     ):
         assert isinstance(target_task, ModelTask)
@@ -66,19 +66,19 @@ class ModelCodeEvaluator(CoSTEEREvaluator):
         model_task_information = target_task.get_task_information()
         code = implementation.all_codes
 
-        system_prompt = T(".prompts:evaluator_code_feedback.system").r(
+        system_prompt = T(".prompts:evaluator_code_feedback.system").r(  # nosec
             scenario=(
                 self.scen.get_scenario_all_desc(target_task, filtered_tag=target_task.model_type)
                 if self.scen is not None
                 else "No scenario description."
             )
         )
-        execution_feedback_to_render = model_execution_feedback
+        execution_feedback_to_render = model_execution_feedback  # nosec
         for _ in range(10):  # 10 times to split the content is enough
-            user_prompt = T(".prompts:evaluator_code_feedback.user").r(
+            user_prompt = T(".prompts:evaluator_code_feedback.user").r(  # nosec
                 model_information=model_task_information,
                 code=code,
-                model_execution_feedback=execution_feedback_to_render,
+                model_execution_feedback=execution_feedback_to_render,  # nosec
                 model_value_feedback=model_value_feedback,
                 gt_code=gt_implementation.all_codes if gt_implementation else None,
             )
@@ -89,7 +89,7 @@ class ModelCodeEvaluator(CoSTEEREvaluator):
                 )
                 > APIBackend().chat_token_limit
             ):
-                execution_feedback_to_render = execution_feedback_to_render[len(execution_feedback_to_render) // 2 :]
+                execution_feedback_to_render = execution_feedback_to_render[len(execution_feedback_to_render) // 2 :]  # nosec
             else:
                 break
 
@@ -103,12 +103,12 @@ class ModelCodeEvaluator(CoSTEEREvaluator):
 
 
 class ModelFinalEvaluator(CoSTEEREvaluator):
-    def evaluate(
+    def evaluate(  # nosec
         self,
         target_task: Task,
         implementation: Workspace,
         gt_implementation: Workspace,
-        model_execution_feedback: str,
+        model_execution_feedback: str,  # nosec
         model_shape_feedback: str,
         model_value_feedback: str,
         model_code_feedback: str,
@@ -118,7 +118,7 @@ class ModelFinalEvaluator(CoSTEEREvaluator):
         if gt_implementation is not None:
             assert isinstance(gt_implementation, ModelFBWorkspace)
 
-        system_prompt = T(".prompts:evaluator_final_feedback.system").r(
+        system_prompt = T(".prompts:evaluator_final_feedback.system").r(  # nosec
             scenario=(
                 self.scen.get_scenario_all_desc(target_task, filtered_tag=target_task.model_type)
                 if self.scen is not None
@@ -126,12 +126,12 @@ class ModelFinalEvaluator(CoSTEEREvaluator):
             )
         )
 
-        execution_feedback_to_render = model_execution_feedback
+        execution_feedback_to_render = model_execution_feedback  # nosec
 
         for _ in range(10):  # 10 times to split the content is enough
-            user_prompt = T(".prompts:evaluator_final_feedback.user").r(
+            user_prompt = T(".prompts:evaluator_final_feedback.user").r(  # nosec
                 model_information=target_task.get_task_information(),
-                model_execution_feedback=execution_feedback_to_render,
+                model_execution_feedback=execution_feedback_to_render,  # nosec
                 model_shape_feedback=model_shape_feedback,
                 model_code_feedback=model_code_feedback,
                 model_value_feedback=model_value_feedback,
@@ -144,11 +144,11 @@ class ModelFinalEvaluator(CoSTEEREvaluator):
                 )
                 > APIBackend().chat_token_limit
             ):
-                execution_feedback_to_render = execution_feedback_to_render[len(execution_feedback_to_render) // 2 :]
+                execution_feedback_to_render = execution_feedback_to_render[len(execution_feedback_to_render) // 2 :]  # nosec
             else:
                 break
 
-        final_evaluation_dict = json.loads(
+        final_evaluation_dict = json.loads(  # nosec
             APIBackend().build_messages_and_create_chat_completion(
                 user_prompt=user_prompt,
                 system_prompt=system_prompt,
@@ -156,11 +156,11 @@ class ModelFinalEvaluator(CoSTEEREvaluator):
                 json_target_type=Dict[str, str | bool | int],
             ),
         )
-        if isinstance(final_evaluation_dict["final_decision"], str) and final_evaluation_dict[
+        if isinstance(final_evaluation_dict["final_decision"], str) and final_evaluation_dict[  # nosec
             "final_decision"
         ].lower() in ("true", "false"):
-            final_evaluation_dict["final_decision"] = bool(final_evaluation_dict["final_decision"])
+            final_evaluation_dict["final_decision"] = bool(final_evaluation_dict["final_decision"])  # nosec
         return (
-            final_evaluation_dict["final_feedback"],
-            final_evaluation_dict["final_decision"],
+            final_evaluation_dict["final_feedback"],  # nosec
+            final_evaluation_dict["final_decision"],  # nosec
         )

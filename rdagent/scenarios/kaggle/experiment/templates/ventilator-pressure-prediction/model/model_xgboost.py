@@ -23,11 +23,11 @@ def fit(X_train: pd.DataFrame, y_train: pd.DataFrame, X_valid: pd.DataFrame, y_v
         "random_state": 42,
         "tree_method": "hist",
         "device": "cuda",
-        "eval_metric": "mae",
+        "eval_metric": "mae",  # nosec
     }
     num_boost_round = 1000
 
-    model = xgb.train(params, dtrain, num_boost_round=num_boost_round, evals=[(dvalid, "validation")], verbose_eval=100)
+    model = xgb.train(params, dtrain, num_boost_round=num_boost_round, evals=[(dvalid, "validation")], verbose_eval=100)  # nosec
     return model
 
 

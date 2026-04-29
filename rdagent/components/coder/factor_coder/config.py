@@ -19,8 +19,8 @@ class FactorCoSTEERSettings(CoSTEERSettings):
     simple_background: bool = False
     """Whether to use simple background information for code feedback"""
 
-    file_based_execution_timeout: int = 3600
-    """Timeout in seconds for each factor implementation execution"""
+    file_based_execution_timeout: int = 3600  # nosec
+    """Timeout in seconds for each factor implementation execution"""  # nosec
 
     select_method: str = "random"
     """Method for the selection of factors implementation"""

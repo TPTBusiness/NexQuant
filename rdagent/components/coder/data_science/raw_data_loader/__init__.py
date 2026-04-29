@@ -12,7 +12,7 @@ Extra feature:
 
 File structure
 - ___init__.py: the entrance/agent of coder
-- evaluator.py
+- evaluator.py  # nosec
 - conf.py
 - exp.py: everything under the experiment, e.g.
     - Task
@@ -26,7 +26,7 @@ import re
 from pathlib import Path
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
-from rdagent.components.coder.CoSTEER.evaluators import (
+from rdagent.components.coder.CoSTEER.evaluators import (  # nosec
     CoSTEERMultiEvaluator,
     CoSTEERSingleFeedback,
 )
@@ -40,7 +40,7 @@ from rdagent.components.coder.data_science.conf import (
     DSCoderCoSTEERSettings,
     get_ds_env,
 )
-from rdagent.components.coder.data_science.raw_data_loader.eval import (
+from rdagent.components.coder.data_science.raw_data_loader.eval import (  # nosec
     DataLoaderCoSTEEREvaluator,
 )
 from rdagent.components.coder.data_science.raw_data_loader.exp import DataLoaderTask
@@ -138,7 +138,7 @@ class DataLoaderMultiProcessEvolvingStrategy(MultiProcessEvolvingStrategy):
             if DS_RD_SETTING.spec_enabled
             else T("scenarios.data_science.share:component_spec.general").r(
                 spec=T("scenarios.data_science.share:component_spec.DataLoadSpec").r(),
-                test_code=(DIRNAME / "eval_tests" / "data_loader_test.txt").read_text(),
+                test_code=(DIRNAME / "eval_tests" / "data_loader_test.txt").read_text(),  # nosec
             )
         )
         user_prompt = T(".prompts:data_loader_coder.user").r(
@@ -231,7 +231,7 @@ class DataLoaderCoSTEER(DSCoSTEER):
             running_timeout_period=self.scen.real_full_timeout(),
         )
 
-        stdout = new_exp.experiment_workspace.execute(env=env, entry=f"python test/data_loader_test.py")
+        stdout = new_exp.experiment_workspace.execute(env=env, entry=f"python test/data_loader_test.py")  # nosec
         match = re.search(r"(.*?)=== Start of EDA part ===(.*)=== End of EDA part ===", stdout, re.DOTALL)
         eda_output = match.groups()[1] if match else None
         if eda_output is not None:

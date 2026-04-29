@@ -1,4 +1,4 @@
-"""Shared benchmark evaluation utilities."""
+"""Shared benchmark evaluation utilities."""  # nosec
 
 from pathlib import Path
 

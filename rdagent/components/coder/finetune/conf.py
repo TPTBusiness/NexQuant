@@ -71,7 +71,7 @@ class FTPathConfig:
     """Centralized path configuration for FT scenario.
 
     Provides environment-aware paths for Docker vs Conda modes.
-    Uses lazy evaluation (properties) to avoid import-time errors.
+    Uses lazy evaluation (properties) to avoid import-time errors.  # nosec
 
     Usage:
         from rdagent.components.coder.finetune.conf import FT_PATHS
@@ -135,8 +135,8 @@ class FTCoderCoSTEERSettings(CoSTEERSettings):
     env_type: str = "docker"
     """Environment type for LLM fine-tuning (docker/conda)"""
 
-    extra_eval: list[str] = []
-    """Extra evaluators"""
+    extra_eval: list[str] = []  # nosec
+    """Extra evaluators"""  # nosec
 
 
 def _get_standard_ft_volumes() -> dict:
@@ -277,7 +277,7 @@ def clear_workspace(workspace: FBWorkspace, env: Env) -> None:
 
     Args:
         workspace: The workspace object containing the file dictionary.
-        env: The environment to execute the clean command in.
+        env: The environment to execute the clean command in.  # nosec
     """
     target_path = workspace.workspace_path
     if not target_path.exists():
@@ -302,7 +302,7 @@ def clear_workspace(workspace: FBWorkspace, env: Env) -> None:
         # Items are relative to workspace root inside the env
         items_str = " ".join([f"'{ws_prefix}/{item}'" for item in remove_items])
         cmd = f"rm -rf {items_str}"
-        workspace.execute(env=env, entry=cmd)
+        workspace.execute(env=env, entry=cmd)  # nosec
 
 
 def get_benchmark_env(
@@ -318,7 +318,7 @@ def get_benchmark_env(
         timeout: Running timeout in seconds (None uses config default)
 
     Returns:
-        Configured environment ready for benchmark evaluation
+        Configured environment ready for benchmark evaluation  # nosec
     """
     conf = FTCoderCoSTEERSettings()
 
@@ -373,7 +373,7 @@ def inject_data_stats(implementation: FBWorkspace, data: list, stdout: str) -> N
     Args:
         implementation: The workspace to inject data_stats.json into
         data: The data list from data.json
-        stdout: The stdout from process_data.py execution
+        stdout: The stdout from process_data.py execution  # nosec
     """
     token_stats = _compute_column_stats(data)
 

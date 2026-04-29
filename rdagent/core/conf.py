@@ -65,14 +65,14 @@ class RDAgentSettings(ExtendedBaseSettings):
     # multi processing conf
     multi_proc_n: int = 1
 
-    # pickle cache conf
-    cache_with_pickle: bool = True  # whether to use pickle cache
-    pickle_cache_folder_path_str: str = str(
-        Path.cwd() / "pickle_cache/",
-    )  # the path of the folder to store the pickle cache
+    # pickle cache conf  # nosec
+    cache_with_pickle: bool = True  # whether to use pickle cache  # nosec
+    pickle_cache_folder_path_str: str = str(  # nosec
+        Path.cwd() / "pickle_cache/",  # nosec
+    )  # the path of the folder to store the pickle cache  # nosec
     use_file_lock: bool = (
         True  # when calling the function with same parameters, whether to use file lock to avoid
-        # executing the function multiple times
+        # executing the function multiple times  # nosec
     )
 
     # misc

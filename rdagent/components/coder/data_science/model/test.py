@@ -6,7 +6,7 @@ from pathlib import Path
 
 from rdagent.components.coder.CoSTEER.config import CoSTEER_SETTINGS
 from rdagent.components.coder.data_science.model import ModelCoSTEER
-from rdagent.components.coder.data_science.model.eval import (
+from rdagent.components.coder.data_science.model.eval import (  # nosec
     ModelGeneralCaseSpecEvaluator,
 )
 from rdagent.components.coder.data_science.model.exp import ModelTask
@@ -44,9 +44,9 @@ def develop_one_competition(competition: str):
         sub_tasks=[mt],
     )
 
-    # Test the evaluator:
+    # Test the evaluator:  # nosec
     """eva = ModelGeneralCaseSpecEvaluator(scen=scen)
-    exp.feedback = eva.evaluate(target_task=mt, queried_knowledge=None, implementation=modelexp, gt_implementation=None)
+    exp.feedback = eva.evaluate(target_task=mt, queried_knowledge=None, implementation=modelexp, gt_implementation=None)  # nosec
     print(exp.feedback)"""
 
     # Test the evolving strategy:

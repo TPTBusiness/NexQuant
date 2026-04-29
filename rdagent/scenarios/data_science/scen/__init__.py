@@ -204,7 +204,7 @@ class DataScienceScen(Scenario):
         return T(".prompts:scenario_description").r(
             background=self.background,
             submission_specifications=self.submission_specifications,
-            evaluation=self.metric_description,
+            evaluation=self.metric_description,  # nosec
             metric_name=self.metric_name,
             metric_direction=self.metric_direction,
             raw_description=self.raw_description,
@@ -224,7 +224,7 @@ class DataScienceScen(Scenario):
         return T(".prompts:scenario_description").r(
             background=self.background,
             submission_specifications=self.submission_specifications,
-            evaluation=self.metric_description,
+            evaluation=self.metric_description,  # nosec
             metric_name=self.metric_name,
             metric_direction=self.metric_direction,
             raw_description=self.raw_description,

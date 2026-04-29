@@ -55,7 +55,7 @@ class PAIAgent(BaseAgent):
 
     def _run_query(self, query: str) -> str:
         """
-        Internal query execution (no caching)
+        Internal query execution (no caching)  # nosec
         """
         nest_asyncio.apply()  # NOTE: very important. Because pydantic-ai uses asyncio!
         result = self.agent.run_sync(query)

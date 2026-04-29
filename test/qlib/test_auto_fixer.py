@@ -1,4 +1,4 @@
-"""Tests for FactorAutoFixer — the pre-execution code patcher."""
+"""Tests for FactorAutoFixer — the pre-execution code patcher."""  # nosec
 
 import pytest
 
@@ -73,7 +73,7 @@ class TestChainedGroupby:
         assert '.groupby("date")' not in result
 
     def test_list_with_level_keyword_syntax_error(self, fixer):
-        # groupby([level=1, 'date']) is a SyntaxError — must be fixed before execution
+        # groupby([level=1, 'date']) is a SyntaxError — must be fixed before execution  # nosec
         code = "asian_vol = df[mask].groupby([level=1, 'date'])['log_return'].std()"
         result = fixer.fix(code)
         assert "get_level_values(1)" in result

@@ -57,7 +57,7 @@ class FTWorkspace(FBWorkspace):
 
         Args:
             env: The environment to run in (DockerEnv, LocalEnv, etc.)
-            entry: The command to execute
+            entry: The command to execute  # nosec
             env_vars: Optional additional environment variables (e.g., LLM API keys)
                      Will be merged with default {"PYTHONPATH": "./"}
             cache_key_extra_func: Optional extra function for cache key calculation
@@ -82,7 +82,7 @@ class FTWorkspace(FBWorkspace):
             cache_files_to_extract=cache_files_to_extract,
         )
 
-        # Unified execution logging for FT scenario (supports both Docker and Conda)
+        # Unified execution logging for FT scenario (supports both Docker and Conda)  # nosec
         if isinstance(env, DockerEnv):
             tag_prefix = "docker_run"
         elif isinstance(env, LocalEnv):

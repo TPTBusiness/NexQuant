@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 class FactorAutoFixer:
     """
-    Automatically patches common factor code issues before execution.
+    Automatically patches common factor code issues before execution.  # nosec
 
-    This runs AFTER LLM code generation but BEFORE execution, ensuring
+    This runs AFTER LLM code generation but BEFORE execution, ensuring  # nosec
     known patterns are fixed without requiring another LLM iteration.
     """
 
