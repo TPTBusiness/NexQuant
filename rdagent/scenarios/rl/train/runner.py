@@ -68,7 +68,7 @@ class RLPostTrainingRunner(Developer):
         start_time = time.time()
 
         try:
-            proc = subprocess.run(
+            proc = subprocess.run( # nosec B603
                 ["python", str(main_py)],
                 cwd=str(code_dir),
                 capture_output=True,

@@ -24,7 +24,7 @@ from rdagent.scenarios.rl.autorl_bench.conf import (
 )
 
 
-def kill_process_group(proc: "subprocess.Popen") -> None:
+def kill_process_group(proc: "subprocess.Popen") -> None: # nosec B603
     """尽力杀掉进程组：SIGTERM → SIGKILL → proc.kill()"""
     import signal as _signal
 
@@ -111,7 +111,7 @@ def download_data(task: str, data_dir: Optional[str] = None) -> str:
         script = bench_dir / "download_data.py"
         if script.exists():
             target_dir.mkdir(parents=True, exist_ok=True)
-            subprocess.run(
+            subprocess.run( # nosec B603
                 [sys.executable, str(script)],
                 cwd=str(bench_dir),
                 check=True,

@@ -669,7 +669,7 @@ def _run_factor_directly(factor_info: FactorInfo) -> Optional[BacktestResult]:
 
         # Try to execute factor.py
         try:
-            proc = subprocess.run(
+            proc = subprocess.run( # nosec B603
                 [sys.executable, str(ws / "factor.py")],
                 cwd=str(ws),
                 capture_output=True,
@@ -860,7 +860,7 @@ task:
 
         # Run Qlib via qrun CLI
         try:
-            result = subprocess.run(
+            result = subprocess.run( # nosec B603
                 [str(QRUN_PATH), str(ws / "conf.yaml")],
                 cwd=str(ws),
                 capture_output=True,

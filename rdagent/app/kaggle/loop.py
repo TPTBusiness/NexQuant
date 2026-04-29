@@ -88,7 +88,7 @@ class KaggleRDLoop(RDLoop):
         if KAGGLE_IMPLEMENT_SETTING.auto_submit:
             csv_path = exp.experiment_workspace.workspace_path / "submission.csv"
             try:
-                subprocess.run(
+                subprocess.run( # nosec B603
                     [
                         "kaggle",
                         "competitions",

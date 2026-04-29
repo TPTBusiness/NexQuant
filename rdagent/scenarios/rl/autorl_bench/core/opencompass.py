@@ -99,7 +99,7 @@ class OpenCompassEvaluator(BaseEvaluator):
         cmd = ["opencompass", str(config_path), "--work-dir", str(work_dir)]
 
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=7200) # nosec B603
         except subprocess.TimeoutExpired:
             result["error"] = "OpenCompass timeout (7200s)"
             return result

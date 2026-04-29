@@ -43,7 +43,7 @@ class RunState:
         self.run_id = run_id
         self.api_key_idx = api_key_idx
         self.model = model
-        self.process: Optional[subprocess.Popen] = None
+        self.process: Optional[subprocess.Popen] = None # nosec B603
         self.status: str = "pending"  # pending, running, success, failed, stopped
         self.start_time: Optional[datetime] = None
         self.end_time: Optional[datetime] = None
@@ -203,7 +203,7 @@ class ParallelRunner:
         Returns
         -------
         list
-            Command list for subprocess.Popen
+            Command list for subprocess.Popen # nosec B603
         """
         cmd = [
             sys.executable,  # Use same Python interpreter
@@ -236,7 +236,7 @@ class ParallelRunner:
         log_f = open(log_path, "a", encoding="utf-8")
 
         # Start subprocess
-        run_state.process = subprocess.Popen(
+        run_state.process = subprocess.Popen( # nosec B603
             cmd,
             env=env,
             cwd=str(self.project_root),

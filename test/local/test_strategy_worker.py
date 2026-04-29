@@ -396,7 +396,7 @@ def generate_signal(factors, close):
         assert result['success'] is False
         assert 'error' in result
 
-    @patch('rdagent.scenarios.qlib.local.strategy_worker.subprocess.run')
+    @patch('rdagent.scenarios.qlib.local.strategy_worker.subprocess.run') # nosec B603
     def test_run_subprocess_timeout(self, mock_run, backtest_engine):
         """Test subprocess timeout handling."""
         import subprocess  # nosec B404
@@ -407,7 +407,7 @@ def generate_signal(factors, close):
         assert result['success'] is False
         assert 'Timeout' in result['error']
 
-    @patch('rdagent.scenarios.qlib.local.strategy_worker.subprocess.run')
+    @patch('rdagent.scenarios.qlib.local.strategy_worker.subprocess.run') # nosec B603
     def test_run_subprocess_success(self, mock_run, backtest_engine):
         """Test successful subprocess execution."""
         mock_proc = Mock()

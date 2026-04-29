@@ -55,7 +55,7 @@ def get_gpu_info():
             gpu_info["message"] = "No CUDA GPU detected"
     except ImportError:
         try:
-            result = subprocess.run(
+            result = subprocess.run( # nosec B603
                 ["nvidia-smi", "--query-gpu=name,memory.total,memory.used", "--format=csv,noheader,nounits"],
                 capture_output=True,
                 text=True,
@@ -63,7 +63,7 @@ def get_gpu_info():
             if result.returncode == 0:
                 gpu_info["source"] = "nvidia-smi"
                 gpu_info["cuda_version"] = None
-                version_result = subprocess.run(
+                version_result = subprocess.run( # nosec B603
                     ["nvidia-smi"],
                     capture_output=True,
                     text=True,

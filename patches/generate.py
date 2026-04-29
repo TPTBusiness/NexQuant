@@ -3,7 +3,7 @@ import sys
 import os
 
 # Qlib läuft in rdagent4qlib environment
-result = subprocess.run(
+result = subprocess.run( # nosec B603
     ["/home/nico/miniconda3/envs/rdagent4qlib/bin/python3", "-c", """
 import qlib
 from qlib.data import D

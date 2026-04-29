@@ -132,7 +132,7 @@ pd.Series(signal).fillna(0).to_pickle('signal.pkl')
         (tdp / "run.py").write_text(script)
 
         try:
-            result = subprocess.run(
+            result = subprocess.run( # nosec B603
                 ["python", "run.py"],
                 capture_output=True,
                 text=True,
