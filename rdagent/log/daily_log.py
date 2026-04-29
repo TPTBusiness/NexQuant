@@ -1,3 +1,4 @@
+import logging
 """
 Daily-rotating log for all Predix commands.
 
@@ -103,7 +104,7 @@ def log_llm_call(
         try:
             entry["duration_ms"] = int((end_time - start_time).total_seconds() * 1000)
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
     line = _json.dumps(entry, ensure_ascii=False)
     out_path = _today_dir() / "llm_calls.jsonl"
     with _llm_log_lock:
