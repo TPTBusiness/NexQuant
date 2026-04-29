@@ -924,7 +924,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         the complete backtest range (not just the debug 2024 subset).
         """
         import os as _os
-        import subprocess
+        import subprocess  # nosec B404 # secure usage: subprocess with sys.executable
         import shutil
         import tempfile
 
