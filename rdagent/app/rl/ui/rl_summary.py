@@ -1,3 +1,4 @@
+import logging
 """
 RL Job Summary View
 Display summary table for all tasks in a job directory
@@ -43,7 +44,7 @@ def get_loop_status(task_path: Path, loop_id: int) -> tuple[str, bool | None]:
                 feedback_decision = decision
                 break
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
 
     if feedback_decision is not None:
         return ("OK" if feedback_decision else "X"), feedback_decision

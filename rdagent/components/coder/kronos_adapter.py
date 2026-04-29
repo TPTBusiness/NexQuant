@@ -355,7 +355,7 @@ def evaluate_kronos_model(
                     predicted_returns.append(pred_ret)
                     actual_returns.append(actual_ret)
                 except Exception:
-                    pass
+                    logging.debug("Exception caught", exc_info=True)
 
     pred_arr = np.array(predicted_returns)
     actual_arr = np.array(actual_returns)

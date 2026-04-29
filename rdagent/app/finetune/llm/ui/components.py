@@ -1,3 +1,4 @@
+import logging
 """
 FT UI Components - Hierarchical Event Renderers
 """
@@ -223,7 +224,7 @@ def render_scenario(content: Any) -> None:
             timeout_hours = content.real_full_timeout() / 60 / 60
             st.markdown(f"**Full Train Timeout:** {timeout_hours:.2f} hours")
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
 
     # 4. Device info - formatted nicely
     if hasattr(content, "device_info") and content.device_info:

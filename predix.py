@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import logging
 """
 Predix CLI - Wrapper for rdagent with LLM model selection.
 
@@ -49,7 +50,7 @@ def _ensure_kronos_factor_in_pool(con) -> None:
             if existing.get("ic") is not None:
                 return
         except Exception:
-            pass
+            logging.debug("Exception caught", exc_info=True)
 
     con.print("\n[bold yellow]Kronos Factor[/bold yellow] not in pool — generating automatically...")
     con.print("  [dim]stride=500 (~4500 windows), batch=32 — ~5-10 min on GPU[/dim]")
