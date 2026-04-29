@@ -171,7 +171,7 @@ model_cls = LINKX
 
 if __name__ == "__main__":
     node_features = torch.load("node_features.pt", weights_only=True)
-    edge_index = torch.load("edge_index.pt", weights_only=True)
+    edge_index = torch.load("edge_index.pt", weights_only=True)  # nosec B614
 
     # Model instantiation and forward pass
     model = LINKX(
