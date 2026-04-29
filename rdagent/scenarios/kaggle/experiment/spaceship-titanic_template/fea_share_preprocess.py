@@ -83,7 +83,7 @@ def preprocess_script():
         X_valid = pd.read_pickle("/kaggle/input/X_valid.pkl")  # nosec B301
         y_train = pd.read_pickle("/kaggle/input/y_train.pkl")  # nosec B301
         y_valid = pd.read_pickle("/kaggle/input/y_valid.pkl")  # nosec B301
-        X_test = pd.read_pickle("/kaggle/input/X_test.pkl")
+        X_test = pd.read_pickle("/kaggle/input/X_test.pkl")  # nosec B301
         others = pd.read_pickle("/kaggle/input/others.pkl")  # nosec B301
         y_train = pd.Series(y_train).reset_index(drop=True)
         y_valid = pd.Series(y_valid).reset_index(drop=True)
