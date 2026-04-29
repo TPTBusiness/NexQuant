@@ -27,6 +27,7 @@ Usage:
 from __future__ import annotations
 
 import json as _json
+import logging
 import sys
 import threading
 from contextlib import contextmanager
@@ -36,21 +37,24 @@ from typing import Any
 
 from loguru import logger as _root
 
-# ── paths ─────────────────────────────────────────────────────────────────────
+# ── paths ─────────────────────────────────────────────────────────────────────────────────
 LOGS_ROOT: Path = Path(__file__).parent.parent.parent / "logs"
 
-# ── format ────────────────────────────────────────────────────────────────────
+# ── format ────────────────────────────────────────────────────────────────────────────────
 _FILE_FMT = (
     "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {extra[cmd]: <18} | {message}"
 )
 
-# ── internal state ─────────────────────────────────────────────────────────────
+# ── internal state ─────────────────────────────────────────────────────────────────────────────
 _registered: set[str] = set()   # command keys that already have a file sink
 _all_added: bool = False         # whether the combined all.log sink is active
 _llm_log_lock = threading.Lock()  # guards concurrent writes to llm_calls.jsonl
 
+# Maximum characters stored per field in llm_calls.jsonl to prevent GB-scale files.
+_LLM_CALL_MAX_CHARS = 500
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+
+# ── helpers ────────────────────────────────────────────────────────────────────────────────
 
 def _today_dir() -> Path:
     d = LOGS_ROOT / datetime.now().strftime("%Y-%m-%d")
@@ -79,7 +83,7 @@ def _banner(log, title: str, meta: dict[str, Any]) -> None:
     log.info(sep)
 
 
-# ── public API ────────────────────────────────────────────────────────────────
+# ── public API ──────────────────────────────────────────────────────────────────────────────
 
 def log_llm_call(
     system: str | None,
@@ -88,16 +92,19 @@ def log_llm_call(
     start_time: Any = None,
     end_time: Any = None,
 ) -> None:
-    """Append one complete LLM call to logs/YYYY-MM-DD/llm_calls.jsonl.
+    """Append one LLM call summary to logs/YYYY-MM-DD/llm_calls.jsonl.
+
+    Prompt/response content is capped at _LLM_CALL_MAX_CHARS to prevent
+    GB-scale log files from long-running loops.
 
     Each line is a self-contained JSON object so the file is grep/jq-friendly:
       jq 'select(.duration_ms > 5000)' logs/2026-04-17/llm_calls.jsonl
     """
     entry: dict[str, Any] = {
         "ts": datetime.now().isoformat(timespec="milliseconds"),
-        "system": system or "",
-        "user": user,
-        "response": response,
+        "system": (system or "")[:_LLM_CALL_MAX_CHARS],
+        "user": user[:_LLM_CALL_MAX_CHARS],
+        "response": response[:_LLM_CALL_MAX_CHARS],
     }
     if start_time is not None and end_time is not None:
         try:
@@ -130,13 +137,13 @@ def setup(command: str, **context: Any):
     key = command.lower()
 
     if key not in _registered:
-        # Per-command rotating file
         _root.add(
             str(log_dir / f"{key}.log"),
             format=_FILE_FMT,
             filter=lambda r, k=key: r["extra"].get("cmd", "").lower() == k,
-            rotation="00:00",      # new file at midnight
-            retention="30 days",
+            rotation="50 MB",
+            compression="gz",
+            retention="7 days",
             encoding="utf-8",
             enqueue=True,
             backtrace=False,
@@ -145,13 +152,13 @@ def setup(command: str, **context: Any):
         _registered.add(key)
 
     if not _all_added:
-        # Combined log — all commands
         _root.add(
             str(log_dir / "all.log"),
             format=_FILE_FMT,
             filter=lambda r: "cmd" in r["extra"],
-            rotation="00:00",
-            retention="60 days",
+            rotation="100 MB",
+            compression="gz",
+            retention="7 days",
             encoding="utf-8",
             enqueue=True,
             backtrace=False,
