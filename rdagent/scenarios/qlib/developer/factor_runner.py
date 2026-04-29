@@ -1,3 +1,4 @@
+import sys
 import os
 import logging
 from pathlib import Path
@@ -966,7 +967,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 shutil.copy(str(full_data), str(tmp / "intraday_pv.h5"))
 
                 ret = subprocess.run(
-                    ["python", "factor.py"],
+                    ["sys.executable", "factor.py"],
                     cwd=str(tmp),
                     capture_output=True,
                     timeout=300,
@@ -1001,7 +1002,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             series.to_frame().to_parquet(str(parquet_path))
 
         except Exception:
-            pass
+    logging.debug("Error in save_factor_values_to_parquet", exc_info=True)
 
     def _log_result_warnings(self, factor_name: str, result, metrics: dict) -> None:
         """
