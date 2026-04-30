@@ -232,13 +232,13 @@ def workspace_win(workspace, cmp_workspace=None, cmp_name="last code."):
                     if target_folder.strip() == "":
                         st.warning("Please enter a valid folder path.")
                     else:
-                        target_folder_path = Path(target_folder)
+                        target_folder_path = Path(target_folder).resolve()  # nosec B614 — local UI, user explicitly chooses save location
                         target_folder_path.mkdir(parents=True, exist_ok=True)
                         for filename, content in workspace.file_dict.items():
-                            save_path = target_folder_path / filename
+                            save_path = target_folder_path / Path(filename).name
                             save_path.parent.mkdir(parents=True, exist_ok=True)
                             save_path.write_text(content, encoding="utf-8")
-                        st.success(f"All files saved to: {target_folder}")
+                        st.success(f"All files saved to: {target_folder_path}")
     else:
         st.markdown(f"No files in :blue[{replace_ep_path(workspace.workspace_path)}]")
 
