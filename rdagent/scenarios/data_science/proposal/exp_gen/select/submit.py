@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 import pickle
@@ -587,8 +588,8 @@ def _parsing_score(grade_stdout: str) -> Optional[float]:
         except:
             pass
         try:
-            # Priority 2: Eval dict
-            return float(eval(json_str)["score"])
+            # Priority 2: safe literal eval for Python-style dicts
+            return float(ast.literal_eval(json_str)["score"])
         except:
             pass
         try:
