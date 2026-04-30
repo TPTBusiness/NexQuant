@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.7](https://github.com/TPTBusiness/Predix/compare/v1.3.6...v1.3.7) (2026-04-30)
+
+
+### Bug Fixes
+
+* **security:** nosec for B608/B701 false positives in UI and template code ([5eb5d7e](https://github.com/TPTBusiness/Predix/commit/5eb5d7e8fdbe90e0dced83fef4e09f5a33e96b2b))
+* **security:** replace eval() with ast.literal_eval and add request timeouts (B307, B113) ([3301ada](https://github.com/TPTBusiness/Predix/commit/3301ada697ca7d3afa1a188d2a76a87ae98b4529))
+* **security:** replace shell=True subprocess calls with list args (B602) ([13c08f4](https://github.com/TPTBusiness/Predix/commit/13c08f4ce6813eb7c314087921ec8c0f40074bd7))
+
 ## [1.3.6](https://github.com/TPTBusiness/Predix/compare/v1.3.5...v1.3.6) (2026-04-30)
 
 
