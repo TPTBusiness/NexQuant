@@ -80,7 +80,7 @@ def get_valid_sessions(log_folder: Path, safe_root: Path | None = None) -> list[
         folder_real = os.path.realpath(str(log_folder.expanduser()))
         if not (folder_real == root_real or folder_real.startswith(root_real + os.sep)):
             return []
-        log_folder = Path(folder_real)
+        log_folder = Path(folder_real)  # nosec B614 — path validated against safe_root via realpath above
 
     if not log_folder.exists():
         return []
@@ -251,7 +251,7 @@ def load_session(log_path: Path, safe_root: Path | None = None) -> Session:
         path_real = os.path.realpath(str(log_path.expanduser()))
         if not (path_real == root_real or path_real.startswith(root_real + os.sep)):
             return Session()
-        log_path = Path(path_real)
+        log_path = Path(path_real)  # nosec B614 — path validated against safe_root via realpath above
 
     session = Session()
 
