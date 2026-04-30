@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.6](https://github.com/TPTBusiness/Predix/compare/v1.3.5...v1.3.6) (2026-04-30)
+
+
+### Bug Fixes
+
+* **security:** real fix for B110 (logging in factor_proposal.py [#746](https://github.com/TPTBusiness/Predix/issues/746)) ([16624e0](https://github.com/TPTBusiness/Predix/commit/16624e0bd966ae4d24c4a3eb42bbc31c11da3136))
+* **security:** real fix for B110 (logging in factor_runner.py [#744](https://github.com/TPTBusiness/Predix/issues/744)) ([88cf0fb](https://github.com/TPTBusiness/Predix/commit/88cf0fb8828b11c97f2f3ae2881a4900b020c6f0))
+* **security:** real fix for B110 (logging in quant_proposal.py [#741](https://github.com/TPTBusiness/Predix/issues/741)) ([7cf2a64](https://github.com/TPTBusiness/Predix/commit/7cf2a644f553b054bd4b0607ea51e5372e68d90a))
+* **security:** real fix for B110 (logging in quant_proposal.py [#741](https://github.com/TPTBusiness/Predix/issues/741)) ([ef985f8](https://github.com/TPTBusiness/Predix/commit/ef985f86035d8dca707c60137e6508349a0c4ae6))
+* **security:** real fix for B404/B603 (sys.executable in factor_runner.py [#745](https://github.com/TPTBusiness/Predix/issues/745)) ([819655a](https://github.com/TPTBusiness/Predix/commit/819655aaa3efa76596d60501d0e8ca365df3e5e2))
+* **security:** revert broken read_pickle encoding arg in kaggle template (B301) ([3574907](https://github.com/TPTBusiness/Predix/commit/35749073c91e69f63ddaad61dae3f2b799327e63))
+* **security:** validate SQL identifiers in _add_column_if_not_exists (B608) ([e10dfa2](https://github.com/TPTBusiness/Predix/commit/e10dfa2576038e911f83595d3b466c261bc0cd54))
+* **security:** whitelist-validate metric column in get_top_factors (B608) ([e50519f](https://github.com/TPTBusiness/Predix/commit/e50519fe066e68aec2f19b83df4f643c3c22053d))
+
 ## [1.3.5](https://github.com/TPTBusiness/Predix/compare/v1.3.4...v1.3.5) (2026-04-27)
 
 
