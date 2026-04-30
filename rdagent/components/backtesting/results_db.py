@@ -71,6 +71,9 @@ class ResultsDatabase:
 
         self.conn.commit()
 
+    _ALLOWED_TABLES = frozenset({"factors", "backtest_runs", "loop_results"})
+    _ALLOWED_COL_TYPES = frozenset({"REAL", "TEXT", "INTEGER", "BLOB"})
+
     def _add_column_if_not_exists(self, table: str, column: str, col_type: str) -> None:
         """
         Add a column to a table if it doesn't already exist.
@@ -78,20 +81,24 @@ class ResultsDatabase:
         Parameters
         ----------
         table : str
-            Table name
+            Table name (must be in _ALLOWED_TABLES)
         column : str
-            Column name to add
+            Column name to add (alphanumeric + underscore only)
         col_type : str
-            SQL column type (e.g., 'REAL', 'TEXT')
+            SQL column type (must be in _ALLOWED_COL_TYPES)
         """
+        if table not in self._ALLOWED_TABLES:
+            raise ValueError(f"Unknown table: {table!r}")
+        if not column.replace("_", "").isalnum():
+            raise ValueError(f"Invalid column name: {column!r}")
+        if col_type not in self._ALLOWED_COL_TYPES:
+            raise ValueError(f"Invalid column type: {col_type!r}")
+
         c = self.conn.cursor()
-        try:
-            # Try to query the column - if it fails, it doesn't exist
-            # nosec B608: Internal schema migration, column names are controlled
-            c.execute(f"SELECT {column} FROM {table} LIMIT 1")  # nosec B608
-        except sqlite3.OperationalError:
-            # Column doesn't exist, add it
-            c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")  # nosec B608
+        c.execute("SELECT name FROM pragma_table_info(?)", (table,))
+        existing = {row[0] for row in c.fetchall()}
+        if column not in existing:
+            c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
     
     def add_factor(self, name: str, type: str = "unknown") -> int:
         c = self.conn.cursor()
