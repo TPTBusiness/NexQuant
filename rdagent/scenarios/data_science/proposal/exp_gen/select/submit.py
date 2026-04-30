@@ -293,7 +293,7 @@ class ValidationSelector(SOTAexpSelector):
         Sorts all valid experiments by score and returns the top N.
         """
 
-        mock_folder = f"/tmp/mock/{self.competition}"
+        mock_folder = f"/tmp/mock/{self.competition}"  # nosec B108 — Docker volume mount point derived from internal competition name
 
         try:
             data_py_code, grade_py_code = self._prepare_validation_scripts(
@@ -540,7 +540,7 @@ def process_experiment(
 
         # Run main script
         env = get_ds_env(
-            extra_volumes={f"/tmp/mock/{competition}/{input_folder}": input_folder},
+            extra_volumes={f"/tmp/mock/{competition}/{input_folder}": input_folder},  # nosec B108 — Docker volume mount point derived from internal competition name
             running_timeout_period=DS_RD_SETTING.full_timeout,
         )
         result = ws.run(env=env, entry="python main.py")

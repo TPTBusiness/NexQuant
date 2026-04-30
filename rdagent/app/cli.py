@@ -1251,7 +1251,7 @@ def start_loop_cli(
     script_dir = str(Path(__file__).parent.parent.parent.parent)
     generator = f"python {script_dir}/scripts/predix_smart_strategy_gen.py"
     logfile = f"{script_dir}/results/logs/generator_loop.log"
-    pidfile = "/tmp/predix_loop.pid"
+    pidfile = "/tmp/predix_loop.pid"  # nosec B108 — administrative PID file, single-process daemon
 
     os.makedirs(f"{script_dir}/results/logs", exist_ok=True)
 
