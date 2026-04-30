@@ -850,24 +850,22 @@ class QlibCondaEnv(LocalEnv[QlibCondaConf]):
     def prepare(self) -> None:
         """Prepare the conda environment if not already created."""
         try:
-            envs = subprocess.run("conda env list", capture_output=True, text=True, shell=True)
+            envs = subprocess.run(["conda", "env", "list"], capture_output=True, text=True)
             if self.conf.conda_env_name not in envs.stdout:
                 print(f"[yellow]Conda env '{self.conf.conda_env_name}' not found, creating...[/yellow]")
                 subprocess.check_call(
-                    f"conda create -y -n {self.conf.conda_env_name} python=3.10",
-                    shell=True,
+                    ["conda", "create", "-y", "-n", self.conf.conda_env_name, "python=3.10"],
                 )
                 subprocess.check_call(
-                    f"conda run -n {self.conf.conda_env_name} pip install --upgrade pip cython",
-                    shell=True,
+                    ["conda", "run", "-n", self.conf.conda_env_name, "pip", "install", "--upgrade", "pip", "cython"],
                 )
                 subprocess.check_call(
-                    f"conda run -n {self.conf.conda_env_name} pip install git+https://github.com/microsoft/qlib.git@2fb9380b342556ddb50a4b24e4fe8655d548b2b8",
-                    shell=True,
+                    ["conda", "run", "-n", self.conf.conda_env_name, "pip", "install",
+                     "git+https://github.com/microsoft/qlib.git@2fb9380b342556ddb50a4b24e4fe8655d548b2b8"],
                 )
                 subprocess.check_call(
-                    f"conda run -n {self.conf.conda_env_name} pip install catboost xgboost tables torch",
-                    shell=True,
+                    ["conda", "run", "-n", self.conf.conda_env_name, "pip", "install",
+                     "catboost", "xgboost", "tables", "torch"],
                 )
 
         except Exception as e:
