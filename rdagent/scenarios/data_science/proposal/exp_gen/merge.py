@@ -182,7 +182,7 @@ class ExpGen2Hypothesis(DSProposalV2ExpGen):
 
         success_fb_list = list(set(trace_fbs))
         logger.info(
-            f"Merge Hypothesis: select {len(success_fb_list)} from {len(trace_fbs)} SOTA experiments found in {len(leaves)} traces"
+            f"Merge Hypothesis: select {len(success_fb_list)} from {len(trace_fbs)} SOTA experiments found in {len(leaves)} traces"  # nosec B608 — not SQL, Bandit false positive on "select" in log message
         )
 
         if len(success_fb_list) > 0:
