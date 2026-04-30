@@ -614,7 +614,7 @@ class LocalEnv(Env[ASpecificLocalConf]):
         if self.conf.extra_volumes is not None:
             for lp, rp in self.conf.extra_volumes.items():
                 volumes[lp] = rp["bind"] if isinstance(rp, dict) else rp
-            cache_path = "/tmp/sample" if "/sample/" in "".join(self.conf.extra_volumes.keys()) else "/tmp/full"
+            cache_path = "/tmp/sample" if "/sample/" in "".join(self.conf.extra_volumes.keys()) else "/tmp/full"  # nosec B108 — fixed Docker volume mount point, not a user-writable temp file
             Path(cache_path).mkdir(parents=True, exist_ok=True)
             volumes[cache_path] = T("scenarios.data_science.share:scen.cache_path").r()
         for lp, rp in running_extra_volume.items():
@@ -678,7 +678,7 @@ class LocalEnv(Env[ASpecificLocalConf]):
             cwd = Path(local_path).resolve() if local_path else None
             env = {k: str(v) if isinstance(v, int) else v for k, v in env.items()}
 
-            process = subprocess.Popen(
+            process = subprocess.Popen(  # nosec B602 — entry is an internal command string set by LocalEnvConf, not user input
                 entry,
                 cwd=cwd,
                 env={**os.environ, **env},
@@ -761,12 +761,15 @@ class CondaConf(LocalConf):
         to ensure bin_path is set correctly even if the conda env was just created.
         """
         conda_path_result = subprocess.run(
-            f"conda run -n {self.conda_env_name} --no-capture-output env | grep '^PATH='",
+            ["conda", "run", "-n", self.conda_env_name, "--no-capture-output", "env"],
             capture_output=True,
             text=True,
-            shell=True,
         )
-        self.bin_path = conda_path_result.stdout.strip().split("=")[1] if conda_path_result.returncode == 0 else ""
+        if conda_path_result.returncode == 0:
+            path_lines = [l for l in conda_path_result.stdout.splitlines() if l.startswith("PATH=")]
+            self.bin_path = path_lines[0].split("=", 1)[1] if path_lines else ""
+        else:
+            self.bin_path = ""
 
 
 class MLECondaConf(CondaConf):
@@ -886,10 +889,9 @@ def _sync_conda_cache_with_real_envs() -> None:
     """Ensure the prepared cache includes environments that already exist on disk."""
     try:
         result = subprocess.run(
-            "conda env list",
+            ["conda", "env", "list"],
             capture_output=True,
             text=True,
-            shell=True,
             check=False,
         )
     except Exception as exc:  # pragma: no cover - best-effort helper
@@ -922,14 +924,15 @@ def _prepare_conda_env(env_name: str, requirements_file: Path, python_version: s
         python_version: Python version for the environment
     """
     # 1. Create conda environment if not exists
-    result = subprocess.run(f"conda env list | grep -q '^{env_name} '", shell=True)
-    if result.returncode != 0:
+    env_list = subprocess.run(["conda", "env", "list"], capture_output=True, text=True, check=False)
+    env_exists = any(line.split()[0] == env_name for line in env_list.stdout.splitlines() if line and not line.startswith("#"))
+    if not env_exists:
         print(f"[yellow]Creating conda env '{env_name}' (Python {python_version})...[/yellow]")
-        subprocess.check_call(f"conda create -y -n {env_name} python={python_version}", shell=True)
-        subprocess.check_call(f"conda run -n {env_name} pip install --upgrade pip", shell=True)
+        subprocess.check_call(["conda", "create", "-y", "-n", env_name, f"python={python_version}"])
+        subprocess.check_call(["conda", "run", "-n", env_name, "pip", "install", "--upgrade", "pip"])
 
     print(f"[yellow]Installing dependencies from {requirements_file.name}...[/yellow]")
-    subprocess.check_call(f"conda run -n {env_name} pip install -r {requirements_file}", shell=True)
+    subprocess.check_call(["conda", "run", "-n", env_name, "pip", "install", "-r", str(requirements_file)])
     print(f"[green]Conda env '{env_name}' ready[/green]")
 
     _CONDA_ENV_PREPARED.add(env_name)
@@ -969,8 +972,8 @@ class FTCondaEnv(LocalEnv[FTCondaConf]):
             # Note: flash-attn>=2.8 is required for B200 (sm_100) support
             print("[yellow]Installing flash-attn (compiling, may take a few minutes)...[/yellow]")
             subprocess.check_call(
-                f"conda run -n {self.conf.conda_env_name} pip install 'flash-attn>=2.8' --no-build-isolation --no-cache-dir",
-                shell=True,
+                ["conda", "run", "-n", self.conf.conda_env_name, "pip", "install",
+                 "flash-attn>=2.8", "--no-build-isolation", "--no-cache-dir"],
             )
 
             # Re-update bin_path after prepare() in case the conda env was just created
@@ -1440,7 +1443,7 @@ class DockerEnv(Env[DockerConf]):
         if self.conf.extra_volumes is not None:
             for lp, rp in self.conf.extra_volumes.items():
                 volumes[lp] = rp if isinstance(rp, dict) else {"bind": rp, "mode": self.conf.extra_volume_mode}
-            cache_path = "/tmp/sample" if "/sample/" in "".join(self.conf.extra_volumes.keys()) else "/tmp/full"
+            cache_path = "/tmp/sample" if "/sample/" in "".join(self.conf.extra_volumes.keys()) else "/tmp/full"  # nosec B108 — fixed Docker volume mount point, not a user-writable temp file
             Path(cache_path).mkdir(parents=True, exist_ok=True)
             volumes[cache_path] = {
                 "bind": T("scenarios.data_science.share:scen.cache_path").r(),
