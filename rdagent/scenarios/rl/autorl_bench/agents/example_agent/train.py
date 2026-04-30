@@ -71,7 +71,7 @@ def submit_for_grading(grading_url: str, model_path: str) -> dict | None:
 def main():
     MODEL_PATH = os.environ.get("MODEL_PATH")
     DATA_PATH = os.environ.get("DATA_PATH")
-    OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/tmp/autorl_output")
+    OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/tmp/autorl_output")  # nosec B108 — Docker container output dir, configurable via env var
     GRADING_SERVER_URL = os.environ.get("GRADING_SERVER_URL", "")
     TRAIN_RATIO = float(os.environ.get("TRAIN_RATIO", "0.05"))
     NUM_EPOCHS = int(os.environ.get("NUM_EPOCHS", "3"))
