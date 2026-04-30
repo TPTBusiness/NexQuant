@@ -103,20 +103,33 @@ gh api repos/TPTBusiness/Predix/code-scanning/alerts  # CodeQL/Bandit alerts
 - **Feature/fix PRs**: run relevant tests, then merge if green
 - Always use `gh pr merge <n> --squash` for clean history
 
-### Auto-merge after commits
-After every `git push`, check for open PRs that are ready to merge:
-```bash
-unset GITHUB_TOKEN && gh pr list --state open
+### Auto-release schema — run this after every `git push`
+
 ```
-- **Dependabot PRs**: merge immediately if CI is green — `gh pr merge <n> --squash --auto`
-- **release-please PRs**: only merge when user explicitly asks for a release
-- **Other PRs**: merge if tests pass and change is clearly ready
+1. unset GITHUB_TOKEN && gh pr list --state open -R TPTBusiness/Predix
+2. For each open PR:
+   - release-please PR  → merge immediately (--squash), then gh release list to verify tag
+   - Dependabot PR      → merge immediately if CI green (--squash --auto)
+   - Other PRs          → merge if tests pass and change is clearly ready
+```
+
+**Always merge the release-please PR right after pushing** — no user confirmation needed.
+This is the standing authorization: every push → release.
+
+```bash
+# Full post-push sequence:
+unset GITHUB_TOKEN
+gh pr list --state open -R TPTBusiness/Predix --json number,title,author
+# merge release-please PR:
+gh pr merge <n> --squash -R TPTBusiness/Predix
+# verify:
+gh release list -R TPTBusiness/Predix --limit 3
+```
 
 ### Release Cadence
-- Releases are cut **automatically** — merge the open release-please PR after every push
-- Version bumps: `fix:` and `feat:` → patch (1.2.x), `feat!:` / BREAKING CHANGE → minor (1.x.0)
+- Version bumps: `fix:` / `feat:` → patch (1.2.x), `feat!:` / BREAKING CHANGE → minor (1.x.0)
 - Only mention open-source changes in release notes — never closed-source strategies/models/prompts
-- After merging the release PR: verify the GitHub Release and tag were created (`gh release list`)
+- If the release-please PR doesn't exist yet (CI still running), wait ~60 s then check again
 
 ### Git Commit Signing — SSH ("Verified" badge)
 - Configured globally: `gpg.format=ssh`, `commit.gpgsign=true`
