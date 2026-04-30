@@ -54,11 +54,11 @@ def rdagent_info():
     current_version = importlib.metadata.version("rdagent")
     logger.info(f"RD-Agent version: {current_version}")
     api_url = f"https://api.github.com/repos/microsoft/RD-Agent/contents/requirements.txt?ref=main"
-    response = requests.get(api_url)
+    response = requests.get(api_url, timeout=30)
     if response.status_code == 200:
         files = response.json()
         file_url = files["download_url"]
-        file_response = requests.get(file_url)
+        file_response = requests.get(file_url, timeout=30)
         if file_response.status_code == 200:
             all_file_contents = file_response.text.split("\n")
         else:
