@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.8](https://github.com/TPTBusiness/Predix/compare/v1.3.7...v1.3.8) (2026-04-30)
+
+
+### Bug Fixes
+
+* **deps:** relax aiohttp constraint to &gt;=3.13.4 for litellm compatibility ([34ab192](https://github.com/TPTBusiness/Predix/commit/34ab1923a887089eb36e5cbad6cb8df16f0333ca))
+* **qlib:** correct indentation in except blocks in quant_proposal and factor_runner ([8143451](https://github.com/TPTBusiness/Predix/commit/8143451e8c0ead01c4d86d19669268c7bfb15fac))
+* **security:** replace eval() with ast.literal_eval in finetune validator (B307) ([0508caf](https://github.com/TPTBusiness/Predix/commit/0508caf9140d210b823fefefa28ee535ec85a0ae))
+* **security:** replace shell=True subprocess calls with list args in env.py (B602) ([2012d5a](https://github.com/TPTBusiness/Predix/commit/2012d5ae4e77cc2f1ab9a48beaaac5a74695d083))
+* **security:** resolve path-injection and add nosec for safe temp paths (B108, py/path-injection) ([6727480](https://github.com/TPTBusiness/Predix/commit/67274803bd1d14e5d1df9a063f46b2edb8501a2b))
+
 ## [1.3.7](https://github.com/TPTBusiness/Predix/compare/v1.3.6...v1.3.7) (2026-04-30)
 
 
