@@ -38,7 +38,7 @@ class KGModelFeatureSelectionCoder(Developer[KGModelExperiment]):
         assert target_model_type in KG_SELECT_MAPPING
         if len(exp.experiment_workspace.data_description) == 1:
             code = (
-                Environment(undefined=StrictUndefined)
+                Environment(undefined=StrictUndefined)  # nosec B701 — renders Python code templates, not HTML; autoescape would corrupt code
                 .from_string(DEFAULT_SELECTION_CODE)
                 .render(feature_index_list=None)
             )
@@ -62,7 +62,7 @@ class KGModelFeatureSelectionCoder(Developer[KGModelExperiment]):
             chosen_index_to_list_index = [i - 1 for i in chosen_index]
 
             code = (
-                Environment(undefined=StrictUndefined)
+                Environment(undefined=StrictUndefined)  # nosec B701 — renders Python code templates, not HTML; autoescape would corrupt code
                 .from_string(DEFAULT_SELECTION_CODE)
                 .render(feature_index_list=chosen_index_to_list_index)
             )
