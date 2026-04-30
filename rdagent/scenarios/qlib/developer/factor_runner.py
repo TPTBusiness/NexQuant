@@ -1002,7 +1002,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             series.to_frame().to_parquet(str(parquet_path))
 
         except Exception:
-    logging.debug("Error in save_factor_values_to_parquet", exc_info=True)
+            logging.debug("Error in save_factor_values_to_parquet", exc_info=True)
 
     def _log_result_warnings(self, factor_name: str, result, metrics: dict) -> None:
         """
