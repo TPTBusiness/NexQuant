@@ -6,6 +6,7 @@ Two-step validation:
 2. Micro-batch testing - Runtime validation with small dataset
 """
 
+import ast
 import json
 import re
 import time
@@ -229,7 +230,7 @@ class LLMConfigValidator:
             final_metrics = re.search(r"\{'train_runtime':[^}]+\}", stdout)
             if final_metrics:
                 try:
-                    metrics = eval(final_metrics.group(0))  # Safe: only numbers and strings
+                    metrics = ast.literal_eval(final_metrics.group(0))
                     result["final_metrics"] = {
                         "train_loss": metrics.get("train_loss"),
                         "train_runtime": metrics.get("train_runtime"),
