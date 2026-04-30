@@ -67,7 +67,7 @@ def get_file_desc(p: Path, variable_list=[]) -> str:
     """
     p = Path(p)
 
-    JJ_TPL = Environment(undefined=StrictUndefined).from_string("""
+    JJ_TPL = Environment(undefined=StrictUndefined).from_string("""  # nosec B701 — renders plain text description, not HTML; autoescape not applicable
 # {{file_name}}
 
 ## File Type
