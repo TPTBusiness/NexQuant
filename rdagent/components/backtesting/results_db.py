@@ -190,16 +190,18 @@ class ResultsDatabase:
         pd.DataFrame
             DataFrame with factor names and metrics
         """
-        # Map shorthand to full column name
+        _ALLOWED_METRICS = frozenset({
+            'sharpe', 'ic', 'annual_return', 'max_drawdown',
+            'win_rate', 'information_ratio', 'volatility',
+        })
         metric_map = {
-            'sharpe': 'sharpe',
-            'ic': 'ic',
-            'return': 'annual_return',
-            'drawdown': 'max_drawdown',
-            'win_rate': 'win_rate',
+            'sharpe': 'sharpe', 'ic': 'ic', 'return': 'annual_return',
+            'drawdown': 'max_drawdown', 'win_rate': 'win_rate',
             'information_ratio': 'information_ratio',
         }
         col = metric_map.get(metric, metric)
+        if col not in _ALLOWED_METRICS:
+            raise ValueError(f"Unknown metric: {metric!r}")
 
         return pd.read_sql_query(
             f"""SELECT factor_name, ic, sharpe, annual_return, max_drawdown,
@@ -208,7 +210,7 @@ class ResultsDatabase:
                 JOIN factors ON factor_id = factors.id
                 WHERE {col} IS NOT NULL
                 ORDER BY {col} DESC
-                LIMIT ?""",
+                LIMIT ?""",  # nosec B608 — col is validated against _ALLOWED_METRICS above
             self.conn,
             params=[limit]
         )
