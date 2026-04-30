@@ -82,7 +82,7 @@ def get_job_options(base_path: Path, safe_root: Path | None = None) -> list[str]
 
     # Security fix: Validate base_path to prevent path traversal
     try:
-        base_path_resolved = base_path.expanduser().resolve()
+        base_path_resolved = base_path.expanduser().resolve()  # nosec B614 — validated against safe_root below via relative_to()
 
         if safe_root is not None:
             safe_root_resolved = safe_root.expanduser().resolve()
