@@ -292,6 +292,7 @@ class OptunaOptimizer:
             "volatility_lookback": trial.suggest_int("volatility_lookback", 5, 500, step=5),
             "signal_bias": trial.suggest_float("signal_bias", -1.0, 1.0, step=0.05),
             "max_hold_bars": trial.suggest_int("max_hold_bars", 5, 1000, step=5),
+            "max_positions": trial.suggest_int("max_positions", 1, 5, step=1),
         }
 
     # Parameters that are allowed to be negative (not clamped to 0).
@@ -308,6 +309,7 @@ class OptunaOptimizer:
         "volatility_lookback": 1.0,
         "signal_bias": -1.0,
         "max_hold_bars": 1.0,
+        "max_positions": 1.0,
     }
 
     def _suggest_bounded(
@@ -357,6 +359,7 @@ class OptunaOptimizer:
             "volatility_lookback": (center.get("volatility_lookback", 100), 30),
             "signal_bias": (center.get("signal_bias", 0.0), 0.2),
             "max_hold_bars": (center.get("max_hold_bars", 100), 50),
+            "max_positions": (center.get("max_positions", 1), 2),
         }
         return {key: self._suggest_bounded(trial, key, c, hw) for key, (c, hw) in ranges.items()}
 
@@ -388,6 +391,7 @@ class OptunaOptimizer:
             "volatility_lookback": (center.get("volatility_lookback", 100), 10),
             "signal_bias": (center.get("signal_bias", 0.0), 0.07),
             "max_hold_bars": (center.get("max_hold_bars", 100), 17),
+            "max_positions": (center.get("max_positions", 1), 1),
         }
         return {key: self._suggest_bounded(trial, key, c, hw) for key, (c, hw) in ranges.items()}
 
@@ -467,6 +471,9 @@ class OptunaOptimizer:
 
             # Max holding periods (in bars)
             "max_hold_bars": trial.suggest_int("max_hold_bars", 10, 500, step=10),
+
+            # Max concurrent positions (1 = no pyramiding, 2-5 = scale-in)
+            "max_positions": trial.suggest_int("max_positions", 1, 5, step=1),
         }
 
         return params
@@ -596,6 +603,13 @@ class OptunaOptimizer:
             # Apply signal bias (shifts signal values before thresholding)
             if signal_bias != 0.0:
                 signal = (signal.astype(float) + signal_bias).round().astype(int).clip(-1, 1)
+
+            # Apply max_positions: scale signal by position_size_pct and cap exposure
+            max_positions   = int(params.get("max_positions", 1))
+            position_size_pct = float(params.get("position_size_pct", 1.0))
+            # Each "position" is position_size_pct of equity; total exposure capped at max_positions × size
+            effective_size  = min(position_size_pct * max_positions, 1.0)
+            signal = (signal.astype(float) * effective_size).clip(-1.0, 1.0)
 
             # Build a synthetic close from the factor-mean so we can route
             # through the same unified engine as every other backtest path.
