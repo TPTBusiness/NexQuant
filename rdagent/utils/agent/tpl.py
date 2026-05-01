@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from jinja2 import Environment, FunctionLoader, StrictUndefined
+from jinja2 import Environment, FunctionLoader, StrictUndefined, select_autoescape
 
 from rdagent.core.conf import RD_AGENT_SETTINGS
 from rdagent.log import rdagent_logger as logger
@@ -38,7 +38,8 @@ def load_content(uri: str, caller_dir: Path | None = None, ftype: str = "yaml") 
         caller_dir = get_caller_dir(upshift=1)
     # Parse the URI
     path_part, *yaml_trace = uri.split(":")
-    assert len(yaml_trace) <= 1, f"Invalid uri {uri}, only one yaml trace is allowed."
+    if len(yaml_trace) > 1:
+        raise ValueError(f"Invalid uri {uri}, only one yaml trace is allowed.")
     yaml_trace = [key for yt in yaml_trace for key in yt.split(".")]
 
     # load file_path with priorities.
@@ -126,7 +127,7 @@ class RDAT:
         # loader=FunctionLoader(load_conent) is for supporting grammar like below.
         # `{% include "scenarios.data_science.share:component_spec.DataLoadSpec" %}`
         rendered = (
-            Environment(undefined=StrictUndefined, loader=FunctionLoader(load_content))
+            Environment(undefined=StrictUndefined, loader=FunctionLoader(load_content), autoescape=select_autoescape())
             .from_string(self.template)
             .render(**context)
             .strip("\n")

@@ -24,46 +24,12 @@ from rdagent.app.finetune.llm.ui.ft_summary import render_job_summary
 
 DEFAULT_LOG_BASE = "log/"
 
+from rdagent.core.utils import safe_resolve_path
+
 
 def validate_path_within_cwd(user_path: Path) -> Path:
-    """
-    Validate that a user-provided path is within the current working directory.
-
-    Security: This function prevents path traversal attacks by:
-    1. Resolving the path to its absolute canonical form
-    2. Verifying it's within the CWD boundary using a normalized common prefix
-    3. Rejecting paths outside the boundary with ValueError
-
-    Parameters
-    ----------
-    user_path : Path
-        User-provided path to validate
-
-    Returns
-    -------
-    Path
-        Resolved absolute path if valid
-
-    Raises
-    ------
-    ValueError
-        If path is outside the current working directory
-    """
     safe_root = Path.cwd().resolve()
-    # Expand any user home reference and resolve without requiring the path to exist.
-    resolved_path = user_path.expanduser().resolve(strict=False)
-
-    # Ensure the resolved path is absolute and remains within the safe root.
-    safe_root_str = str(safe_root)
-    resolved_str = str(resolved_path)
-    common = os.path.commonpath([safe_root_str, resolved_str])
-    if common != safe_root_str:
-        raise ValueError("Path is outside the allowed project directory")
-
-    # This will raise ValueError if resolved_path is not within safe_root
-    resolved_path.relative_to(safe_root)
-
-    return resolved_path
+    return safe_resolve_path(user_path, safe_root)
 
 
 def get_job_options(base_path: Path, safe_root: Path | None = None) -> list[str]:
@@ -141,19 +107,14 @@ def main():
             st.header("Job")
             base_folder = st.text_input("Base Folder", value=default_log, key="base_folder_input")
 
-            # Normalize and validate the base folder against the configured log root
-            root_real = os.path.realpath(str(Path(default_log).expanduser()))
-            folder_real = os.path.realpath(str(Path(base_folder).expanduser()))
-            if folder_real == root_real or folder_real.startswith(root_real + os.sep):
-                base_path = Path(folder_real)
-                safe_root = Path(root_real)
-            else:
+            safe_root = Path(default_log).expanduser().resolve()
+            try:
+                base_path = safe_resolve_path(Path(base_folder), safe_root)
+            except ValueError:
                 st.error("Invalid base folder: must be within the configured log directory.")
-                safe_root = Path(root_real)
                 base_path = safe_root
 
-            # base_path is validated against safe_root – nosec B614
-            job_options = get_job_options(base_path, safe_root)  # nosec B614 – validated above
+            job_options = get_job_options(base_path, safe_root)
             if job_options:
                 selected_job = st.selectbox("Select Job", job_options, key="job_select")
                 if selected_job.startswith("."):

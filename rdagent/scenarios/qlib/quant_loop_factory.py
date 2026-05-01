@@ -77,6 +77,7 @@ def count_valid_factors() -> int:
             if data.get("status") == "success" and data.get("ic") is not None:
                 count += 1
         except Exception:
+            logger.warning("Failed to load factor file %s", json_file, exc_info=True)
             continue
 
     return count
