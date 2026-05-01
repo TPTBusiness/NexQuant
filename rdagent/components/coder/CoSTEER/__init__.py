@@ -75,8 +75,10 @@ class CoSTEER(Developer[Experiment]):
 
     def _get_last_fb(self) -> CoSTEERMultiFeedback:
         fb = self.evolve_agent.evolving_trace[-1].feedback
-        assert fb is not None, "feedback is None"
-        assert isinstance(fb, CoSTEERMultiFeedback), "feedback must be of type CoSTEERMultiFeedback"
+        if fb is None:
+            raise AssertionError("feedback is None")
+        if not isinstance(fb, CoSTEERMultiFeedback):
+            raise TypeError("feedback must be of type CoSTEERMultiFeedback")
         return fb
 
     def should_use_new_evo(self, base_fb: CoSTEERMultiFeedback | None, new_fb: CoSTEERMultiFeedback) -> bool:
@@ -121,7 +123,8 @@ class CoSTEER(Developer[Experiment]):
 
         for evo_exp in self.evolve_agent.multistep_evolve(evo_exp, self.evaluator):
             iteration_count += 1
-            assert isinstance(evo_exp, Experiment)  # multiple inheritance
+            if not isinstance(evo_exp, Experiment):
+                raise TypeError("evo_exp must be an instance of Experiment")
             evo_fb = self._get_last_fb()
             update_fallback = self.should_use_new_evo(
                 base_fb=fallback_evo_fb,
@@ -154,7 +157,8 @@ class CoSTEER(Developer[Experiment]):
                 evo_exp = fallback_evo_exp
                 evo_exp.recover_ws_ckp()
                 evo_fb = fallback_evo_fb
-            assert evo_fb is not None  # multistep_evolve should run at least once
+            if evo_fb is None:
+                raise AssertionError("multistep_evolve should run at least once")
             evo_exp = self._exp_postprocess_by_feedback(evo_exp, evo_fb)
         except CoderError as e:
             e.caused_by_timeout = reached_max_seconds
@@ -264,9 +268,12 @@ class CoSTEER(Developer[Experiment]):
         - Raise Error if it failed to handle the develop task
         -
         """
-        assert isinstance(evo, Experiment)
-        assert isinstance(feedback, CoSTEERMultiFeedback)
-        assert len(evo.sub_workspace_list) == len(feedback)
+        if not isinstance(evo, Experiment):
+            raise TypeError("evo must be an instance of Experiment")
+        if not isinstance(feedback, CoSTEERMultiFeedback):
+            raise TypeError("feedback must be an instance of CoSTEERMultiFeedback")
+        if len(evo.sub_workspace_list) != len(feedback):
+            raise ValueError("Length of sub_workspace_list must match length of feedback")
 
         # FIXME: when whould the feedback be None?
         failed_feedbacks = [

@@ -213,7 +213,8 @@ class DSTrace(Trace[DataScienceScen, KnowledgeBase]):
         self, component: COMPONENT, search_list: list[tuple[DSExperiment, ExperimentFeedback]] = []
     ) -> bool:
         for exp, fb in search_list:
-            assert isinstance(exp.hypothesis, DSHypothesis), "Hypothesis should be DSHypothesis (and not None)"
+            if not isinstance(exp.hypothesis, DSHypothesis):
+                raise TypeError("Hypothesis should be DSHypothesis (and not None)")
             if exp.hypothesis.component == component and fb:
                 return True
         return False

@@ -122,7 +122,8 @@ class MultiProcessEvolvingStrategy(EvolvingStrategy):
         last_feedback = None
         if len(evolving_trace) > 0:
             last_feedback = evolving_trace[-1].feedback
-            assert isinstance(last_feedback, CoSTEERMultiFeedback)
+            if not isinstance(last_feedback, CoSTEERMultiFeedback):
+                raise TypeError("last_feedback must be of type CoSTEERMultiFeedback")
 
         # 1.找出需要evolve的task
         to_be_finished_task_index: list[int] = []
