@@ -307,7 +307,8 @@ class KGHypothesisGen(FactorAndModelHypothesisGen):
 class KGHypothesis2Experiment(FactorAndModelHypothesis2Experiment):
     def prepare_context(self, hypothesis: Hypothesis, trace: Trace) -> Tuple[dict, bool]:
         scenario = trace.scen.get_scenario_all_desc(filtered_tag="hypothesis_and_experiment")
-        assert isinstance(hypothesis, KGHypothesis)
+        if not isinstance(hypothesis, KGHypothesis):
+            raise TypeError("hypothesis must be an instance of KGHypothesis")
         experiment_output_format = (
             T("scenarios.kaggle.prompts:feature_experiment_output_format").r()
             if hypothesis.action in [KG_ACTION_FEATURE_ENGINEERING, KG_ACTION_FEATURE_PROCESSING]
