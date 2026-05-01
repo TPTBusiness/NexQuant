@@ -7,8 +7,10 @@ from sklearn.metrics import roc_auc_score
 def prepare_for_auroc_metric(submission: pd.DataFrame, answers: pd.DataFrame, id_col: str, target_col: str) -> dict:
 
     # Answers checks
-    assert id_col in answers.columns, f"answers dataframe should have an {id_col} column"
-    assert target_col in answers.columns, f"answers dataframe should have a {target_col} column"
+    if id_col not in answers.columns:
+        raise InvalidSubmissionError(f"answers dataframe should have an {id_col} column")
+    if target_col not in answers.columns:
+        raise InvalidSubmissionError(f"answers dataframe should have a {target_col} column")
 
     # Submission checks
     if id_col not in submission.columns:

@@ -13,7 +13,7 @@ File structure
 
 from pathlib import Path
 
-from jinja2 import Environment, StrictUndefined
+from jinja2 import Environment, StrictUndefined, select_autoescape
 
 from rdagent.app.data_science.conf import DS_RD_SETTING
 from rdagent.components.coder.CoSTEER.evaluators import (
@@ -88,7 +88,7 @@ class EnsembleMultiProcessEvolvingStrategy(MultiProcessEvolvingStrategy):
             code_spec = workspace.file_dict["spec/ensemble.md"]
         else:
             test_code = (
-                Environment(undefined=StrictUndefined)
+                Environment(undefined=StrictUndefined, autoescape=select_autoescape())
                 .from_string((DIRNAME / "eval_tests" / "ensemble_test.txt").read_text())
                 .render(
                     model_names=[
