@@ -27,7 +27,12 @@ import typer
 from rich.console import Console
 from typing_extensions import Annotated
 
-from rdagent.utils.env import logger
+try:
+    from rdagent.utils.env import logger
+except ImportError:
+    import logging
+
+    logger = logging.getLogger(__name__)
 
 from rdagent.app.data_science.loop import main as data_science
 from rdagent.app.finetune.llm.loop import main as llm_finetune
