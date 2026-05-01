@@ -56,14 +56,17 @@ sparse.save_npz(public / "test" / "X.npz", X_test)
 sparse.save_npz(public / "train" / "X.npz", X_train)
 df_train.to_csv(public / "train" / "ARF_12h.csv", index=False)
 
-assert (
-    X_train.shape[0] == df_train.shape[0]
-), f"Mismatch: X_train rows ({X_train.shape[0]}) != df_train rows ({df_train.shape[0]})"
-assert (
-    X_test.shape[0] == df_test.shape[0]
-), f"Mismatch: X_test rows ({X_test.shape[0]}) != df_test rows ({df_test.shape[0]})"
-assert df_test.shape[1] == 2, "Public test set should have 2 columns"
-assert df_train.shape[1] == 3, "Public train set should have 3 columns"
-assert len(df_train) + len(df_test) == len(
-    df_label
-), "Length of new_train and new_test should equal length of old_train"
+if X_train.shape[0] != df_train.shape[0]:
+    raise ValueError(
+        f"Mismatch: X_train rows ({X_train.shape[0]}) != df_train rows ({df_train.shape[0]})"
+    )
+if X_test.shape[0] != df_test.shape[0]:
+    raise ValueError(
+        f"Mismatch: X_test rows ({X_test.shape[0]}) != df_test rows ({df_test.shape[0]})"
+    )
+if df_test.shape[1] != 2:
+    raise ValueError("Public test set should have 2 columns")
+if df_train.shape[1] != 3:
+    raise ValueError("Public train set should have 3 columns")
+if len(df_train) + len(df_test) != len(df_label):
+    raise ValueError("Length of new_train and new_test should equal length of old_train")

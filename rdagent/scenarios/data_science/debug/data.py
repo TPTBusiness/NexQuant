@@ -268,7 +268,8 @@ class JsonReducer(DataReducer):
                 parent[key] = sampled  # type: ignore  # parent 是 list，key 是 index, list.__setitem__(key, sampled)
             self.sampled_files.extend([self.extract_filename(i) for i in sampled])
             break
-        assert len(self.sampled_files) > 0
+        if len(self.sampled_files) <= 0:
+            raise AssertionError("sampled_files must contain at least one file")
         return data
 
     def _find_all_lists(

@@ -58,10 +58,12 @@ class ModelCodeEvaluator(CoSTEEREvaluator):
         model_execution_feedback: str = "",
         model_value_feedback: str = "",
     ):
-        assert isinstance(target_task, ModelTask)
-        assert isinstance(implementation, ModelFBWorkspace)
-        if gt_implementation is not None:
-            assert isinstance(gt_implementation, ModelFBWorkspace)
+        if not isinstance(target_task, ModelTask):
+            raise TypeError("target_task must be of type ModelTask")
+        if not isinstance(implementation, ModelFBWorkspace):
+            raise TypeError("implementation must be of type ModelFBWorkspace")
+        if gt_implementation is not None and not isinstance(gt_implementation, ModelFBWorkspace):
+            raise TypeError("gt_implementation must be of type ModelFBWorkspace")
 
         model_task_information = target_task.get_task_information()
         code = implementation.all_codes
@@ -113,10 +115,12 @@ class ModelFinalEvaluator(CoSTEEREvaluator):
         model_value_feedback: str,
         model_code_feedback: str,
     ):
-        assert isinstance(target_task, ModelTask)
-        assert isinstance(implementation, ModelFBWorkspace)
-        if gt_implementation is not None:
-            assert isinstance(gt_implementation, ModelFBWorkspace)
+        if not isinstance(target_task, ModelTask):
+            raise TypeError("target_task must be of type ModelTask")
+        if not isinstance(implementation, ModelFBWorkspace):
+            raise TypeError("implementation must be of type ModelFBWorkspace")
+        if gt_implementation is not None and not isinstance(gt_implementation, ModelFBWorkspace):
+            raise TypeError("gt_implementation must be of type ModelFBWorkspace")
 
         system_prompt = T(".prompts:evaluator_final_feedback.system").r(
             scenario=(
