@@ -9,6 +9,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from rdagent.core.utils import safe_resolve_path
+
 
 def is_valid_task(task_path: Path) -> bool:
     """Check if directory is a valid RL task (has __session__ subdirectory)"""
@@ -62,14 +64,10 @@ def get_loop_status(task_path: Path, loop_id: int) -> tuple[str, bool | None]:
 
 
 def _validate_job_path(job_path: Path, safe_root: Path) -> Path:
-    """Resolve and validate that job_path stays within safe_root."""
-    resolved_root = safe_root.expanduser().resolve()
-    resolved_job = job_path.expanduser().resolve()
     try:
-        # Reconstruct from trusted root so the returned path is root-derived.
-        return resolved_root / resolved_job.relative_to(resolved_root)
+        return safe_resolve_path(job_path, safe_root)
     except ValueError:
-        raise ValueError(f"Job path is outside allowed root {resolved_root}")
+        raise ValueError(f"Job path is outside allowed root {safe_root}")
 
 
 def get_max_loops(job_path: Path, safe_root: Path | None = None) -> int:

@@ -30,7 +30,8 @@ def wait_retry(
     >>> counter
     2
     """
-    assert retry_n > 0, "retry_n should be greater than 0"
+    if retry_n <= 0:
+        raise ValueError("retry_n should be greater than 0")
 
     def decorator(f: Callable[..., ASpecificRet]) -> Callable[..., ASpecificRet]:
         def wrapper(*args: Any, **kwargs: Any) -> ASpecificRet:

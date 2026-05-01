@@ -1,7 +1,8 @@
 from pathlib import Path
 
 # Check if our submission file exists
-assert Path("submission.csv").exists(), "Error: submission.csv not found"
+if not Path("submission.csv").exists():
+    raise FileNotFoundError("Error: submission.csv not found")
 
 submission_lines = Path("submission.csv").read_text().splitlines()
 test_lines = Path("submission_test.csv").read_text().splitlines()
