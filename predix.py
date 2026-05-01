@@ -18,6 +18,8 @@ load_dotenv(Path(__file__).parent / ".env")
 import typer
 from rich.console import Console
 
+from rdagent.utils.env import logger
+
 app = typer.Typer(help="Predix - AI Quantitative Trading Agent")
 console = Console()
 
@@ -510,6 +512,7 @@ def top(
             if data.get("status") == "success" and data.get("ic") is not None:
                 results.append(data)
         except Exception:
+            logger.warning("Failed to load factor file %s", f, exc_info=True)
             continue
 
     if not results:
@@ -659,6 +662,7 @@ def portfolio(
             if data.get("status") == "success" and data.get("ic") is not None:
                 results.append(data)
         except Exception:
+            logger.warning("Failed to load factor file %s", f, exc_info=True)
             continue
 
     if not results:
@@ -956,6 +960,7 @@ def portfolio_simple(
             if data.get("status") == "success" and data.get("ic") is not None:
                 results.append(data)
         except Exception:
+            logger.warning("Failed to load factor file %s", f, exc_info=True)
             continue
 
     if not results:
@@ -1337,6 +1342,7 @@ def build_strategies_ai(
             if data.get("status") == "success" and data.get("ic") is not None:
                 factors.append(data)
         except Exception:
+            logger.warning("Failed to load factor file %s", f, exc_info=True)
             continue
 
     if len(factors) < 10:
@@ -1552,6 +1558,7 @@ def _load_strategies():
             try:
                 raw = json.loads(p.read_text())
             except Exception:
+                logger.warning("Failed to load strategy file %s", p, exc_info=True)
                 continue
             if not isinstance(raw, dict):
                 continue
