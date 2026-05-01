@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.9](https://github.com/TPTBusiness/Predix/compare/v1.3.8...v1.3.9) (2026-05-01)
+
+
+### Bug Fixes
+
+* **security:** resolve path-injection, B701, B101, B112 Bandit alerts ([20b89a0](https://github.com/TPTBusiness/Predix/commit/20b89a061843b39836e975f158404e8e2d4627cd))
+
 ## [1.3.8](https://github.com/TPTBusiness/Predix/compare/v1.3.7...v1.3.8) (2026-04-30)
 
 
