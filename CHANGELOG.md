@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.10](https://github.com/TPTBusiness/Predix/compare/v1.3.9...v1.3.10) (2026-05-01)
+
+
+### Bug Fixes
+
+* **security:** replace remaining assert statements with proper error handling ([928533d](https://github.com/TPTBusiness/Predix/commit/928533d9a81bd5062f07458fbf94d3c7fe347775))
+
 ## [1.3.9](https://github.com/TPTBusiness/Predix/compare/v1.3.8...v1.3.9) (2026-05-01)
 
 
