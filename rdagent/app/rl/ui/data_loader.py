@@ -15,6 +15,7 @@ from typing import Any
 import streamlit as st
 
 from rdagent.app.rl.ui.config import EventType
+from rdagent.core.utils import safe_resolve_path
 from rdagent.log.storage import FileStorage
 
 
@@ -76,11 +77,10 @@ def extract_stage(tag: str) -> str:
 def get_valid_sessions(log_folder: Path, safe_root: Path | None = None) -> list[str]:
     """Get list of valid session directories, optionally validating against a safe root."""
     if safe_root is not None:
-        root_real = os.path.realpath(str(safe_root.expanduser()))
-        folder_real = os.path.realpath(str(log_folder.expanduser()))
-        if not (folder_real == root_real or folder_real.startswith(root_real + os.sep)):
+        try:
+            log_folder = safe_resolve_path(log_folder, safe_root)
+        except ValueError:
             return []
-        log_folder = Path(folder_real)  # nosec B614 — path validated against safe_root via realpath above
 
     if not log_folder.exists():
         return []
@@ -245,13 +245,11 @@ def parse_event(tag: str, content: Any, timestamp: datetime) -> Event | None:
 @st.cache_data(ttl=300, hash_funcs={Path: str})
 def load_session(log_path: Path, safe_root: Path | None = None) -> Session:
     """Load events into hierarchical session structure, optionally validating against safe root."""
-    # Validate path is within safe_root if provided
     if safe_root is not None:
-        root_real = os.path.realpath(str(safe_root.expanduser()))
-        path_real = os.path.realpath(str(log_path.expanduser()))
-        if not (path_real == root_real or path_real.startswith(root_real + os.sep)):
+        try:
+            log_path = safe_resolve_path(log_path, safe_root)
+        except ValueError:
             return Session()
-        log_path = Path(path_real)  # nosec B614 — path validated against safe_root via realpath above
 
     session = Session()
 

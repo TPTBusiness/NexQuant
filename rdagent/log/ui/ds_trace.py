@@ -30,6 +30,7 @@ from rdagent.log.utils import (
     extract_loopid_func_name,
     is_valid_session,
 )
+from rdagent.core.utils import safe_resolve_path
 from rdagent.oai.backend.litellm import LITELLM_SETTINGS
 from rdagent.oai.llm_utils import APIBackend
 
@@ -232,7 +233,13 @@ def workspace_win(workspace, cmp_workspace=None, cmp_name="last code."):
                     if target_folder.strip() == "":
                         st.warning("Please enter a valid folder path.")
                     else:
-                        target_folder_path = Path(target_folder).resolve()  # nosec B614 — local UI, user explicitly chooses save location
+                        safe_root = Path(UI_SETTING.trace_folder).expanduser().resolve()
+                        safe_root.mkdir(parents=True, exist_ok=True)
+                        try:
+                            target_folder_path = safe_resolve_path(Path(target_folder), safe_root)
+                        except ValueError:
+                            st.warning(f"Path must be within {safe_root}. Saving to default location.")
+                            target_folder_path = safe_root
                         target_folder_path.mkdir(parents=True, exist_ok=True)
                         for filename, content in workspace.file_dict.items():
                             save_path = target_folder_path / Path(filename).name

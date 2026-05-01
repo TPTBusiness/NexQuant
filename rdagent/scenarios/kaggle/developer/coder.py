@@ -35,7 +35,8 @@ def select(X: pd.DataFrame) -> pd.DataFrame:
 class KGModelFeatureSelectionCoder(Developer[KGModelExperiment]):
     def develop(self, exp: KGModelExperiment) -> KGModelExperiment:
         target_model_type = exp.sub_tasks[0].model_type
-        assert target_model_type in KG_SELECT_MAPPING
+        if target_model_type not in KG_SELECT_MAPPING:
+            raise ValueError(f"target_model_type {target_model_type} not in KG_SELECT_MAPPING")
         if len(exp.experiment_workspace.data_description) == 1:
             code = (
                 Environment(undefined=StrictUndefined)  # nosec B701 — renders Python code templates, not HTML; autoescape would corrupt code
