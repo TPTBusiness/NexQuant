@@ -36,16 +36,18 @@ def get_agent_model() -> OpenAIChatModel:
 
     """
     backend = APIBackend()
-    assert isinstance(backend, LiteLLMAPIBackend), "Only LiteLLMAPIBackend is supported"
+    if not isinstance(backend, LiteLLMAPIBackend):
+        raise TypeError("Only LiteLLMAPIBackend is supported")
 
     compl_kwargs = backend.get_complete_kwargs()
 
     selected_model = compl_kwargs["model"]
 
     _, custom_llm_provider, _, _ = get_llm_provider(selected_model)
-    assert (
-        custom_llm_provider in PROVIDER_TO_ENV_MAP
-    ), f"Provider {custom_llm_provider} not supported. Please add it into `PROVIDER_TO_ENV_MAP`"
+    if custom_llm_provider not in PROVIDER_TO_ENV_MAP:
+        raise ValueError(
+            f"Provider {custom_llm_provider} not supported. Please add it into `PROVIDER_TO_ENV_MAP`"
+        )
     prefix = PROVIDER_TO_ENV_MAP[custom_llm_provider]
     api_key = os.getenv(f"{prefix}_API_KEY", None)
     api_base = os.getenv(f"{prefix}_API_BASE", None)
