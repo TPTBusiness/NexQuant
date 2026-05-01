@@ -377,7 +377,8 @@ class ExpGen2TraceAndMergeV2(ExpGen):
             if DS_RD_SETTING.enable_multi_version_exp_gen:
                 exp_gen_version_list = DS_RD_SETTING.exp_gen_version_list.split(",")
                 for version in exp_gen_version_list:
-                    assert version in ["v3", "v2", "v1"]
+                    if version not in ["v3", "v2", "v1"]:
+                        raise ValueError(f"version must be 'v1', 'v2', or 'v3', got {version!r}")
 
                 if len(trace.hist) == 0:
                     # set the proposal version for the first sub-trace

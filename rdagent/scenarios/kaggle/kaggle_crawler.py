@@ -87,7 +87,12 @@ def crawl_descriptions(
         content = e.get_attribute("innerHTML")
         contents.append(content)
 
-    assert len(subtitles) == len(contents) + 1 and subtitles[-1] == "Citation"
+    if not (len(subtitles) == len(contents) + 1 and subtitles[-1] == "Citation"):
+        raise AssertionError(
+            f"Expected len(contents)+1 == len(subtitles) and last subtitle == 'Citation', "
+            f"got len(subtitles)={len(subtitles)}, len(contents)={len(contents)}, "
+            f"last subtitle={subtitles[-1]!r}"
+        )
     for i in range(len(subtitles) - 1):
         descriptions[subtitles[i]] = contents[i]
 

@@ -58,18 +58,18 @@ def main(
 
     if user_target_scenario:
         FT_RD_SETTING.user_target_scenario = user_target_scenario
-    assert (
-        FT_RD_SETTING.user_target_scenario is None
-    ), "user_target_scenario is not yet supported, please specify via benchmark and benchmark_description"
+    if FT_RD_SETTING.user_target_scenario is not None:
+        raise ValueError("user_target_scenario is not yet supported, please specify via benchmark and benchmark_description")
     if upper_data_size_limit:
         FT_RD_SETTING.upper_data_size_limit = upper_data_size_limit
         logger.info(f"Set upper_data_size_limit to {FT_RD_SETTING.upper_data_size_limit}")
     if benchmark and benchmark_description:
         FT_RD_SETTING.target_benchmark = benchmark
         FT_RD_SETTING.benchmark_description = benchmark_description
-    assert FT_RD_SETTING.user_target_scenario or (
-        FT_RD_SETTING.target_benchmark and FT_RD_SETTING.benchmark_description
-    ), "Either user_target_scenario or target_benchmark must be specified for LLM fine-tuning."
+    if not (
+        FT_RD_SETTING.user_target_scenario or (FT_RD_SETTING.target_benchmark and FT_RD_SETTING.benchmark_description)
+    ):
+        raise ValueError("Either user_target_scenario or target_benchmark must be specified for LLM fine-tuning.")
 
     # Update configuration with provided parameters
     if dataset:
@@ -82,9 +82,8 @@ def main(
     model_target = FT_RD_SETTING.base_model if FT_RD_SETTING.base_model else "auto selected model"
 
     # Temporary assertion until auto-selection is implemented
-    assert (
-        FT_RD_SETTING.base_model is not None
-    ), "Base model auto selection not yet supported, please specify via --base-model"
+    if FT_RD_SETTING.base_model is None:
+        raise ValueError("Base model auto selection not yet supported, please specify via --base-model")
 
     logger.info(f"Starting LLM fine-tuning on dataset='{data_set_target}' with model='{model_target}'")
 

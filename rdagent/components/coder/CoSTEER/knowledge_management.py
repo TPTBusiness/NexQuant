@@ -1028,7 +1028,8 @@ class CoSTEERKnowledgeBaseV2(EvolvingKnowledgeBase):
 
         """
         node_count = len(nodes)
-        assert node_count >= 2, "nodes length must >=2"
+        if node_count < 2:
+            raise ValueError("nodes length must >=2")
         intersection_node_list = []
         if output_intersection_origin:
             origin_list = []

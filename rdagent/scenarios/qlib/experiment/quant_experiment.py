@@ -56,7 +56,8 @@ class QlibQuantScenario(Scenario):
         )
 
     def background(self, tag=None) -> str:
-        assert tag in [None, "factor", "model"]
+        if tag not in [None, "factor", "model"]:
+            raise ValueError(f"tag must be None, 'factor', or 'model', got {tag!r}")
         quant_background = "The background of the scenario is as follows:\n" + T(".prompts:qlib_quant_background").r(
             runtime_environment=self.get_runtime_environment(),
         )
@@ -83,7 +84,8 @@ class QlibQuantScenario(Scenario):
         return self._source_data
 
     def output_format(self, tag=None) -> str:
-        assert tag in [None, "factor", "model"]
+        if tag not in [None, "factor", "model"]:
+            raise ValueError(f"tag must be None, 'factor', or 'model', got {tag!r}")
         factor_output_format = (
             "The factor code should output the following format:\n" + T(".prompts:qlib_factor_output_format").r()
         )
@@ -99,7 +101,8 @@ class QlibQuantScenario(Scenario):
             return model_output_format
 
     def interface(self, tag=None) -> str:
-        assert tag in [None, "factor", "model"]
+        if tag not in [None, "factor", "model"]:
+            raise ValueError(f"tag must be None, 'factor', or 'model', got {tag!r}")
         factor_interface = (
             "The factor code should be written in the following interface:\n" + T(".prompts:qlib_factor_interface").r()
         )
@@ -115,7 +118,8 @@ class QlibQuantScenario(Scenario):
             return model_interface
 
     def simulator(self, tag=None) -> str:
-        assert tag in [None, "factor", "model"]
+        if tag not in [None, "factor", "model"]:
+            raise ValueError(f"tag must be None, 'factor', or 'model', got {tag!r}")
         factor_simulator = "The factor code will be sent to the simulator:\n" + T(".prompts:qlib_factor_simulator").r()
         model_simulator = "The model code will be sent to the simulator:\n" + T(".prompts:qlib_model_simulator").r()
 
@@ -185,7 +189,8 @@ class QlibQuantScenario(Scenario):
             return common_description(action) + interface(action) + output(action) + simulator(action)
 
     def get_runtime_environment(self, tag: str = None) -> str:
-        assert tag in [None, "factor", "model"]
+        if tag not in [None, "factor", "model"]:
+            raise ValueError(f"tag must be None, 'factor', or 'model', got {tag!r}")
 
         if tag is None or tag == "factor":
             # Use factor env to get the runtime environment

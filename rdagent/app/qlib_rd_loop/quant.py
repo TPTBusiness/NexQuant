@@ -78,7 +78,8 @@ class QuantRDLoop(RDLoop):
         while True:
             if self.get_unfinished_loop_cnt(self.loop_idx) < RD_AGENT_SETTINGS.get_max_parallel():
                 hypo = self._propose()
-                assert hypo.action in ["factor", "model"]
+                if hypo.action not in ["factor", "model"]:
+                    raise ValueError(f"hypo.action must be 'factor' or 'model', got {hypo.action!r}")
                 if hypo.action == "factor":
                     exp = self.factor_hypothesis2experiment.convert(hypo, self.trace)
                 else:
