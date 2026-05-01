@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.11](https://github.com/TPTBusiness/Predix/compare/v1.3.10...v1.3.11) (2026-05-01)
+
+
+### Bug Fixes
+
+* **ci:** lazy import logger in predix.py and cli.py to avoid ImportError in test env ([60763e8](https://github.com/TPTBusiness/Predix/commit/60763e8eae34f41865ba8e5e65bdfde13b564b4b))
+
 ## [1.3.10](https://github.com/TPTBusiness/Predix/compare/v1.3.9...v1.3.10) (2026-05-01)
 
 
