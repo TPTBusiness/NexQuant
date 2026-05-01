@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/TPTBusiness/Predix/compare/v1.3.11...v1.4.0) (2026-05-01)
+
+
+### Features
+
+* **optimizer:** add max_positions parameter to Optuna search space ([fdb4be3](https://github.com/TPTBusiness/Predix/commit/fdb4be3b3ebd93325e7821f4251148424184a40d))
+
 ## [1.3.11](https://github.com/TPTBusiness/Predix/compare/v1.3.10...v1.3.11) (2026-05-01)
 
 
