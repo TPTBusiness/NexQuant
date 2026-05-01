@@ -16,55 +16,26 @@ from rdagent.app.rl.ui.components import render_session, render_summary
 from rdagent.app.rl.ui.config import ALWAYS_VISIBLE_TYPES, OPTIONAL_TYPES
 from rdagent.app.rl.ui.data_loader import get_summary, get_valid_sessions, load_session
 from rdagent.app.rl.ui.rl_summary import render_job_summary
+from rdagent.core.utils import safe_resolve_path
 
 DEFAULT_LOG_BASE = "log/"
 
 
 def _safe_resolve(user_input: str | None, safe_root: Path) -> Path:
-    """
-    Resolve user path relative to safe_root; raise ValueError if it escapes.
-
-    Security: This function prevents path traversal attacks by:
-    1. Rejecting null bytes in user input
-    2. Rejecting Windows drive letters (C:\, D:\, etc.)
-    3. Rejecting absolute paths
-    4. Normalizing path to remove .. traversal attempts
-    5. Validating resolved path is within safe_root using a realpath-based check
-
-    All user-provided paths are validated before filesystem access.
-    """
-    # Treat the provided safe_root as trusted and canonicalize it once.
     safe_root = safe_root.expanduser().resolve()
-
-    # Empty input maps to the safe root directory.
     if not user_input:
         return safe_root
-
-    # Security check 1: Reject null bytes (path truncation attack)
     if "\x00" in user_input:
         raise ValueError("Invalid path: contains null byte")
-
     try:
-        # Security check 2: Normalize path to resolve .. and . components
         normalized = os.path.normpath(user_input.strip())
-
-        # Security check 3: Reject Windows drive letters (C:\, D:\, etc.)
         drive, _ = os.path.splitdrive(normalized)
         if drive:
             raise ValueError("Absolute paths with drive letters are not allowed")
-
-        # Security check 4: Reject absolute paths (/, //server/share, etc.)
         if os.path.isabs(normalized):
             raise ValueError("Absolute paths are not allowed")
-
-        # Security check 5: Build candidate path under safe_root and fully resolve it.
-        joined = os.path.join(str(safe_root), normalized)
-        resolved_candidate = os.path.realpath(joined)
-
-        # Security check 6: Validate candidate is within safe_root (prevent path traversal)
-        candidate_path = Path(resolved_candidate)
-        # Reconstruct from trusted safe_root so the returned path is root-derived.
-        return safe_root / candidate_path.relative_to(safe_root)
+        joined = safe_root / normalized
+        return safe_resolve_path(joined, safe_root)
     except (OSError, ValueError) as exc:
         raise ValueError(f"Invalid path outside of allowed root: {user_input}") from exc
 
@@ -203,8 +174,7 @@ def main():
         except ValueError as e:
             st.warning(str(e))
             return
-        # job_path is validated by _safe_resolve() above
-        if job_path.exists():  # nosec B614 – path validated by _safe_resolve
+        if job_path.exists():
             render_job_summary(job_path, safe_root, is_root=is_root_job)
         else:
             st.warning(f"Job folder not found: {job_folder}")

@@ -54,7 +54,8 @@ def get_ds_env(
         ValueError: If the env_type is not recognized.
     """
     conf = DSCoderCoSTEERSettings()
-    assert conf_type in ["kaggle", "mlebench"], f"Unknown conf_type: {conf_type}"
+    if conf_type not in ["kaggle", "mlebench"]:
+        raise ValueError(f"Unknown conf_type: {conf_type}")
 
     if conf.env_type == "docker":
         env_conf = DSDockerConf() if conf_type == "kaggle" else MLEBDockerConf()
@@ -79,7 +80,8 @@ def get_clear_ws_cmd(stage: Literal["before_training", "before_inference"] = "be
     """
     Clean the files in workspace to a specific stage
     """
-    assert stage in ["before_training", "before_inference"], f"Unknown stage: {stage}"
+    if stage not in ["before_training", "before_inference"]:
+        raise ValueError(f"Unknown stage: {stage}")
     if DS_RD_SETTING.enable_model_dump and stage == "before_training":
         cmd = "rm -r submission.csv scores.csv models trace.log"
     else:

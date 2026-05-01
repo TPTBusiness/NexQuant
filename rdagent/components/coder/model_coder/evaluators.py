@@ -41,7 +41,8 @@ class ModelCoSTEEREvaluator(CoSTEEREvaluator):
                 final_feedback="This task has failed too many times, skip implementation.",
                 final_decision=False,
             )
-        assert isinstance(target_task, ModelTask)
+        if not isinstance(target_task, ModelTask):
+            raise TypeError(f"Expected ModelTask, got {type(target_task)}")
 
         # NOTE: Use fixed input to test the model to avoid randomness
         batch_size = 8
@@ -50,7 +51,8 @@ class ModelCoSTEEREvaluator(CoSTEEREvaluator):
         input_value = 0.4
         param_init_value = 0.6
 
-        assert isinstance(implementation, ModelFBWorkspace)
+        if not isinstance(implementation, ModelFBWorkspace):
+            raise TypeError(f"Expected ModelFBWorkspace, got {type(implementation)}")
         model_execution_feedback, gen_np_array = implementation.execute(
             batch_size=batch_size,
             num_features=num_features,
@@ -59,7 +61,8 @@ class ModelCoSTEEREvaluator(CoSTEEREvaluator):
             param_init_value=param_init_value,
         )
         if gt_implementation is not None:
-            assert isinstance(gt_implementation, ModelFBWorkspace)
+            if not isinstance(gt_implementation, ModelFBWorkspace):
+                raise TypeError(f"Expected ModelFBWorkspace, got {type(gt_implementation)}")
             _, gt_np_array = gt_implementation.execute(
                 batch_size=batch_size,
                 num_features=num_features,

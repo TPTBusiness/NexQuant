@@ -22,7 +22,8 @@ def prepare_for_metric(submission: pd.DataFrame, answers: pd.DataFrame) -> dict:
     if "price" not in submission.columns:
         raise InvalidSubmissionError("Submission DataFrame must contain 'price' columns.")
 
-    assert "price" in answers.columns, "Answers DataFrame must contain 'price' columns."
+    if "price" not in answers.columns:
+        raise InvalidSubmissionError("Answers DataFrame must contain 'price' columns.")
 
     if len(submission) != len(answers):
         raise InvalidSubmissionError("Submission must be the same length as the answers.")
