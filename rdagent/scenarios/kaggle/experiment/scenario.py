@@ -165,7 +165,8 @@ class KGScenario(Scenario):
         return data_info
 
     def output_format(self, tag=None) -> str:
-        assert tag in [None, "feature", "model"]
+        if tag not in [None, "feature", "model"]:
+            raise ValueError(f"tag must be None, 'feature', or 'model', got {tag!r}")
         feature_output_format = f"""The feature code should output following the format:
 {T(".prompts:kg_feature_output_format").r()}"""
         model_output_format = f"""The model code should output following the format:\n""" + T(
@@ -180,7 +181,8 @@ class KGScenario(Scenario):
             return model_output_format
 
     def interface(self, tag=None) -> str:
-        assert tag in [None, "feature", "XGBoost", "RandomForest", "LightGBM", "NN"]
+        if tag not in [None, "feature", "XGBoost", "RandomForest", "LightGBM", "NN"]:
+            raise ValueError(f"tag must be None, 'feature', 'XGBoost', 'RandomForest', 'LightGBM', or 'NN', got {tag!r}")
         feature_interface = f"""The feature code should follow the interface:
 {T(".prompts:kg_feature_interface").r()}"""
         if tag == "feature":
@@ -195,7 +197,8 @@ class KGScenario(Scenario):
             return model_interface
 
     def simulator(self, tag=None) -> str:
-        assert tag in [None, "feature", "model"]
+        if tag not in [None, "feature", "model"]:
+            raise ValueError(f"tag must be None, 'feature', or 'model', got {tag!r}")
 
         kg_feature_simulator = (
             "The feature code will be sent to the simulator:\n" + T(".prompts:kg_feature_simulator").r()

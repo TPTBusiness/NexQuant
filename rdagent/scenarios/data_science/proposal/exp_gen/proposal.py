@@ -339,7 +339,8 @@ class DSProposalV1ExpGen(ExpGen):
             eda_output = sota_exp.experiment_workspace.file_dict.get("EDA.md", None)
         scenario_desc = trace.scen.get_scenario_all_desc(eda_output=eda_output)
 
-        assert sota_exp is not None, "SOTA experiment is not provided."
+        if sota_exp is None:
+            raise ValueError("SOTA experiment is not provided.")
         last_exp = trace.last_exp()
         # exp_and_feedback = trace.hist[-1]
         # last_exp = exp_and_feedback[0]
@@ -445,8 +446,10 @@ class DSProposalV1ExpGen(ExpGen):
                         json_target_type=dict[str, dict[str, str | dict] | str],
                     )
                 )
-                assert "hypothesis_proposal" in resp_dict, "Hypothesis proposal not provided."
-                assert "task_design" in resp_dict, "Task design not provided."
+                if "hypothesis_proposal" not in resp_dict:
+                    raise ValueError("Hypothesis proposal not provided.")
+                if "task_design" not in resp_dict:
+                    raise ValueError("Task design not provided.")
                 task_class = component_info["task_class"]
                 hypothesis_proposal = resp_dict.get("hypothesis_proposal", {})
                 hypothesis = DSHypothesis(
@@ -1149,8 +1152,10 @@ You help users retrieve relevant knowledge from community discussions and public
         )
 
         response_dict = json.loads(response)
-        assert response_dict.get("component") in HypothesisComponent.__members__, f"Invalid component"
-        assert response_dict.get("hypothesis") is not None, f"Invalid hypothesis"
+        if response_dict.get("component") not in HypothesisComponent.__members__:
+            raise ValueError(f"Invalid component: {response_dict.get('component')}")
+        if response_dict.get("hypothesis") is None:
+            raise ValueError("Invalid hypothesis")
         return response_dict
 
     # END: for support llm-based hypothesis selection  -----
@@ -1253,7 +1258,8 @@ You help users retrieve relevant knowledge from community discussions and public
             description=task_desc,
         )
 
-        assert isinstance(task, PipelineTask), f"Task {task_name} is not a PipelineTask, got {type(task)}"
+        if not isinstance(task, PipelineTask):
+            raise TypeError(f"Task {task_name} is not a PipelineTask, got {type(task)}")
         # only for llm with response schema.(TODO: support for non-schema llm?)
         # If the LLM provides a "packages" field (list[str]), compute runtime environment now and cache it for subsequent prompts in later loops.
         if isinstance(task_dict, dict) and "packages" in task_dict and isinstance(task_dict["packages"], list):
