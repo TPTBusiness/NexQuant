@@ -620,7 +620,8 @@ class LocalEnv(Env[ASpecificLocalConf]):
         for lp, rp in running_extra_volume.items():
             volumes[lp] = rp
 
-        assert local_path is not None, "local_path should not be None"
+        if local_path is None:
+            raise ValueError("local_path should not be None")
         volumes = normalize_volumes(volumes, local_path)
 
         @contextlib.contextmanager
@@ -1472,7 +1473,8 @@ class DockerEnv(Env[DockerConf]):
                 cpu_count=self.conf.cpu_count,  # Set CPU limit
                 **self._gpu_kwargs(client),
             )
-            assert container is not None  # Ensure container was created successfully
+            if container is None:
+                raise AssertionError("Docker container was not created successfully")
             logs = container.logs(stream=True)
             print(Rule("[bold green]Docker Logs Begin[/bold green]", style="dark_orange"))
             table = Table(title="Run Info", show_header=False)

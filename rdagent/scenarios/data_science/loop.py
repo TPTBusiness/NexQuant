@@ -320,7 +320,8 @@ class DataScienceRDLoop(RDLoop):
             # only clean current workspace without affecting other loops.
             for k in "direct_exp_gen", "coding", "running":
                 if k in prev_out and prev_out[k] is not None:
-                    assert isinstance(prev_out[k], DSExperiment)
+                    if not isinstance(prev_out[k], DSExperiment):
+                        raise TypeError(f"prev_out[{k!r}] must be an instance of DSExperiment")
                     clean_workspace(prev_out[k].experiment_workspace.workspace_path)
 
             # Backup the workspace (only necessary files are included)
