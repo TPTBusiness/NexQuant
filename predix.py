@@ -18,7 +18,12 @@ load_dotenv(Path(__file__).parent / ".env")
 import typer
 from rich.console import Console
 
-from rdagent.utils.env import logger
+try:
+    from rdagent.utils.env import logger
+except ImportError:
+    import logging
+
+    logger = logging.getLogger(__name__)
 
 app = typer.Typer(help="Predix - AI Quantitative Trading Agent")
 console = Console()
