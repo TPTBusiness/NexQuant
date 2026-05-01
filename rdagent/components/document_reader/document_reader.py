@@ -85,13 +85,16 @@ def load_and_process_one_pdf_by_azure_document_intelligence(
 
 
 def load_and_process_pdfs_by_azure_document_intelligence(path: Path) -> dict[str, str]:
-    assert RD_AGENT_SETTINGS.azure_document_intelligence_key is not None
-    assert RD_AGENT_SETTINGS.azure_document_intelligence_endpoint is not None
+    if RD_AGENT_SETTINGS.azure_document_intelligence_key is None:
+        raise AssertionError("azure_document_intelligence_key must be set")
+    if RD_AGENT_SETTINGS.azure_document_intelligence_endpoint is None:
+        raise AssertionError("azure_document_intelligence_endpoint must be set")
 
     content_dict = {}
     ab_path = path.resolve()
     if ab_path.is_file():
-        assert ".pdf" in ab_path.suffixes, "The file must be a PDF file."
+        if ".pdf" not in ab_path.suffixes:
+            raise ValueError("The file must be a PDF file.")
         proc = load_and_process_one_pdf_by_azure_document_intelligence
         content_dict[str(ab_path)] = proc(
             ab_path,

@@ -84,7 +84,8 @@ class WorkflowTracker:
             # Log timer status if timer is started
             if self.loop_base.timer.started:
                 remain_time = self.loop_base.timer.remain_time()
-                assert remain_time is not None
+                if remain_time is None:
+                    raise AssertionError("remain_time should not be None")
                 mlflow.log_metric("remain_time", remain_time.total_seconds())
                 mlflow.log_metric(
                     "remain_percent",

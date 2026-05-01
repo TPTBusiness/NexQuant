@@ -87,7 +87,8 @@ class ModelWsLoader(WsLoader[ModelTask, ModelFBWorkspace]):
         self.path = Path(path)
 
     def load(self, task: ModelTask) -> ModelFBWorkspace:
-        assert task.name is not None
+        if task.name is None:
+            raise AssertionError("task.name should not be None")
         mti = ModelFBWorkspace(task)
         mti.prepare()
         with open(self.path / f"{task.name}.py", "r") as f:
