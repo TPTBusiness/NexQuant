@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 import pandas as pd
-from jinja2 import Environment, StrictUndefined
+from jinja2 import Environment, StrictUndefined, select_autoescape
 
 from rdagent.components.coder.factor_coder.config import FACTOR_COSTEER_SETTINGS
 from rdagent.utils.env import QTDockerEnv
@@ -21,14 +21,16 @@ def generate_data_folder_from_qlib():
         entry=f"python generate.py",
     )
 
-    assert (Path(__file__).parent / "factor_data_template" / "intraday_pv_all.h5").exists(), (
-        "intraday_pv_all.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"
-        + execute_log
-    )
-    assert (Path(__file__).parent / "factor_data_template" / "intraday_pv_debug.h5").exists(), (
-        "intraday_pv_debug.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"
-        + execute_log
-    )
+    if not (Path(__file__).parent / "factor_data_template" / "intraday_pv_all.h5").exists():
+        raise FileNotFoundError(
+            "intraday_pv_all.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"
+            + execute_log
+        )
+    if not (Path(__file__).parent / "factor_data_template" / "intraday_pv_debug.h5").exists():
+        raise FileNotFoundError(
+            "intraday_pv_debug.h5 is not generated. It means rdagent/scenarios/qlib/experiment/factor_data_template/generate.py is not executed correctly. Please check the log: \n"
+            + execute_log
+        )
 
     Path(FACTOR_COSTEER_SETTINGS.data_folder).mkdir(parents=True, exist_ok=True)
     shutil.copy(
@@ -67,7 +69,7 @@ def get_file_desc(p: Path, variable_list=[]) -> str:
     """
     p = Path(p)
 
-    JJ_TPL = Environment(undefined=StrictUndefined).from_string("""  # nosec B701 — renders plain text description, not HTML; autoescape not applicable
+    JJ_TPL = Environment(undefined=StrictUndefined, autoescape=select_autoescape()).from_string("""
 # {{file_name}}
 
 ## File Type

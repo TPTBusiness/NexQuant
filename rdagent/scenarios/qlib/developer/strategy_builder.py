@@ -241,6 +241,7 @@ class StrategyBuilder:
                 if data.get("status") == "success" and data.get("ic") is not None:
                     factors.append(data)
             except Exception:
+                logger.warning("Failed to load factor file %s", f, exc_info=True)
                 continue
 
         # Sort by absolute IC

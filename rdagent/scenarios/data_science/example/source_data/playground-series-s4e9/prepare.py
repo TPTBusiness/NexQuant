@@ -25,11 +25,12 @@ def prepare(raw: Path, public: Path, private: Path):
     new_test.to_csv(public / "test.csv", index=False)
 
     # Checks
-    assert new_test.shape[1] == 12, "Public test set should have 12 columns"
-    assert new_train.shape[1] == 13, "Public train set should have 13 columns"
-    assert len(new_train) + len(new_test) == len(
-        old_train
-    ), "Length of new_train and new_test should equal length of old_train"
+    if new_test.shape[1] != 12:
+        raise AssertionError("Public test set should have 12 columns")
+    if new_train.shape[1] != 13:
+        raise AssertionError("Public train set should have 13 columns")
+    if len(new_train) + len(new_test) != len(old_train):
+        raise AssertionError("Length of new_train and new_test should equal length of old_train")
 
 
 if __name__ == "__main__":

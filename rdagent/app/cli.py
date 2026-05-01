@@ -27,6 +27,8 @@ import typer
 from rich.console import Console
 from typing_extensions import Annotated
 
+from rdagent.utils.env import logger
+
 from rdagent.app.data_science.loop import main as data_science
 from rdagent.app.finetune.llm.loop import main as llm_finetune
 from rdagent.app.general_model.general_model import (
@@ -882,6 +884,7 @@ def optimize_portfolio_cli(
                 if data.get("status") == "accepted":
                     strategies.append(data)
             except Exception:
+                logger.warning("Failed to load strategy file %s", f, exc_info=True)
                 continue
 
         if not strategies:
