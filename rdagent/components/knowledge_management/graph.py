@@ -24,7 +24,8 @@ class UndirectedNode(Node):
         super().__init__(content, label, embedding)
         self.neighbors: set[UndirectedNode] = set()
         self.appendix = appendix  # appendix stores any additional information
-        assert isinstance(content, str), "content must be a string"
+        if not isinstance(content, str):
+            raise TypeError("content must be a string")
 
     def add_neighbor(self, node: UndirectedNode) -> None:
         self.neighbors.add(node)
@@ -96,7 +97,8 @@ class Graph(KnowledgeBase):
                 APIBackend().create_embedding(input_content=contents[i : i + size]),
             )
 
-        assert len(nodes) == len(embeddings), "nodes' length must equals embeddings' length"
+        if len(nodes) != len(embeddings):
+            raise ValueError("nodes' length must equal embeddings' length")
         for node, embedding in zip(nodes, embeddings):
             node.embedding = embedding
         return nodes
@@ -252,7 +254,8 @@ class UndirectedGraph(Graph):
 
         """
         min_nodes_count = 2
-        assert len(nodes) >= min_nodes_count, "nodes length must >=2"
+        if len(nodes) < min_nodes_count:
+            raise ValueError("nodes length must >=2")
         intersection = None
 
         for node in nodes:
