@@ -541,7 +541,8 @@ class APIBackend(ABC):
         **kwargs,
     ) -> str | list[list[float]]:
         """This function to share operation between embedding and chat completion"""
-        assert not (chat_completion and embedding), "chat_completion and embedding cannot be True at the same time"
+        if chat_completion and embedding:
+            raise ValueError("chat_completion and embedding cannot be True at the same time")
         max_retry = LLM_SETTINGS.max_retry if LLM_SETTINGS.max_retry is not None else max_retry
         timeout_count = 0
         violation_count = 0
