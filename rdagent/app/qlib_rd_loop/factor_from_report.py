@@ -1,10 +1,9 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import fire
-
 from rdagent.app.qlib_rd_loop.conf import FACTOR_FROM_REPORT_PROP_SETTING
 from rdagent.app.qlib_rd_loop.factor import FactorRDLoop
 from rdagent.components.document_reader.document_reader import (
@@ -12,7 +11,7 @@ from rdagent.components.document_reader.document_reader import (
     load_and_process_pdfs_by_langchain,
 )
 from rdagent.core.conf import RD_AGENT_SETTINGS
-from rdagent.core.proposal import Hypothesis, HypothesisFeedback
+from rdagent.core.proposal import Hypothesis
 from rdagent.log import rdagent_logger as logger
 from rdagent.oai.llm_utils import APIBackend
 from rdagent.scenarios.qlib.experiment.factor_experiment import QlibFactorExperiment
@@ -36,14 +35,14 @@ def generate_hypothesis(factor_result: dict, report_content: str) -> str:
     """
     system_prompt = T(".prompts:hypothesis_generation.system").r()
     user_prompt = T(".prompts:hypothesis_generation.user").r(
-        factor_descriptions=json.dumps(factor_result), report_content=report_content
+        factor_descriptions=json.dumps(factor_result), report_content=report_content,
     )
 
     response = APIBackend().build_messages_and_create_chat_completion(
         user_prompt=user_prompt,
         system_prompt=system_prompt,
         json_mode=True,
-        json_target_type=Dict[str, str],
+        json_target_type=dict[str, str],
     )
 
     response_json = json.loads(response)
@@ -99,7 +98,7 @@ class FactorReportLoop(FactorRDLoop, metaclass=LoopMeta):
         super().__init__(PROP_SETTING=FACTOR_FROM_REPORT_PROP_SETTING)
         if report_folder is None:
             self.judge_pdf_data_items = json.load(
-                open(FACTOR_FROM_REPORT_PROP_SETTING.report_result_json_file_path, "r")
+                open(FACTOR_FROM_REPORT_PROP_SETTING.report_result_json_file_path),
             )
         else:
             self.judge_pdf_data_items = [i for i in Path(report_folder).rglob("*.pdf")]
@@ -118,7 +117,7 @@ class FactorReportLoop(FactorRDLoop, metaclass=LoopMeta):
                 if exp is None:
                     self.shift_report += 1
                     self.loop_n -= 1
-                    if self.loop_n < 0:  # NOTE: on every step, we self.loop_n -= 1 at first.
+                    if self.loop_n < 0:  # loop_n is decremented above when reports are empty; prevents infinite skipping
                         raise self.LoopTerminationError("Reach stop criterion and stop loop")
                     continue
                 exp.based_experiments = [QlibFactorExperiment(sub_tasks=[], hypothesis=exp.hypothesis)] + [
