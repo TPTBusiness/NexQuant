@@ -576,9 +576,11 @@ def top(
 
     console.print(table)
 
-    # Summary
-    valid_ic = [r.get("ic") for r in results if r.get("ic") is not None]
-    valid_sharpe = [r.get("sharpe") for r in results if r.get("sharpe") is not None]
+    # Summary — filter None, NaN, and non-numeric values
+    valid_ic = [v for v in (r.get("ic") for r in results)
+                if isinstance(v, (int, float)) and v is not None and not np.isnan(v)]
+    valid_sharpe = [v for v in (r.get("sharpe") for r in results)
+                    if isinstance(v, (int, float)) and v is not None and not np.isnan(v)]
     # Filter extreme outliers for average
     valid_sharpe_filtered = [s for s in valid_sharpe if abs(s or 0) < 1e6]
 
