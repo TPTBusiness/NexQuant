@@ -1,7 +1,7 @@
-import sys
-import os
 import logging
+import os
 from pathlib import Path
+
 """
 Qlib Factor Runner - Executes factor backtests in Docker.
 
@@ -11,15 +11,8 @@ NOTE: The @cache_with_pickle decorator was REMOVED from develop() because:
 - Docker-level caching (QlibDockerConf.enable_cache=False) is sufficient
 - The pickle cache caused 240+ factor generations but ZERO Docker backtests
 """
-from pathlib import Path
-from typing import Optional
 
 import pandas as pd
-from pandarallel import pandarallel
-
-
-pandarallel.initialize(verbose=1)
-
 from rdagent.app.qlib_rd_loop.conf import FactorBasePropSetting
 from rdagent.components.runner import CachedRunner
 from rdagent.core.exception import FactorEmptyError
@@ -74,7 +67,7 @@ def _shift_daily_constant_factor_if_needed(factor_col: "pd.Series", factor_name:
 
         logger.warning(
             f"[LookAheadFix] Factor '{factor_name}' is daily-constant "
-            f"({fraction_constant:.0%} of days). Applying 1-day shift to remove look-ahead bias."
+            f"({fraction_constant:.0%} of days). Applying 1-day shift to remove look-ahead bias.",
         )
 
         # Shift: for each instrument, map daily values forward by 1 trading day
@@ -122,13 +115,13 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
     """
 
     def calculate_information_coefficient(
-        self, concat_feature: pd.DataFrame, SOTA_feature_column_size: int, new_feature_columns_size: int
+        self, concat_feature: pd.DataFrame, SOTA_feature_column_size: int, new_feature_columns_size: int,
     ) -> pd.DataFrame:
         res = pd.Series(index=range(SOTA_feature_column_size * new_feature_columns_size))
         for col1 in range(SOTA_feature_column_size):
             for col2 in range(SOTA_feature_column_size, SOTA_feature_column_size + new_feature_columns_size):
                 res.loc[col1 * new_feature_columns_size + col2 - SOTA_feature_column_size] = concat_feature.iloc[
-                    :, col1
+                    :, col1,
                 ].corr(concat_feature.iloc[:, col2])
         return res
 
@@ -137,11 +130,14 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         # if the IC is larger than a threshold, remove the new_feature column
         # return the new_feature
 
+        from pandarallel import pandarallel
+        pandarallel.initialize(verbose=1)
+
         concat_feature = pd.concat([SOTA_feature, new_feature], axis=1)
         IC_max = (
             concat_feature.groupby("datetime")
             .parallel_apply(
-                lambda x: self.calculate_information_coefficient(x, SOTA_feature.shape[1], new_feature.shape[1])
+                lambda x: self.calculate_information_coefficient(x, SOTA_feature.shape[1], new_feature.shape[1]),
             )
             .mean()
         )
@@ -161,7 +157,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         self._ensure_results_dirs()
 
         if exp.based_experiments and exp.based_experiments[-1].result is None:
-            logger.info(f"Baseline experiment execution ...")
+            logger.info("Baseline experiment execution ...")
             exp.based_experiments[-1] = self.develop(exp.based_experiments[-1])
 
         fbps = FactorBasePropSetting()
@@ -185,11 +181,11 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 base_exp for base_exp in exp.based_experiments if isinstance(base_exp, QlibFactorExperiment)
             ]
             if len(sota_factor_experiments_list) > 1:
-                logger.info(f"SOTA factor processing ...")
+                logger.info("SOTA factor processing ...")
                 SOTA_factor = process_factor_data(sota_factor_experiments_list)
 
             # Process the new factors data
-            logger.info(f"New factor processing ...")
+            logger.info("New factor processing ...")
             new_factors = process_factor_data(exp)
 
             if new_factors.empty:
@@ -200,7 +196,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 new_factors = self.deduplicate_new_factors(SOTA_factor, new_factors)
                 if new_factors.empty:
                     raise FactorEmptyError(
-                        "The factors generated in this round are highly similar to the previous factors. Please change the direction for creating new factors."
+                        "The factors generated in this round are highly similar to the previous factors. Please change the direction for creating new factors.",
                     )
                 combined_factors = pd.concat([SOTA_factor, new_factors], axis=1).dropna()
             else:
@@ -211,7 +207,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             combined_factors = combined_factors.loc[:, ~combined_factors.columns.duplicated(keep="last")]
             new_columns = pd.MultiIndex.from_product([["feature"], combined_factors.columns])
             combined_factors.columns = new_columns
-            logger.info(f"Factor data processing completed.")
+            logger.info("Factor data processing completed.")
 
             num_features = len(exp.base_features) + len(combined_factors.columns)
 
@@ -230,10 +226,10 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                     sota_model_exp = base_exp
                     exist_sota_model_exp = True
                     break
-            logger.info(f"Experiment execution ...")
+            logger.info("Experiment execution ...")
             if exist_sota_model_exp:
                 exp.experiment_workspace.inject_files(
-                    **{"model.py": sota_model_exp.sub_workspace_list[0].file_dict["model.py"]}
+                    **{"model.py": sota_model_exp.sub_workspace_list[0].file_dict["model.py"]},
                 )
                 sota_training_hyperparameters = sota_model_exp.sub_tasks[0].training_hyperparameters
                 if sota_training_hyperparameters:
@@ -244,19 +240,19 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                             "early_stop": str(sota_training_hyperparameters.get("early_stop", 10)),
                             "batch_size": str(sota_training_hyperparameters.get("batch_size", 256)),
                             "weight_decay": str(sota_training_hyperparameters.get("weight_decay", 0.0001)),
-                        }
+                        },
                     )
                 sota_model_type = sota_model_exp.sub_tasks[0].model_type
                 if sota_model_type == "TimeSeries":
                     env_to_use.update(
-                        {"dataset_cls": "TSDatasetH", "num_features": num_features, "step_len": 20, "num_timesteps": 20}
+                        {"dataset_cls": "TSDatasetH", "num_features": num_features, "step_len": 20, "num_timesteps": 20},
                     )
                 elif sota_model_type == "Tabular":
                     env_to_use.update({"dataset_cls": "DatasetH", "num_features": num_features})
 
                 # model + combined factors
                 result, stdout = exp.experiment_workspace.execute(
-                    qlib_config_name="conf_combined_factors_sota_model.yaml", run_env=env_to_use
+                    qlib_config_name="conf_combined_factors_sota_model.yaml", run_env=env_to_use,
                 )
             else:
                 # LGBM + combined factors
@@ -265,7 +261,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                     run_env=env_to_use,
                 )
         else:
-            logger.info(f"Experiment execution ...")
+            logger.info("Experiment execution ...")
             if exp.base_feature_codes:
                 factors = process_factor_data(exp)
                 factors = factors.sort_index()
@@ -275,7 +271,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 target_path = exp.experiment_workspace.workspace_path / "combined_factors_df.parquet"
                 # Save the combined factors to the workspace
                 factors.to_parquet(target_path, engine="pyarrow")
-                logger.info(f"Factor data processing completed.")
+                logger.info("Factor data processing completed.")
                 result, stdout = exp.experiment_workspace.execute(
                     qlib_config_name="conf_combined_factors.yaml",
                     run_env=env_to_use,
@@ -288,10 +284,10 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
         # Handle Qlib Docker backtest failure gracefully
         if result is None:
-            factor_name = getattr(exp.hypothesis, 'hypothesis', 'unknown')
+            factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
             logger.warning(
                 f"Qlib Docker backtest returned None for '{factor_name}'. "
-                f"Attempting direct factor evaluation..."
+                f"Attempting direct factor evaluation...",
             )
 
             # Try to compute metrics directly from the factor's result.h5
@@ -303,7 +299,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             else:
                 logger.error(
                     f"Both Qlib Docker backtest and direct evaluation failed for '{factor_name}'. "
-                    f"Skipping this factor and continuing."
+                    f"Skipping this factor and continuing.",
                 )
                 # Save failed run info for debugging
                 self._save_failed_run(exp, stdout, error_type="result_none")
@@ -321,7 +317,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         if validation_result.get("has_issues"):
             logger.warning(
                 f"Result validation warnings for factor '{getattr(exp.hypothesis, 'hypothesis', 'unknown')}': "
-                f"{validation_result['warnings']}"
+                f"{validation_result['warnings']}",
             )
             # Save warning info for debugging
             self._save_failed_run(exp, stdout, error_type="validation_warnings", validation=validation_result)
@@ -372,43 +368,43 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         details = {}
 
         factor_name = "unknown"
-        if hasattr(exp, 'hypothesis') and exp.hypothesis is not None:
-            factor_name = getattr(exp.hypothesis, 'hypothesis', 'unknown')
+        if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
+            factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
 
         if isinstance(result, pd.Series):
             # Check IC
-            ic_value = result.get('IC', None)
-            details['ic_raw'] = ic_value
+            ic_value = result.get("IC", None)
+            details["ic_raw"] = ic_value
             if ic_value is None or (isinstance(ic_value, float) and (ic_value != ic_value)):  # NaN check
                 warnings.append("IC is None/NaN — factor has no predictive power")
             else:
                 try:
                     ic_float = float(ic_value)
-                    details['ic'] = ic_float
+                    details["ic"] = ic_float
                     if abs(ic_float) < 0.001:
                         warnings.append(
-                            f"IC is near zero ({ic_float:.6f}) — factor may not predict returns"
+                            f"IC is near zero ({ic_float:.6f}) — factor may not predict returns",
                         )
                 except (ValueError, TypeError):
                     warnings.append(f"IC value is not numeric: {ic_value}")
 
             # Check positions (1day.pos)
-            pos_value = result.get('1day.pos', None)
-            details['positions_raw'] = pos_value
+            pos_value = result.get("1day.pos", None)
+            details["positions_raw"] = pos_value
             if pos_value is not None:
                 try:
                     pos_float = float(pos_value)
-                    details['positions'] = pos_float
+                    details["positions"] = pos_float
                     if pos_float == 0:
                         warnings.append(
                             "1day.pos == 0 — model opened ZERO positions (stayed neutral). "
                             "Possible causes: (1) topk too high for single-asset, "
-                            "(2) signal threshold too restrictive, (3) no valid predictions"
+                            "(2) signal threshold too restrictive, (3) no valid predictions",
                         )
                     elif pos_float < 10:
                         warnings.append(
                             f"1day.pos = {pos_float:.0f} — very few positions opened. "
-                            f"Check signal threshold and topk settings"
+                            f"Check signal threshold and topk settings",
                         )
                 except (ValueError, TypeError):
                     pass  # pos might be a string
@@ -416,24 +412,24 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             # Check if result is essentially empty (all values None or NaN)
             non_null_count = result.notna().sum()
             total_count = len(result)
-            details['non_null_metrics'] = int(non_null_count)
-            details['total_metrics'] = int(total_count)
+            details["non_null_metrics"] = int(non_null_count)
+            details["total_metrics"] = int(total_count)
             if non_null_count < 3:
                 warnings.append(
                     f"Result has only {non_null_count}/{total_count} non-null metrics — "
-                    f"backtest likely produced empty results"
+                    f"backtest likely produced empty results",
                 )
 
             # Check for key metrics
-            required_metrics = ['IC', '1day.excess_return_with_cost.shar', '1day.pos']
+            required_metrics = ["IC", "1day.excess_return_with_cost.shar", "1day.pos"]
             for metric_name in required_metrics:
                 val = result.get(metric_name, None)
-                details[f'has_{metric_name}'] = val is not None
+                details[f"has_{metric_name}"] = val is not None
 
         elif isinstance(result, dict):
             # Dict-based result validation
-            ic_value = result.get('IC', result.get('ic', None))
-            details['ic_raw'] = ic_value
+            ic_value = result.get("IC", result.get("ic", None))
+            details["ic_raw"] = ic_value
             if ic_value is None:
                 warnings.append("IC is None — factor has no predictive power")
 
@@ -443,7 +439,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             "details": details,
         }
 
-    def _evaluate_factor_directly(self, exp, stdout: str) -> Optional[pd.Series]:
+    def _evaluate_factor_directly(self, exp, stdout: str) -> pd.Series | None:
         """
         Evaluate factor directly from its result.h5 file when Qlib Docker fails.
 
@@ -475,7 +471,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             workspace_path = None
             if exp.sub_workspace_list:
                 for ws in exp.sub_workspace_list:
-                    if ws is not None and hasattr(ws, 'workspace_path'):
+                    if ws is not None and hasattr(ws, "workspace_path"):
                         candidate = ws.workspace_path / "result.h5"
                         if candidate.exists():
                             workspace_path = ws.workspace_path
@@ -579,7 +575,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
             logger.info(
                 f"Direct evaluation: IC={ic:.6f}, Sharpe={sharpe:.4f}, "
-                f"AnnRet={annualized_return:.4f}%, WR={win_rate:.2%}"
+                f"AnnRet={annualized_return:.4f}%, WR={win_rate:.2%}",
             )
             return result
 
@@ -588,7 +584,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             return None
 
     def _save_failed_run(self, exp, stdout: str, error_type: str = "unknown",
-                         validation: Optional[dict] = None) -> None:
+                         validation: dict | None = None) -> None:
         """
         Save failed run information to results/failed_runs.json for debugging.
 
@@ -615,20 +611,20 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
             # Get factor name
             factor_name = "unknown"
-            if hasattr(exp, 'hypothesis') and exp.hypothesis is not None:
-                factor_name = getattr(exp.hypothesis, 'hypothesis', 'unknown')
+            if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
+                factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
 
             # Build failed run record
             failed_record = {
                 "timestamp": datetime.now().isoformat(),
                 "factor_name": factor_name,
                 "error_type": error_type,
-                "stdout": stdout if stdout else "(empty)",
+                "stdout": stdout or "(empty)",
                 "validation": validation,
                 "experiment_details": {
-                    "base_features": list(getattr(exp, 'base_features', {}).keys()) if hasattr(exp, 'base_features') else [],
-                    "hypothesis": getattr(exp.hypothesis, 'hypothesis', str(getattr(exp, 'hypothesis', 'N/A')))
-                                  if hasattr(exp, 'hypothesis') else "N/A",
+                    "base_features": list(getattr(exp, "base_features", {}).keys()) if hasattr(exp, "base_features") else [],
+                    "hypothesis": getattr(exp.hypothesis, "hypothesis", str(getattr(exp, "hypothesis", "N/A")))
+                                  if hasattr(exp, "hypothesis") else "N/A",
                 },
             }
 
@@ -651,11 +647,11 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
             failed_file.write_text(
                 json.dumps(existing_records, indent=2, default=str, ensure_ascii=False),
-                encoding="utf-8"
+                encoding="utf-8",
             )
             logger.info(
                 f"Failed run saved: {factor_name} (type={error_type}) "
-                f"→ {failed_file}"
+                f"→ {failed_file}",
             )
 
         except Exception as e:
@@ -678,23 +674,23 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             containing metric names like 'IC', '1day.excess_return_with_cost.shar', etc.
         """
         try:
-            import json
-            import pandas as pd
             from pathlib import Path
+
+            import pandas as pd
             from rdagent.components.backtesting import ResultsDatabase
 
             # Get factor name: prefer hypothesis, fallback to result Series 'factor_name' key
             factor_name = "unknown"
-            if hasattr(exp, 'hypothesis') and exp.hypothesis is not None:
-                factor_name = getattr(exp.hypothesis, 'hypothesis', 'unknown')
-            if factor_name == 'unknown' and isinstance(result, pd.Series) and 'factor_name' in result.index:
-                factor_name = str(result['factor_name'])
+            if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
+                factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
+            if factor_name == "unknown" and isinstance(result, pd.Series) and "factor_name" in result.index:
+                factor_name = str(result["factor_name"])
 
             # Check if already rejected by protection
-            if getattr(exp, 'rejected_by_protection', False):
+            if getattr(exp, "rejected_by_protection", False):
                 logger.info(
                     f"Factor rejected by protection, skipping DB save: "
-                    f"{getattr(exp, 'protection_reason', 'unknown')}"
+                    f"{getattr(exp, 'protection_reason', 'unknown')}",
                 )
                 return
 
@@ -710,47 +706,47 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             # Extract metrics from result (pd.Series from qlib_res.csv)
             metrics = {}
             if isinstance(result, pd.Series):
-                metrics['ic'] = self._safe_float(result.get('IC', None))
-                metrics['sharpe_ratio'] = self._safe_float(
-                    result.get('1day.excess_return_with_cost.shar',
-                    result.get('1day.excess_return_with_cost.sharpe', None))
+                metrics["ic"] = self._safe_float(result.get("IC", None))
+                metrics["sharpe_ratio"] = self._safe_float(
+                    result.get("1day.excess_return_with_cost.shar",
+                    result.get("1day.excess_return_with_cost.sharpe", None)),
                 )
-                metrics['annualized_return'] = self._safe_float(
-                    result.get('1day.excess_return_with_cost.annualized_return', None)
+                metrics["annualized_return"] = self._safe_float(
+                    result.get("1day.excess_return_with_cost.annualized_return", None),
                 )
-                metrics['max_drawdown'] = self._safe_float(
-                    result.get('1day.excess_return_with_cost.max_drawdown', None)
+                metrics["max_drawdown"] = self._safe_float(
+                    result.get("1day.excess_return_with_cost.max_drawdown", None),
                 )
-                metrics['win_rate'] = self._safe_float(result.get('win_rate', None))
-                metrics['information_ratio'] = self._safe_float(
-                    result.get('1day.excess_return_with_cost.information_ratio', None)
+                metrics["win_rate"] = self._safe_float(result.get("win_rate", None))
+                metrics["information_ratio"] = self._safe_float(
+                    result.get("1day.excess_return_with_cost.information_ratio", None),
                 )
-                metrics['volatility'] = self._safe_float(
-                    result.get('1day.excess_return_with_cost.std',
-                    result.get('1day.excess_return_with_cost.volatility', None))
+                metrics["volatility"] = self._safe_float(
+                    result.get("1day.excess_return_with_cost.std",
+                    result.get("1day.excess_return_with_cost.volatility", None)),
                 )
                 # Store raw metrics for JSON export
-                metrics['raw_metrics'] = result.to_dict()
+                metrics["raw_metrics"] = result.to_dict()
             elif isinstance(result, dict):
-                metrics['ic'] = self._safe_float(result.get('IC', result.get('ic', None)))
-                metrics['sharpe_ratio'] = self._safe_float(
-                    result.get('sharpe', result.get('sharpe_ratio', None))
+                metrics["ic"] = self._safe_float(result.get("IC", result.get("ic", None)))
+                metrics["sharpe_ratio"] = self._safe_float(
+                    result.get("sharpe", result.get("sharpe_ratio", None)),
                 )
-                metrics['annualized_return'] = self._safe_float(result.get('annualized_return', None))
-                metrics['max_drawdown'] = self._safe_float(result.get('max_drawdown', None))
-                metrics['win_rate'] = self._safe_float(result.get('win_rate', None))
-                metrics['information_ratio'] = None
-                metrics['volatility'] = None
-                metrics['raw_metrics'] = result
+                metrics["annualized_return"] = self._safe_float(result.get("annualized_return", None))
+                metrics["max_drawdown"] = self._safe_float(result.get("max_drawdown", None))
+                metrics["win_rate"] = self._safe_float(result.get("win_rate", None))
+                metrics["information_ratio"] = None
+                metrics["volatility"] = None
+                metrics["raw_metrics"] = result
 
             # Result validation before saving (warnings, not blocking)
             self._log_result_warnings(factor_name, result, metrics)
 
             # Only save if we have at least IC or Sharpe
-            if metrics.get('ic') is None and metrics.get('sharpe_ratio') is None:
+            if metrics.get("ic") is None and metrics.get("sharpe_ratio") is None:
                 logger.warning(
                     f"No valid IC/Sharpe for factor '{factor_name}', skipping DB save. "
-                    f"IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}"
+                    f"IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}",
                 )
                 return
 
@@ -773,7 +769,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             run_id = db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
             logger.info(
                 f"Factor result saved to DB: {factor_name[:60]} "
-                f"(IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}, run_id={run_id})"
+                f"(IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}, run_id={run_id})",
             )
 
             # Extract factor code and description from experiment
@@ -784,7 +780,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 factor_name, metrics, run_id,
                 factor_code=factor_code,
                 factor_description=factor_description,
-                exp=exp
+                exp=exp,
             )
 
             # Save factor values as parquet for strategy building
@@ -796,7 +792,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             import traceback
             logger.error(
                 f"Database save failed for factor '{getattr(exp.hypothesis, 'hypothesis', 'unknown')}': {e}\n"
-                f"Traceback: {traceback.format_exc()}"
+                f"Traceback: {traceback.format_exc()}",
             )
 
     def _save_factor_json(self, factor_name: str, metrics: dict, run_id: int,
@@ -907,14 +903,14 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 factor_description = match.group(1).strip()[:500]
             else:
                 # Try comments
-                lines = factor_code.split('\n')
+                lines = factor_code.split("\n")
                 desc_lines = []
                 for line in lines[:20]:
                     stripped = line.strip()
-                    if stripped.startswith('#') and not stripped.startswith('#!'):
+                    if stripped.startswith("#") and not stripped.startswith("#!"):
                         desc_lines.append(stripped[1:].strip())
                 if desc_lines:
-                    factor_description = ' '.join(desc_lines)[:500]
+                    factor_description = " ".join(desc_lines)[:500]
 
         return factor_code, factor_description
 
@@ -926,8 +922,8 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         the complete backtest range (not just the debug 2024 subset).
         """
         import os as _os
-        import subprocess
         import shutil
+        import subprocess
         import tempfile
 
         try:
@@ -935,7 +931,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             workspace_path = None
             if exp.sub_workspace_list:
                 for ws in exp.sub_workspace_list:
-                    if ws is not None and hasattr(ws, 'workspace_path'):
+                    if ws is not None and hasattr(ws, "workspace_path"):
                         fp = ws.workspace_path / "factor.py"
                         if fp.exists():
                             workspace_path = ws.workspace_path
@@ -1023,7 +1019,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         warnings_list = []
 
         # Check IC
-        ic = metrics.get('ic')
+        ic = metrics.get("ic")
         if ic is None:
             warnings_list.append("IC is None — factor has no predictive power")
         elif abs(ic) < 0.001:
@@ -1031,7 +1027,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
         # Check positions (1day.pos) — CRITICAL for EURUSD
         if isinstance(result, pd.Series):
-            pos_value = result.get('1day.pos', None)
+            pos_value = result.get("1day.pos", None)
             if pos_value is not None:
                 try:
                     pos_float = float(pos_value)
@@ -1039,23 +1035,23 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                         warnings_list.append(
                             "WARNING: 1day.pos == 0 — ZERO positions opened! "
                             "Model stayed completely neutral. Check Qlib config: "
-                            "ensure topk=1 and market=eurusd for single-asset trading."
+                            "ensure topk=1 and market=eurusd for single-asset trading.",
                         )
                     elif pos_float < 10:
                         warnings_list.append(
                             f"Low position count: 1day.pos = {pos_float:.0f} — "
-                            f"model traded very rarely"
+                            f"model traded very rarely",
                         )
                 except (ValueError, TypeError):
                     pass
 
         # Check Sharpe
-        sharpe = metrics.get('sharpe_ratio')
+        sharpe = metrics.get("sharpe_ratio")
         if sharpe is not None and abs(sharpe) < 0.1:
             warnings_list.append(f"Sharpe near zero ({sharpe:.4f}) — no risk-adjusted edge")
 
         # Check max drawdown
-        mdd = metrics.get('max_drawdown')
+        mdd = metrics.get("max_drawdown")
         if mdd is not None and mdd < -0.5:
             warnings_list.append(f"Extreme drawdown: {mdd:.2%} — high risk factor")
 
@@ -1070,7 +1066,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             return None
         try:
             f = float(value)
-            if pd.isna(f) or f == float('inf') or f == float('-inf'):
+            if pd.isna(f) or f == float("inf") or f == float("-inf"):
                 return None
             return f
         except (ValueError, TypeError):
@@ -1113,7 +1109,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
         if protection_result.should_block:
             logger.warning(
-                f"Factor {factor_name} rejected by protection manager: {protection_result.reason}"
+                f"Factor {factor_name} rejected by protection manager: {protection_result.reason}",
             )
             # Mark factor as rejected by protection
             exp.rejected_by_protection = True
@@ -1138,8 +1134,8 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         from pathlib import Path
 
         factor_name = "unknown"
-        if hasattr(exp, 'hypothesis') and exp.hypothesis is not None:
-            factor_name = getattr(exp.hypothesis, 'hypothesis', 'unknown')
+        if hasattr(exp, "hypothesis") and exp.hypothesis is not None:
+            factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
 
         # Build log entry
         log_entry = {
@@ -1151,42 +1147,42 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             "annualized_return": None,
             "max_drawdown": None,
             "win_rate": None,
-            "rejected_by_protection": getattr(exp, 'rejected_by_protection', False),
-            "protection_reason": getattr(exp, 'protection_reason', None),
+            "rejected_by_protection": getattr(exp, "rejected_by_protection", False),
+            "protection_reason": getattr(exp, "protection_reason", None),
         }
 
         # Extract metrics if available
         if result is not None:
-            if hasattr(result, 'get'):  # pd.Series or dict
-                ic_val = result.get('IC', result.get('ic', None))
-                log_entry['ic'] = self._safe_float(ic_val) if ic_val is not None else None
+            if hasattr(result, "get"):  # pd.Series or dict
+                ic_val = result.get("IC", result.get("ic", None))
+                log_entry["ic"] = self._safe_float(ic_val) if ic_val is not None else None
 
-                sharpe_val = result.get('1day.excess_return_with_cost.shar',
-                                        result.get('1day.excess_return_with_cost.sharpe',
-                                        result.get('sharpe', None)))
-                log_entry['sharpe'] = self._safe_float(sharpe_val) if sharpe_val is not None else None
+                sharpe_val = result.get("1day.excess_return_with_cost.shar",
+                                        result.get("1day.excess_return_with_cost.sharpe",
+                                        result.get("sharpe", None)))
+                log_entry["sharpe"] = self._safe_float(sharpe_val) if sharpe_val is not None else None
 
-                ann_ret = result.get('1day.excess_return_with_cost.annualized_return',
-                                     result.get('annualized_return', None))
-                log_entry['annualized_return'] = self._safe_float(ann_ret) if ann_ret is not None else None
+                ann_ret = result.get("1day.excess_return_with_cost.annualized_return",
+                                     result.get("annualized_return", None))
+                log_entry["annualized_return"] = self._safe_float(ann_ret) if ann_ret is not None else None
 
-                mdd = result.get('1day.excess_return_with_cost.max_drawdown',
-                                 result.get('max_drawdown', None))
-                log_entry['max_drawdown'] = self._safe_float(mdd) if mdd is not None else None
+                mdd = result.get("1day.excess_return_with_cost.max_drawdown",
+                                 result.get("max_drawdown", None))
+                log_entry["max_drawdown"] = self._safe_float(mdd) if mdd is not None else None
 
-                wr = result.get('win_rate', None)
-                log_entry['win_rate'] = self._safe_float(wr) if wr is not None else None
+                wr = result.get("win_rate", None)
+                log_entry["win_rate"] = self._safe_float(wr) if wr is not None else None
 
             # Determine status
-            if log_entry['ic'] is not None or log_entry['sharpe'] is not None:
-                log_entry['status'] = "success"
-            elif getattr(exp, 'rejected_by_protection', False):
-                log_entry['status'] = "rejected_protection"
+            if log_entry["ic"] is not None or log_entry["sharpe"] is not None:
+                log_entry["status"] = "success"
+            elif getattr(exp, "rejected_by_protection", False):
+                log_entry["status"] = "rejected_protection"
             else:
-                log_entry['status'] = "no_valid_metrics"
+                log_entry["status"] = "no_valid_metrics"
         else:
-            log_entry['status'] = "execution_failed"
-            log_entry['reason'] = "Result was None"
+            log_entry["status"] = "execution_failed"
+            log_entry["reason"] = "Result was None"
 
         # Write to results/logs/
         try:
@@ -1209,7 +1205,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
             logger.info(
                 f"Run log written for '{factor_name[:50]}': "
-                f"status={log_entry['status']}, IC={log_entry['ic']}, Sharpe={log_entry['sharpe']}"
+                f"status={log_entry['status']}, IC={log_entry['ic']}, Sharpe={log_entry['sharpe']}",
             )
         except Exception as e:
             logger.error(f"Failed to write run log: {e}")
