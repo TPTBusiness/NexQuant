@@ -399,3 +399,91 @@ class TestDatabaseIntegrity:
 
 # Import am Anfang der Datei für die Tests
 from rdagent.components.backtesting.results_db import ResultsDatabase
+
+
+class TestAddColumnIfNotExists:
+    """Direct tests for _add_column_if_not_exists migration helper."""
+
+    def test_add_new_column_succeeds(self):
+        """Adding a new column to an existing table should work."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            import os
+            db_path = os.path.join(tmpdir, "test.db")
+            db = ResultsDatabase(db_path=db_path)
+            try:
+                db._add_column_if_not_exists("backtest_runs", "test_new_col", "REAL")
+                c = db.conn.cursor()
+                c.execute("PRAGMA table_info(backtest_runs)")
+                cols = [row[1] for row in c.fetchall()]
+                assert "test_new_col" in cols
+            finally:
+                db.close()
+
+    def test_existing_column_noop(self):
+        """Adding an already existing column should succeed (no-op)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            import os
+            db_path = os.path.join(tmpdir, "test.db")
+            db = ResultsDatabase(db_path=db_path)
+            try:
+                # First call adds, second call should be no-op
+                db._add_column_if_not_exists("backtest_runs", "ic", "REAL")
+                db._add_column_if_not_exists("backtest_runs", "ic", "REAL")
+                c = db.conn.cursor()
+                c.execute("PRAGMA table_info(backtest_runs)")
+                cols = [row[1] for row in c.fetchall()]
+                assert cols.count("ic") == 1  # should exist exactly once
+            finally:
+                db.close()
+
+    def test_invalid_table_raises(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            import os
+            db_path = os.path.join(tmpdir, "test.db")
+            db = ResultsDatabase(db_path=db_path)
+            try:
+                with pytest.raises(ValueError, match="Unknown table"):
+                    db._add_column_if_not_exists("nonexistent_table", "col", "REAL")
+            finally:
+                db.close()
+
+    def test_invalid_column_name_raises(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            import os
+            db_path = os.path.join(tmpdir, "test.db")
+            db = ResultsDatabase(db_path=db_path)
+            try:
+                with pytest.raises(ValueError, match="Invalid column name"):
+                    db._add_column_if_not_exists("backtest_runs", "bad;column", "REAL")
+            finally:
+                db.close()
+
+    def test_invalid_column_type_raises(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            import os
+            db_path = os.path.join(tmpdir, "test.db")
+            db = ResultsDatabase(db_path=db_path)
+            try:
+                with pytest.raises(ValueError, match="Invalid column type"):
+                    db._add_column_if_not_exists("backtest_runs", "col", "INVALID_TYPE")
+            finally:
+                db.close()
+
+    def test_all_allowed_types_work(self):
+        """REAL, TEXT, INTEGER, BLOB should all be valid types."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            import os
+            db_path = os.path.join(tmpdir, "test.db")
+            db = ResultsDatabase(db_path=db_path)
+            try:
+                for col_type in ("REAL", "TEXT", "INTEGER", "BLOB"):
+                    db._add_column_if_not_exists(
+                        "backtest_runs", f"test_{col_type.lower()}", col_type,
+                    )
+                c = db.conn.cursor()
+                c.execute("PRAGMA table_info(backtest_runs)")
+                cols = {row[1] for row in c.fetchall()}
+                for col_type in ("REAL", "TEXT", "INTEGER", "BLOB"):
+                    assert f"test_{col_type.lower()}" in cols
+            finally:
+                db.close()
