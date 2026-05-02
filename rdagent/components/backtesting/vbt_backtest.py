@@ -19,7 +19,7 @@ Design goals
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -69,7 +69,7 @@ def _cross_check_with_vbt(
     txn_cost: float,
     manual_total_return: float,
     freq: str,
-) -> Optional[float]:
+) -> float | None:
     """Run a vectorbt simulation and return its total_return for comparison."""
     if not VBT_AVAILABLE:
         return None
@@ -95,9 +95,9 @@ def backtest_signal(
     txn_cost_bps: float = DEFAULT_TXN_COST_BPS,
     freq: str = "1min",
     bars_per_year: int = DEFAULT_BARS_PER_YEAR,
-    forward_returns: Optional[pd.Series] = None,
+    forward_returns: pd.Series | None = None,
     cross_check: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Run a single-asset backtest from a position signal.
 
@@ -204,7 +204,7 @@ def backtest_signal(
     calmar = ann_return_arith / abs(max_dd) if max_dd < 0 else 0.0
 
     trade_pnl = _compute_trade_pnl(position, strategy_returns)
-    n_trades = int(len(trade_pnl))
+    n_trades = len(trade_pnl)
     n_position_changes = int((position.diff().fillna(0) != 0).sum())
 
     if n_trades > 0:
@@ -216,7 +216,7 @@ def backtest_signal(
         win_rate = 0.0
         profit_factor = 0.0
 
-    ic: Optional[float] = None
+    ic: float | None = None
     if forward_returns is not None:
         fwd = pd.to_numeric(forward_returns, errors="coerce")
         common = signal.index.intersection(fwd.dropna().index)
@@ -227,7 +227,7 @@ def backtest_signal(
                 ic_val = float(s.corr(f))
                 ic = ic_val if np.isfinite(ic_val) else None
 
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "success",
         "sharpe": sharpe,
         "sortino": sortino,
@@ -244,7 +244,7 @@ def backtest_signal(
         "volatility": volatility,
         "n_trades": n_trades,
         "n_position_changes": n_position_changes,
-        "n_bars": int(len(strategy_returns)),
+        "n_bars": len(strategy_returns),
         "n_months": float(n_months),
         "signal_long": int((signal > 0).sum()),
         "signal_short": int((signal < 0).sum()),
@@ -293,7 +293,7 @@ def _apply_ftmo_mask(
 
     daily_breaches = 0
     total_breached = False
-    total_breach_ts: Optional[pd.Timestamp] = None
+    total_breach_ts: pd.Timestamp | None = None
     current_day    = None
     day_start_eq   = FTMO_INITIAL_CAPITAL
 
@@ -308,11 +308,8 @@ def _apply_ftmo_mask(
         pos_i  = float(signal.at[ts]) * leverage
         ret_i  = float(bar_ret.get(ts, 0.0))
         cost_i = abs(pos_i - pos_prev) * txn_cost
-        ret_net = pos_prev * ret_i - cost_i
-        equity  = equity * (1.0 + ret_net / FTMO_INITIAL_CAPITAL * FTMO_INITIAL_CAPITAL / equity
-                            if equity > 0 else 1.0)
-        # Simpler: track as fraction
-        equity += FTMO_INITIAL_CAPITAL * ret_net
+        ret_frac = pos_prev * ret_i - cost_i
+        equity *= 1.0 + ret_frac if equity > 0 else 1.0
         pos_prev = pos_i
 
         if total_breached:
@@ -399,7 +396,7 @@ def walk_forward_rolling(
     is_years: int = WF_IS_YEARS,
     oos_years: int = WF_OOS_YEARS,
     step_years: int = WF_STEP_YEARS,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Rolling walk-forward validation: multiple IS/OOS windows shifted by ``step_years``.
 
@@ -433,7 +430,7 @@ def walk_forward_rolling(
             yr += step_years
             continue
 
-        window: Dict[str, Any] = {
+        window: dict[str, Any] = {
             "is_start":  str(is_start.date()),
             "is_end":    str(is_end.date()),
             "oos_start": str(is_end.date()),
@@ -475,11 +472,11 @@ def backtest_signal_ftmo(
     stop_pips: float = FTMO_STOP_PIPS,
     max_leverage: float = FTMO_MAX_LEVERAGE,
     bars_per_year: int = DEFAULT_BARS_PER_YEAR,
-    forward_returns: Optional[pd.Series] = None,
-    oos_start: Optional[str] = OOS_START_DEFAULT,
+    forward_returns: pd.Series | None = None,
+    oos_start: str | None = OOS_START_DEFAULT,
     wf_rolling: bool = False,
     mc_n_permutations: int = 0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     FTMO-compliant backtest of a strategy signal on EUR/USD.
 
@@ -547,7 +544,7 @@ def backtest_signal_ftmo(
         is_mask  = close.index < oos_ts
         oos_mask = close.index >= oos_ts
 
-        def _split_bt(mask: "pd.Series[bool]", prefix: str) -> None:
+        def _split_bt(mask: pd.Series[bool], prefix: str) -> None:
             if mask.sum() < 100:
                 return
             close_s  = close.loc[mask]
@@ -602,7 +599,7 @@ def backtest_from_forward_returns(
     forward_returns: pd.Series,
     txn_cost_bps: float = DEFAULT_TXN_COST_BPS,
     bars_per_year: int = DEFAULT_BARS_PER_YEAR,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Backtest a factor using sign(factor) as signal against forward returns.
 
@@ -640,7 +637,7 @@ def backtest_from_forward_returns(
     ic = ic_val if np.isfinite(ic_val) else 0.0
 
     trade_pnl = _compute_trade_pnl(position, strategy_returns)
-    n_trades = int(len(trade_pnl))
+    n_trades = len(trade_pnl)
     win_rate = float((trade_pnl > 0).mean()) if n_trades > 0 else 0.0
 
     ann_return = float(strategy_returns.mean() * bars_per_year)
@@ -656,7 +653,7 @@ def backtest_from_forward_returns(
         "win_rate": win_rate,
         "n_trades": n_trades,
         "ic": ic,
-        "n_bars": int(len(strategy_returns)),
+        "n_bars": len(strategy_returns),
         "txn_cost_bps": txn_cost_bps,
         "bars_per_year": bars_per_year,
     }
