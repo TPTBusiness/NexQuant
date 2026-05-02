@@ -26,22 +26,18 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
-import requests
-
-from rdagent.components.prompt_loader import load_prompt
 from rdagent.components.coder.optuna_optimizer import OptunaOptimizer
+from rdagent.components.prompt_loader import load_prompt
 
 # OHLCV data path
 OHLCV_PATH = Path(os.getenv(
-    'PREDIX_OHLCV_PATH',
-    '/home/nico/Predix/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5'
+    "PREDIX_OHLCV_PATH",
+    "/home/nico/Predix/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5",
 ))
-from rdagent.log import rdagent_logger as logger
-
 logger = logging.getLogger(__name__)
 
 
@@ -60,7 +56,7 @@ class StrategyOrchestrator:
         min_sharpe: float = 0.3,
         max_drawdown: float = -0.30,
         min_win_rate: float = 0.40,
-        results_dir: Optional[str] = None,
+        results_dir: str | None = None,
         use_optuna: bool = True,
         optuna_trials: int = 20,
         continuous_optimization: bool = True,
@@ -118,7 +114,7 @@ class StrategyOrchestrator:
 
         logger.info(
             f"StrategyOrchestrator initialized: style={self.trading_style}, "
-            f"top_factors={self.top_factors}, min_sharpe={self.min_sharpe}"
+            f"top_factors={self.top_factors}, min_sharpe={self.min_sharpe}",
         )
 
     def load_ohlcv_close(self) -> pd.Series:
@@ -126,31 +122,31 @@ class StrategyOrchestrator:
         if not OHLCV_PATH.exists():
             logger.warning(f"OHLCV data not found: {OHLCV_PATH}")
             return None
-        
+
         try:
-            ohlcv = pd.read_hdf(str(OHLCV_PATH), key='data')
-            if '$close' in ohlcv.columns:
-                close = ohlcv['$close'].dropna()
-            elif 'close' in ohlcv.columns:
-                close = ohlcv['close'].dropna()
+            ohlcv = pd.read_hdf(str(OHLCV_PATH), key="data")
+            if "$close" in ohlcv.columns:
+                close = ohlcv["$close"].dropna()
+            elif "close" in ohlcv.columns:
+                close = ohlcv["close"].dropna()
             else:
                 close = ohlcv.select_dtypes(include=[np.number]).iloc[:, 0].dropna()
-            
+
             # Handle MultiIndex
             if isinstance(close.index, pd.MultiIndex):
                 try:
-                    close = close.xs('EURUSD', level='instrument')
+                    close = close.xs("EURUSD", level="instrument")
                 except KeyError:
-                    idx = close.index.get_level_values('instrument') == 'EURUSD'
+                    idx = close.index.get_level_values("instrument") == "EURUSD"
                     close = close[idx]
-                    close.index = close.index.droplevel('instrument')
-            
+                    close.index = close.index.droplevel("instrument")
+
             return close
         except Exception as e:
             logger.warning(f"Failed to load OHLCV data: {e}")
             return None
 
-    def load_top_factors(self) -> List[Dict[str, Any]]:
+    def load_top_factors(self) -> list[dict[str, Any]]:
         """
         Load top evaluated factors from JSON files.
 
@@ -177,7 +173,7 @@ class StrategyOrchestrator:
 
         # Sort by absolute IC and take top N
         factors.sort(key=lambda x: abs(x.get("ic", 0) or 0), reverse=True)
-        
+
         # Filter to only include factors that have parquet files
         factors_with_files = []
         for f in factors:
@@ -188,16 +184,16 @@ class StrategyOrchestrator:
                 factors_with_files.append(f)
             else:
                 logger.debug(f"Skipping {fname} - no parquet file")
-        
+
         # Select diverse factor TYPES, not just top IC
         # This ensures we get momentum, volatility, session, volume, etc.
         type_keywords = {
             "momentum": [], "trend": [], "volatility": [], "volume": [],
             "session": [], "london": [], "range": [], "vwap": [],
             "return": [], "ofi": [], "spread": [], "close": [],
-            "divergence": [], "other": []
+            "divergence": [], "other": [],
         }
-        
+
         for f in factors_with_files:
             name = f.get("factor_name", "").lower()
             matched = False
@@ -208,18 +204,18 @@ class StrategyOrchestrator:
                     break
             if not matched:
                 type_keywords["other"].append(f)
-        
+
         # Select best from each type (ensures diversity)
         selected = []
         already_names = set()
-        
+
         # Priority order: momentum, divergence, volatility, session, volume, etc.
-        priority_types = ["momentum", "divergence", "volatility", "session", 
-                         "london", "range", "vwap", "volume", "ofi", "spread", 
+        priority_types = ["momentum", "divergence", "volatility", "session",
+                         "london", "range", "vwap", "volume", "ofi", "spread",
                          "return", "trend", "close", "other"]
-        
+
         per_type = max(2, self.top_factors // len(priority_types))
-        
+
         for kw in priority_types:
             for f in sorted(type_keywords[kw], key=lambda x: abs(x.get("ic", 0)), reverse=True):
                 if f["factor_name"] not in already_names:
@@ -227,13 +223,13 @@ class StrategyOrchestrator:
                     already_names.add(f["factor_name"])
                     if len([s for s in selected if s["factor_name"] in [x["factor_name"] for x in type_keywords[kw]]]) >= per_type:
                         break
-        
+
         # Fill remaining with highest IC not yet selected
         if len(selected) < self.top_factors:
             remaining = [f for f in factors_with_files if f["factor_name"] not in already_names]
             remaining.sort(key=lambda x: abs(x.get("ic", 0)), reverse=True)
             selected.extend(remaining[:self.top_factors - len(selected)])
-        
+
         # Log diversity
         type_counts = {}
         for f in selected:
@@ -246,12 +242,12 @@ class StrategyOrchestrator:
                     break
             if not matched:
                 type_counts["other"] = type_counts.get("other", 0) + 1
-        
+
         logger.info(f"Selected {len(selected)} diverse factors: {type_counts}")
-        
+
         return selected[:self.top_factors]
 
-    def load_factor_values(self, factor_name: str) -> Optional[pd.Series]:
+    def load_factor_values(self, factor_name: str) -> pd.Series | None:
         """
         Load factor time-series values from parquet file.
 
@@ -273,32 +269,32 @@ class StrategyOrchestrator:
 
         try:
             df = pd.read_parquet(str(parquet_path))
-            
+
             # Handle empty DataFrame
             if df.empty or len(df.columns) == 0:
                 logger.warning(f"Empty parquet file: {parquet_path}")
                 return None
-            
+
             # Handle MultiIndex (datetime, instrument)
             if isinstance(df.index, pd.MultiIndex):
                 # Get the factor column name (should be the only column)
                 factor_col = df.columns[0]
                 # Extract EURUSD series
                 try:
-                    series = df.xs('EURUSD', level='instrument')[factor_col]
+                    series = df.xs("EURUSD", level="instrument")[factor_col]
                 except KeyError:
                     # Try alternative extraction
                     df_reset = df.reset_index()
-                    if 'instrument' in df_reset.columns:
-                        df_eur = df_reset[df_reset['instrument'] == 'EURUSD'].set_index('datetime')
+                    if "instrument" in df_reset.columns:
+                        df_eur = df_reset[df_reset["instrument"] == "EURUSD"].set_index("datetime")
                         series = df_eur[factor_col] if factor_col in df_eur.columns else df_eur.iloc[:, -1]
                     else:
                         series = df.iloc[:, 0]
             else:
                 series = df.iloc[:, 0]
-            
+
             # Ensure numeric
-            series = pd.to_numeric(series, errors='coerce')
+            series = pd.to_numeric(series, errors="coerce")
             series.name = factor_name
             return series
         except Exception as e:
@@ -307,10 +303,10 @@ class StrategyOrchestrator:
 
     def generate_strategy_code(
         self,
-        factors: List[Dict[str, Any]],
+        factors: list[dict[str, Any]],
         strategy_name: str,
         max_retries: int = 3,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Generate strategy code using LLM from factor combinations.
 
@@ -371,12 +367,12 @@ class StrategyOrchestrator:
                     last_error = f"Attempt {attempt}: LLM returned empty or invalid code"
                     logger.warning(f"LLM attempt {attempt}/{max_retries} failed: {last_error}")
                 except Exception as e:
-                    last_error = f"Attempt {attempt}: {str(e)}"
+                    last_error = f"Attempt {attempt}: {e!s}"
                     logger.warning(f"LLM attempt {attempt}/{max_retries} failed with exception: {e}")
 
             logger.warning(
                 f"LLM strategy generation failed after {max_retries} attempts. "
-                f"Last error: {last_error}"
+                f"Last error: {last_error}",
             )
 
         # Fallback: generate template code programmatically
@@ -385,10 +381,10 @@ class StrategyOrchestrator:
 
     def _generate_with_llm(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         attempt: int = 1,
-        feedback: Optional[str] = None,
-    ) -> Optional[str]:
+        feedback: str | None = None,
+    ) -> str | None:
         """
         Generate strategy code using LLM with APIBackend (same as Factor Coder).
 
@@ -406,7 +402,6 @@ class StrategyOrchestrator:
         str or None
             Validated Python strategy code, or None if invalid
         """
-        import json as json_module
 
         # Build user message with optional feedback
         user_content = context.get("user_prompt", "")
@@ -446,14 +441,13 @@ class StrategyOrchestrator:
                 if self._validate_python_code(code):
                     logger.info(f"[DEBUG] Valid Python code extracted ({len(code)} chars)")
                     return code
-                else:
-                    logger.warning(f"JSON 'code' field contains invalid Python (attempt {attempt}). Preview: {code[:200]}")
+                logger.warning(f"JSON 'code' field contains invalid Python (attempt {attempt}). Preview: {code[:200]}")
             else:
                 logger.warning(f"JSON parsed but no valid 'code' field found (attempt {attempt}). Keys: {list(json_data.keys())}")
 
         # === STEP 2: Fallback - Extract Python code block directly (like Factor Coder) ===
         import re
-        code_block_match = re.search(r'```python\s*\n(.*?)\n```', content, re.DOTALL)
+        code_block_match = re.search(r"```python\s*\n(.*?)\n```", content, re.DOTALL)
         if code_block_match:
             code = code_block_match.group(1).strip()
             if code and self._validate_python_code(code):
@@ -463,7 +457,7 @@ class StrategyOrchestrator:
         logger.warning(f"All extraction methods failed (attempt {attempt}). Response preview: {response[:200]}")
         return None
 
-    def _extract_json(self, content: str) -> Optional[Dict[str, Any]]:
+    def _extract_json(self, content: str) -> dict[str, Any] | None:
         """
         Extract JSON object from LLM response content.
 
@@ -491,7 +485,7 @@ class StrategyOrchestrator:
                 pass
 
         # Strategy 2: Find ```json ... ``` blocks
-        json_block_match = re.search(r'```json\s*\n(.*?)\n```', content, re.DOTALL)
+        json_block_match = re.search(r"```json\s*\n(.*?)\n```", content, re.DOTALL)
         if json_block_match:
             try:
                 return json_module.loads(json_block_match.group(1))
@@ -499,7 +493,7 @@ class StrategyOrchestrator:
                 pass
 
         # Strategy 3: Find ```python ... ``` blocks (Qwen often puts JSON in python blocks)
-        python_block_match = re.search(r'```python\s*\n(.*?)\n```', content, re.DOTALL)
+        python_block_match = re.search(r"```python\s*\n(.*?)\n```", content, re.DOTALL)
         if python_block_match:
             block = python_block_match.group(1).strip()
             if block.startswith("{") and block.endswith("}"):
@@ -519,13 +513,13 @@ class StrategyOrchestrator:
                 # Try to fix common JSON issues (trailing commas, unescaped newlines)
                 try:
                     # Remove trailing commas before } or ]
-                    json_str_fixed = re.sub(r',\s*([}\]])', r'\1', json_str)
+                    json_str_fixed = re.sub(r",\s*([}\]])", r"\1", json_str)
                     return json_module.loads(json_str_fixed)
                 except json_module.JSONDecodeError:
                     pass
 
         # Strategy 5: Find ``` ... ``` blocks (any language tag)
-        code_block_match = re.search(r'```\w*\s*\n(.*?)\n```', content, re.DOTALL)
+        code_block_match = re.search(r"```\w*\s*\n(.*?)\n```", content, re.DOTALL)
         if code_block_match:
             block = code_block_match.group(1).strip()
             if block.startswith("{") and block.endswith("}"):
@@ -536,7 +530,7 @@ class StrategyOrchestrator:
 
         return None
 
-    def _extract_code_from_json(self, json_data: Dict[str, Any]) -> Optional[str]:
+    def _extract_code_from_json(self, json_data: dict[str, Any]) -> str | None:
         """
         Extract Python code from parsed JSON data.
 
@@ -559,7 +553,7 @@ class StrategyOrchestrator:
 
         return None
 
-    def _extract_code_from_raw(self, content: str) -> Optional[str]:
+    def _extract_code_from_raw(self, content: str) -> str | None:
         """
         Extract Python code from raw (non-JSON) LLM response.
 
@@ -579,12 +573,12 @@ class StrategyOrchestrator:
         code = content.strip()
 
         # Try to find ```python blocks
-        python_match = re.search(r'```python\s*\n(.*?)\n```', code, re.DOTALL)
+        python_match = re.search(r"```python\s*\n(.*?)\n```", code, re.DOTALL)
         if python_match:
             code = python_match.group(1)
         else:
             # Try generic ``` blocks
-            block_match = re.search(r'```\s*\n(.*?)\n```', code, re.DOTALL)
+            block_match = re.search(r"```\s*\n(.*?)\n```", code, re.DOTALL)
             if block_match:
                 code = block_match.group(1)
 
@@ -636,7 +630,7 @@ class StrategyOrchestrator:
         # Remove non-ASCII characters (emojis, etc.)
         code = code.encode("ascii", "ignore").decode("ascii").strip()
 
-        return code if code else None
+        return code or None
 
     def _validate_python_code(self, code: str) -> bool:
         """
@@ -663,14 +657,14 @@ class StrategyOrchestrator:
             logger.debug(f"Python syntax error: {e}")
             return False
 
-    def _generate_fallback_code(self, context: Dict[str, Any]) -> str:
+    def _generate_fallback_code(self, context: dict[str, Any]) -> str:
         """Generate fallback strategy code programmatically."""
         factor_names = context["factor_names"]
         style_config = "daytrading" if context["trading_style"] == "daytrading" else "swing"
 
         # Build factor assignment code
         factor_assignments = "\n    ".join(
-            [f'"{name}": factors["{name}"]' for name in factor_names if name != "timestamp"]
+            [f'"{name}": factors["{name}"]' for name in factor_names if name != "timestamp"],
         )
 
         code = f'''"""
@@ -717,8 +711,8 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
         return code
 
     def evaluate_strategy(
-        self, strategy_code: str, strategy_name: str, factors: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, strategy_code: str, strategy_name: str, factors: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """
         Evaluate a strategy by executing its code and calculating metrics.
 
@@ -765,7 +759,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                         common_idx = s.index
                     else:
                         common_idx = common_idx.intersection(s.index)
-                
+
                 if common_idx is not None and len(common_idx) > 100:
                     df_factors = pd.DataFrame({
                         name: s.reindex(common_idx) for name, s in factor_values.items()
@@ -783,8 +777,8 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
 
             # Convert all factor columns to numeric
             for col in df_factors.columns:
-                df_factors[col] = pd.to_numeric(df_factors[col], errors='coerce')
-            
+                df_factors[col] = pd.to_numeric(df_factors[col], errors="coerce")
+
             # Forward-fill daily factors to match OHLCV 1-min index
             # Many factors are daily (1 value per day), need to ffill to 1-min
             # FIX 6: Track ffill ratio for data quality monitoring
@@ -799,11 +793,11 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                     f"[DEBUG] {strategy_name}: data quality: "
                     f"original_rows={original_len}, "
                     f"ffill_rows={len(df_factors) - original_len}, "
-                    f"ffill_ratio={ffill_ratio:.2%}"
+                    f"ffill_ratio={ffill_ratio:.2%}",
                 )
 
             df_factors = df_factors.dropna()
-            
+
             if len(df_factors) < 1000:
                 return {
                     "strategy_name": strategy_name,
@@ -811,24 +805,24 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                     "reason": f"Insufficient numeric data after conversion ({len(df_factors)} rows)",
                     "factors_used": factor_names,
                 }
-            
+
             # close is already loaded above for ffill, reuse it
             # Reindex close to match factor index
             if close is not None:
                 close = close.reindex(df_factors.index)
-            
+
             # Execute strategy code with factor data and close prices
             local_vars = {"factors": df_factors}
             if close is not None:
                 local_vars["close"] = close
-            
+
             try:
                 exec(strategy_code, {"np": np, "pd": pd, "numpy": np}, local_vars)
             except Exception as e:
                 return {
                     "strategy_name": strategy_name,
                     "status": "rejected",
-                    "reason": f"Code execution error: {str(e)}",
+                    "reason": f"Code execution error: {e!s}",
                     "factors_used": factor_names,
                 }
 
@@ -848,14 +842,14 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 f"long={int((signal > 0).sum())}, "
                 f"short={int((signal < 0).sum())}, "
                 f"flat={int((signal == 0).sum())}, "
-                f"unique={signal.nunique()}"
+                f"unique={signal.nunique()}",
             )
 
             # Delegate all metric computation to the single source of truth.
             # Same formulas as every other backtest path in the repo.
             from rdagent.components.backtesting.vbt_backtest import (
-                backtest_signal_ftmo,
                 DEFAULT_TXN_COST_BPS,
+                backtest_signal_ftmo,
             )
 
             close = self.load_ohlcv_close()
@@ -890,7 +884,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             logger.info(
                 f"[DEBUG] {strategy_name}: bt stats: "
                 f"sharpe={sharpe:.4f} dd={max_dd:.4f} wr={win_rate:.4f} "
-                f"trades={num_real_trades} total_ret={bt['total_return']:.4%}"
+                f"trades={num_real_trades} total_ret={bt['total_return']:.4%}",
             )
 
             metrics = {
@@ -920,7 +914,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                     f"[DEBUG] {strategy_name}: rejection breakdown: "
                     f"sharpe={sharpe:.4f} (need>={self.min_sharpe}), "
                     f"dd={max_dd:.4f} (need>={self.max_drawdown}), "
-                    f"wr={win_rate:.4f} (need>={self.min_win_rate})"
+                    f"wr={win_rate:.4f} (need>={self.min_win_rate})",
                 )
                 metrics["reason"] = self._get_rejection_reason(sharpe, max_dd, win_rate)
 
@@ -932,7 +926,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             return {
                 "strategy_name": strategy_name,
                 "status": "rejected",
-                "reason": f"Evaluation error: {str(e)}",
+                "reason": f"Evaluation error: {e!s}",
                 "factors_used": [],
             }
 
@@ -951,7 +945,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             reasons.append(f"Win Rate {win_rate:.2%} < {self.min_win_rate:.2%}")
         return "; ".join(reasons) if reasons else "Unknown"
 
-    def _generate_strategy_name(self, factors: List[Dict[str, Any]], idx: int) -> str:
+    def _generate_strategy_name(self, factors: list[dict[str, Any]], idx: int) -> str:
         """Generate a strategy name from its factors."""
         # Extract key words from factor names
         words = []
@@ -962,7 +956,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             for p in parts:
                 # Extract capitalized words
                 cap_words = [w for w in p.split() if w[0:1].isupper()]
-                words.extend(cap_words if cap_words else [p])
+                words.extend(cap_words or [p])
 
         # Take up to 3 unique words
         unique_words = list(dict.fromkeys(words))[:3]
@@ -975,7 +969,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
         count: int = 10,
         workers: int = 2,  # Reduced from 4 to 2 to avoid LLM server overload
         progress_callback=None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Generate and evaluate trading strategies.
 
@@ -1028,7 +1022,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                         logger.info(
                             f"Strategy ACCEPTED: {result['strategy_name']} | "
                             f"Sharpe={result['sharpe_ratio']:.2f} | "
-                            f"DD={result['max_drawdown']:.2%}"
+                            f"DD={result['max_drawdown']:.2%}",
                         )
                     else:
                         # Also save rejected strategies for debugging
@@ -1036,7 +1030,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                         logger.warning(
                             f"Strategy REJECTED: {result['strategy_name']} - {result.get('reason', 'unknown')} | "
                             f"Sharpe={result.get('sharpe_ratio', 'N/A')} | "
-                            f"DD={result.get('max_drawdown', 'N/A')}"
+                            f"DD={result.get('max_drawdown', 'N/A')}",
                         )
 
                     if progress_callback:
@@ -1052,12 +1046,12 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
 
         logger.info(
             f"Strategy generation complete: {strategies_accepted}/{strategies_generated} accepted "
-            f"({strategies_accepted/max(strategies_generated,1)*100:.1f}%)"
+            f"({strategies_accepted/max(strategies_generated,1)*100:.1f}%)",
         )
 
         return results
 
-    def _generate_strategy_configs(self, factors: List[Dict], count: int) -> List[List[Dict]]:
+    def _generate_strategy_configs(self, factors: list[dict], count: int) -> list[list[dict]]:
         """
         Generate strategy configurations from factor combinations.
 
@@ -1085,7 +1079,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
         np.random.shuffle(configs)
         return configs[: count * 2]  # Generate extras
 
-    def _generate_and_evaluate_single(self, idx: int, factors: List[Dict]) -> Dict[str, Any]:
+    def _generate_and_evaluate_single(self, idx: int, factors: list[dict]) -> dict[str, Any]:
         """Generate and evaluate a single strategy."""
         strategy_name = self._generate_strategy_name(factors, idx + 1)
 
@@ -1108,7 +1102,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
         # by finding optimal entry/exit thresholds, signal smoothing, etc.
         if self.use_optuna:
             initial_status = result.get("status", "rejected")
-            initial_sharpe = result.get("sharpe_ratio", float('-inf'))
+            initial_sharpe = result.get("sharpe_ratio", float("-inf"))
             logger.info(f"Running Optuna optimization for {strategy_name} (initial: {initial_status}, Sharpe={initial_sharpe:.4f})...")
             optimizer = OptunaOptimizer(n_trials=self.optuna_trials)
 
@@ -1117,7 +1111,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
 
             if factor_values is not None:
                 optimized = optimizer.optimize_strategy(result, factor_values)
-                optimized_sharpe = optimized.get("sharpe_ratio", float('-inf'))
+                optimized_sharpe = optimized.get("sharpe_ratio", float("-inf"))
                 optimized_status = optimized.get("status", "rejected")
                 best_params = optimized.get("best_params", {})
 
@@ -1126,14 +1120,14 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                     improvement = optimized_sharpe - initial_sharpe
                     logger.info(
                         f"Optuna {'RESCUED' if optimized_status == 'accepted' and initial_status == 'rejected' else 'improved'} "
-                        f"{strategy_name}: Sharpe {initial_sharpe:.4f} → {optimized_sharpe:.4f} (+{improvement:.4f})"
+                        f"{strategy_name}: Sharpe {initial_sharpe:.4f} → {optimized_sharpe:.4f} (+{improvement:.4f})",
                     )
 
                     # Re-evaluate with best parameters to get comparable metrics
                     if best_params:
                         patched_code = self._patch_strategy_code(code, best_params)
                         re_eval = self._evaluate_with_patched_code(patched_code, strategy_name, factors)
-                        if re_eval.get("sharpe_ratio", float('-inf')) > initial_sharpe:
+                        if re_eval.get("sharpe_ratio", float("-inf")) > initial_sharpe:
                             result.update(re_eval)
                             result["code"] = patched_code
                             result["best_params"] = best_params
@@ -1142,7 +1136,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                                 result.pop("reason", None)
                             logger.info(
                                 f"Re-evaluated {strategy_name} with best params: "
-                                f"Sharpe {initial_sharpe:.4f} → {re_eval.get('sharpe_ratio', 0):.4f}"
+                                f"Sharpe {initial_sharpe:.4f} → {re_eval.get('sharpe_ratio', 0):.4f}",
                             )
                         else:
                             result.update(optimized)
@@ -1162,7 +1156,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
 
         return result
 
-    def _prepare_factor_values(self, factors: List[Dict]) -> Optional[pd.DataFrame]:
+    def _prepare_factor_values(self, factors: list[dict]) -> pd.DataFrame | None:
         """Prepare factor values DataFrame for Optuna optimization."""
         factor_values = {}
         for f in factors:
@@ -1181,7 +1175,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             return df.dropna()
         return None
 
-    def _patch_strategy_code(self, code: str, params: Dict[str, Any]) -> str:
+    def _patch_strategy_code(self, code: str, params: dict[str, Any]) -> str:
         """Patch strategy code with Optuna's best parameters."""
         import re
         patched = code
@@ -1192,26 +1186,26 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
         signal_window = params.get("signal_window", 3)
 
         param_patterns = [
-            (r'entry_thresh\s*=\s*[\d.]+', f'entry_thresh = {entry_thresh}'),
-            (r'exit_thresh\s*=\s*[\d.]+', f'exit_thresh = {exit_thresh}'),
-            (r'window\s*=\s*\d+', f'window = {zscore_window}'),
-            (r'signal_window\s*=\s*\d+', f'signal_window = {signal_window}'),
+            (r"entry_thresh\s*=\s*[\d.]+", f"entry_thresh = {entry_thresh}"),
+            (r"exit_thresh\s*=\s*[\d.]+", f"exit_thresh = {exit_thresh}"),
+            (r"window\s*=\s*\d+", f"window = {zscore_window}"),
+            (r"signal_window\s*=\s*\d+", f"signal_window = {signal_window}"),
         ]
         for pattern, replacement in param_patterns:
             patched = re.sub(pattern, replacement, patched)
 
         # Patch .rolling(N) calls for common window sizes
-        rolling_pattern = r'\.rolling\((\d+)\)'
+        rolling_pattern = r"\.rolling\((\d+)\)"
         def replace_rolling(match):
             val = int(match.group(1))
             if val in (20, 30, 50, 100, 200):
-                return f'.rolling({zscore_window})'
+                return f".rolling({zscore_window})"
             return match.group(0)
         patched = re.sub(rolling_pattern, replace_rolling, patched)
 
         return patched
 
-    def _evaluate_with_patched_code(self, patched_code: str, strategy_name: str, factors: List[Dict]) -> Dict[str, Any]:
+    def _evaluate_with_patched_code(self, patched_code: str, strategy_name: str, factors: list[dict]) -> dict[str, Any]:
         """Re-evaluate strategy with patched parameters using full OHLCV backtest."""
         try:
             factor_names = [f["factor_name"] for f in factors if f["factor_name"] != "timestamp"]
@@ -1222,7 +1216,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                     factor_values[fname] = series
 
             if not factor_values:
-                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+                return {"sharpe_ratio": float("-inf"), "status": "rejected"}
 
             common_idx = None
             for name, s in factor_values.items():
@@ -1232,14 +1226,14 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                     common_idx = common_idx.intersection(s.index)
 
             if common_idx is None or len(common_idx) < 100:
-                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+                return {"sharpe_ratio": float("-inf"), "status": "rejected"}
 
             df_factors = pd.DataFrame({
                 name: s.reindex(common_idx) for name, s in factor_values.items()
             }).dropna()
 
             for col in df_factors.columns:
-                df_factors[col] = pd.to_numeric(df_factors[col], errors='coerce')
+                df_factors[col] = pd.to_numeric(df_factors[col], errors="coerce")
 
             close = self.load_ohlcv_close()
             if close is not None:
@@ -1247,7 +1241,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
 
             df_factors = df_factors.dropna()
             if len(df_factors) < 1000:
-                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+                return {"sharpe_ratio": float("-inf"), "status": "rejected"}
 
             if close is not None:
                 close = close.reindex(df_factors.index)
@@ -1256,21 +1250,21 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             try:
                 exec(patched_code, {"np": np, "pd": pd, "numpy": np}, local_vars)
             except Exception:
-                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+                return {"sharpe_ratio": float("-inf"), "status": "rejected"}
 
             if "signal" not in local_vars:
-                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+                return {"sharpe_ratio": float("-inf"), "status": "rejected"}
 
             signal = local_vars["signal"]
 
             from rdagent.components.backtesting.vbt_backtest import (
-                backtest_signal_ftmo,
                 DEFAULT_TXN_COST_BPS,
+                backtest_signal_ftmo,
             )
 
             close_for_bt = close.reindex(signal.index).ffill() if close is not None else None
             if close_for_bt is None:
-                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+                return {"sharpe_ratio": float("-inf"), "status": "rejected"}
 
             bt = backtest_signal_ftmo(
                 close=close_for_bt,
@@ -1278,7 +1272,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 txn_cost_bps=float(os.getenv("TXN_COST_BPS", DEFAULT_TXN_COST_BPS)),
             )
             if bt.get("status") != "success":
-                return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+                return {"sharpe_ratio": float("-inf"), "status": "rejected"}
 
             sharpe = bt["sharpe"]
             max_dd = bt["max_drawdown"]
@@ -1307,9 +1301,9 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
 
         except Exception as e:
             logger.debug(f"Re-evaluation failed for {strategy_name}: {e}")
-            return {"sharpe_ratio": float('-inf'), "status": "rejected"}
+            return {"sharpe_ratio": float("-inf"), "status": "rejected"}
 
-    def _save_strategy(self, result: Dict[str, Any]) -> None:
+    def _save_strategy(self, result: dict[str, Any]) -> None:
         """Save accepted strategy to JSON file."""
         timestamp = int(time.time())
         safe_name = result["strategy_name"].replace("/", "_").replace(" ", "_")[:60]
@@ -1325,7 +1319,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
 
         logger.info(f"Saved strategy to {filepath}")
 
-    def get_strategy_summary(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def get_strategy_summary(self, results: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Generate summary statistics from strategy generation results.
 
