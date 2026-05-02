@@ -15,19 +15,19 @@ import multiprocessing.queues
 import os
 import pickle
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Optional, Union, cast
+from typing import Any, cast
 
 import psutil
-from tqdm.auto import tqdm
-
 from rdagent.core.conf import RD_AGENT_SETTINGS
 from rdagent.log import rdagent_logger as logger
 from rdagent.log.conf import LOG_SETTINGS
 from rdagent.log.timer import RD_Agent_TIMER_wrapper, RDAgentTimer
 from rdagent.utils.workflow.tracking import WorkflowTracker
+from tqdm.auto import tqdm
 
 
 class LoopMeta(type):
@@ -98,7 +98,7 @@ class LoopBase:
     skip_loop_error: tuple[type[BaseException], ...] = ()  # you can define a list of error that will skip current loop
     skip_loop_error_stepname: str | None = None  # if skip_loop_error exception happens, what's the next step to work on
     withdraw_loop_error: tuple[
-        type[BaseException], ...
+        type[BaseException], ...,
     ] = ()  # you can define a list of error that will withdraw current loop
 
     EXCEPTION_KEY = "_EXCEPTION"
@@ -129,8 +129,8 @@ class LoopBase:
         self.tracker = WorkflowTracker(self)  # Initialize tracker with this LoopBase instance
 
         # progress control
-        self.loop_n: Optional[int] = None  # remain loop count
-        self.step_n: Optional[int] = None  # remain step count
+        self.loop_n: int | None = None  # remain loop count
+        self.step_n: int | None = None  # remain step count
 
         self.semaphores: dict[str, asyncio.Semaphore] = {}
 
@@ -169,7 +169,7 @@ class LoopBase:
             self._pbar.close()
             del self._pbar
 
-    def _check_exit_conditions_on_step(self, loop_id: Optional[int] = None, step_id: Optional[int] = None) -> None:
+    def _check_exit_conditions_on_step(self, loop_id: int | None = None, step_id: int | None = None) -> None:
         """Check if the loop should continue or terminate.
 
         Raises
@@ -188,8 +188,7 @@ class LoopBase:
             if self.timer.is_timeout():
                 logger.warning("Timeout, exiting the loop.")
                 raise self.LoopTerminationError("Timer timeout")
-            else:
-                logger.info(f"Timer remaining time: {self.timer.remain_time()}")
+            logger.info(f"Timer remaining time: {self.timer.remain_time()}")
 
     async def _run_step(self, li: int, force_subproc: bool = False) -> None:
         """Execute a single step (next unrun step) in the workflow (async version with force_subproc option).
@@ -217,7 +216,7 @@ class LoopBase:
 
             with logger.tag(f"Loop_{li}.{name}"):
                 start = datetime.now(timezone.utc)
-                func: Callable[..., Any] = cast(Callable[..., Any], getattr(self, name))
+                func: Callable[..., Any] = cast("Callable[..., Any]", getattr(self, name))
 
                 next_step_idx = si + 1
                 step_forward = True
@@ -233,15 +232,14 @@ class LoopBase:
                             # Using deepcopy is to avoid triggering errors like "RuntimeError: dictionary changed size during iteration"
                             # GUESS: Some content in self.loop_prev_out[li] may be in the middle of being changed.
                             result = await curr_loop.run_in_executor(
-                                pool, copy.deepcopy(func), copy.deepcopy(self.loop_prev_out[li])
+                                pool, copy.deepcopy(func), copy.deepcopy(self.loop_prev_out[li]),
                             )
+                    # auto determine whether to run async or sync
+                    elif asyncio.iscoroutinefunction(func):
+                        result = await func(self.loop_prev_out[li])
                     else:
-                        # auto determine whether to run async or sync
-                        if asyncio.iscoroutinefunction(func):
-                            result = await func(self.loop_prev_out[li])
-                        else:
-                            # Default: run sync function directly
-                            result = func(self.loop_prev_out[li])
+                        # Default: run sync function directly
+                        result = func(self.loop_prev_out[li])
                     # Store result in the nested dictionary
                     self.loop_prev_out[li][name] = result
                 except Exception as e:
@@ -251,14 +249,13 @@ class LoopBase:
                             next_step_idx = self.steps.index(self.skip_loop_error_stepname)
                             if next_step_idx <= si:
                                 raise RuntimeError(
-                                    f"Cannot skip backwards or to same step. Current: {si} ({name}), Target: {next_step_idx} ({self.skip_loop_error_stepname})"
+                                    f"Cannot skip backwards or to same step. Current: {si} ({name}), Target: {next_step_idx} ({self.skip_loop_error_stepname})",
                                 ) from e
+                        # Default: jump to feedback step if exists, otherwise jump to the last step (record)
+                        elif "feedback" in self.steps:
+                            next_step_idx = self.steps.index("feedback")
                         else:
-                            # Default: jump to feedback step if exists, otherwise jump to the last step (record)
-                            if "feedback" in self.steps:
-                                next_step_idx = self.steps.index("feedback")
-                            else:
-                                next_step_idx = len(self.steps) - 1
+                            next_step_idx = len(self.steps) - 1
                         self.loop_prev_out[li][name] = None
                         self.loop_prev_out[li][self.EXCEPTION_KEY] = e
                     elif isinstance(e, self.withdraw_loop_error):
@@ -409,6 +406,8 @@ class LoopBase:
                 self.close_pbar()
 
     def withdraw_loop(self, loop_idx: int) -> None:
+        if loop_idx <= 0:
+            raise RuntimeError(f"Cannot withdraw loop {loop_idx}: no previous loop exists.")
         prev_session_dir = self.session_folder / str(loop_idx - 1)
         prev_path = min(
             (p for p in prev_session_dir.glob("*_*") if p.is_file()),
@@ -501,7 +500,7 @@ class LoopBase:
             session_folder = path.parent.parent
 
         with path.open("rb") as f:
-            session = cast(LoopBase, pickle.load(f))
+            session = cast("LoopBase", pickle.load(f))
 
         # set session folder
         if checkout:
