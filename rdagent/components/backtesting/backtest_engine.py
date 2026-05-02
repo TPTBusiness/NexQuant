@@ -222,7 +222,7 @@ class FactorBacktester:
 
             # Calculate return for this step
             if step > 0:
-                prev_price = float(price_values[step - 1]) if step > 0 else current_price
+                prev_price = float(price_values[step - 1])
                 if prev_price > 0:
                     step_return = (current_price - prev_price) / prev_price * position
                     returns_history.append(step_return)
