@@ -1,21 +1,19 @@
 """
 Predix Risk Management - Korrelation, Portfolio-Optimierung
 """
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from typing import Dict, List, Optional
-from datetime import datetime
-import json
+
 
 class CorrelationAnalyzer:
     def __init__(self, lookback: int = 60):
         self.lookback = lookback
-    
+
     def calculate_matrix(self, returns: pd.DataFrame) -> pd.DataFrame:
         return returns.dropna().corr()
-    
-    def find_uncorrelated(self, corr: pd.DataFrame, threshold: float = 0.3) -> List[str]:
+
+    def find_uncorrelated(self, corr: pd.DataFrame, threshold: float = 0.3) -> list[str]:
         result = []
         for f in corr.columns:
             others = [x for x in corr.columns if x != f]
@@ -28,9 +26,9 @@ class PortfolioOptimizer:
         try:
             w = np.linalg.inv(cov.values) @ exp_ret.values
             return w / np.sum(w)
-        except:
+        except np.linalg.LinAlgError:
             return np.ones(len(exp_ret)) / len(exp_ret)
-    
+
     def risk_parity(self, cov: pd.DataFrame, max_iter: int = 100) -> np.ndarray:
         n = cov.shape[0]
         w = np.ones(n) / n
@@ -53,36 +51,36 @@ class AdvancedRiskManager:
         self.max_dd = max_dd
         self.corr_analyzer = CorrelationAnalyzer()
         self.optimizer = PortfolioOptimizer()
-    
-    def check_limits(self, weights: np.ndarray, vol: float, dd: float) -> Dict[str, bool]:
+
+    def check_limits(self, weights: np.ndarray, vol: float, dd: float) -> dict[str, bool]:
         return {
-            'position_limit': np.max(np.abs(weights)) <= self.max_pos,
-            'leverage_limit': np.sum(np.abs(weights)) <= self.max_lev,
-            'drawdown_limit': abs(dd) <= self.max_dd,
+            "position_limit": np.max(np.abs(weights)) <= self.max_pos,
+            "leverage_limit": np.sum(np.abs(weights)) <= self.max_lev,
+            "drawdown_limit": abs(dd) <= self.max_dd,
         }
 
 if __name__ == "__main__":
     print("=== Risk Test ===")
     np.random.seed(42)
-    n, names = 252, ['Mom', 'MeanRev', 'Vol', 'Volu', 'ML']
+    n, names = 252, ["Mom", "MeanRev", "Vol", "Volu", "ML"]
     ret = pd.DataFrame(np.random.randn(n, 5), columns=names)
-    
+
     corr = CorrelationAnalyzer().calculate_matrix(ret)
     print("Korrelationsmatrix:")
     print(corr.round(2))
-    
+
     opt = PortfolioOptimizer()
     exp_ret = pd.Series([0.1, 0.08, 0.06, 0.07, 0.12], index=names)
     cov = ret.cov() * 252
-    
+
     mv = opt.mean_variance(exp_ret, cov)
     print("\nMean-Variance:")
     for n, w in zip(names, mv): print(f"  {n}: {w:.2%}")
-    
+
     rp = opt.risk_parity(cov)
     print("\nRisk Parity:")
     for n, w in zip(names, rp): print(f"  {n}: {w:.2%}")
-    
+
     rm = AdvancedRiskManager()
     checks = rm.check_limits(mv, 0.15, -0.08)
     print(f"\nLimits OK: {all(checks.values())}")
