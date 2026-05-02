@@ -67,7 +67,6 @@ def _cross_check_with_vbt(
     close: pd.Series,
     position: pd.Series,
     txn_cost: float,
-    manual_total_return: float,
     freq: str,
 ) -> float | None:
     """Run a vectorbt simulation and return its total_return for comparison."""
@@ -264,7 +263,6 @@ def backtest_signal(
             close=close,
             position=position,
             txn_cost=txn_cost,
-            manual_total_return=total_return,
             freq=freq,
         )
 
