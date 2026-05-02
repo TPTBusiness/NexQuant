@@ -436,13 +436,10 @@ class Env(Generic[ASpecificEnvConf]):
         else:
             timeout_cmd = f"timeout --kill-after=10 {self.conf.running_timeout_period} {entry}"
         entry_add_timeout = (
-            f"/bin/sh -c '"  # start of the sh command
-            + f"{timeout_cmd}; entry_exit_code=$?; "
+            "/bin/sh -c '"  # start of the sh command
+            + timeout_cmd.replace("'", "'\\''") + "; entry_exit_code=$?; "
             + (
                 f"{_get_chmod_cmd(self.conf.mount_path)}; "
-                # We don't have to change the permission of the cache and input folder to remove it
-                # + f"if [ -d {self.conf.mount_path}/cache ]; then chmod 777 {self.conf.mount_path}/cache; fi; " +
-                #     f"if [ -d {self.conf.mount_path}/input ]; then chmod 777 {self.conf.mount_path}/input; fi; "
                 if isinstance(self.conf, DockerConf)
                 else ""
             )
@@ -1524,8 +1521,8 @@ class DockerEnv(Env[DockerConf]):
 class QTDockerEnv(DockerEnv):
     """Qlib Torch Docker"""
 
-    def __init__(self, conf: DockerConf = QlibDockerConf()):
-        super().__init__(conf)
+    def __init__(self, conf: DockerConf | None = None):
+        super().__init__(conf if conf is not None else QlibDockerConf())
 
     def prepare(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
         """
@@ -1544,15 +1541,15 @@ class QTDockerEnv(DockerEnv):
 class KGDockerEnv(DockerEnv):
     """Kaggle Competition Docker"""
 
-    def __init__(self, competition: str | None = None, conf: DockerConf = KGDockerConf()):
-        super().__init__(conf)
+    def __init__(self, competition: str | None = None, conf: DockerConf | None = None):
+        super().__init__(conf if conf is not None else KGDockerConf())
 
 
 class MLEBDockerEnv(DockerEnv):
     """MLEBench Docker"""
 
-    def __init__(self, conf: DockerConf = MLEBDockerConf()):
-        super().__init__(conf)
+    def __init__(self, conf: DockerConf | None = None):
+        super().__init__(conf if conf is not None else MLEBDockerConf())
 
 
 class FTDockerEnv(DockerEnv):
@@ -1568,8 +1565,8 @@ class FTDockerEnv(DockerEnv):
         export FT_DOCKER_save_logs_to_file=false # disable log file
     """
 
-    def __init__(self, conf: DockerConf = FTDockerConf()):
-        super().__init__(conf)
+    def __init__(self, conf: DockerConf | None = None):
+        super().__init__(conf if conf is not None else FTDockerConf())
 
 
 class BenchmarkDockerEnv(DockerEnv):
@@ -1586,5 +1583,5 @@ class BenchmarkDockerEnv(DockerEnv):
         export BENCHMARK_DOCKER_terminal_tail_lines=100  # show last 100 lines
     """
 
-    def __init__(self, conf: DockerConf = BenchmarkDockerConf()):
-        super().__init__(conf)
+    def __init__(self, conf: DockerConf | None = None):
+        super().__init__(conf if conf is not None else BenchmarkDockerConf())
