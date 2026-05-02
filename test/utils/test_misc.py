@@ -1,8 +1,10 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 import pytest
 
-from rdagent.core.utils import SingletonBaseClass
+from rdagent.core.utils import SingletonBaseClass, import_class, safe_resolve_path
 
 
 class A(SingletonBaseClass):
@@ -68,6 +70,77 @@ class MiscTest(unittest.TestCase):
         #     a3_pkl = pickle.load(f)
         # print(id(a3), id(a3_pkl))  # not the same object
         # print(a1.kwargs)  # a1 will be changed.
+
+
+class TestSafeResolvePath:
+    """Tests for safe_resolve_path — path traversal prevention."""
+
+    def test_inside_root_returns_absolute(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            result = safe_resolve_path(root / "subdir" / "file.txt", safe_root=root)
+            assert result.is_absolute()
+            assert str(result).startswith(str(root.resolve()))
+
+    def test_no_safe_root_just_resolves(self):
+        result = safe_resolve_path(Path("/tmp/nonexistent_test"), safe_root=None)
+        assert result.is_absolute()
+
+    def test_path_traversal_raises(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            with pytest.raises(ValueError, match="outside allowed root"):
+                safe_resolve_path(root / ".." / "etc" / "passwd", safe_root=root)
+
+    def test_symlink_outside_root_raises(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            inside = root / "inside"
+            inside.mkdir()
+            link = inside / "escape"
+            link.symlink_to("/etc/passwd")
+            with pytest.raises(ValueError, match="outside allowed root"):
+                safe_resolve_path(link, safe_root=root)
+
+    def test_root_itself_is_valid(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            result = safe_resolve_path(root, safe_root=root)
+            assert result == root.resolve()
+
+    def test_expanduser_resolves_home(self):
+        result = safe_resolve_path(Path("~/nonexistent_test"), safe_root=None)
+        assert str(result).startswith(str(Path.home()))
+
+
+class TestImportClass:
+    """Tests for import_class — dynamic class loading."""
+
+    def test_valid_class_import(self):
+        cls = import_class("pathlib.Path")
+        assert cls is Path
+
+    def test_builtin_class_import(self):
+        cls = import_class("collections.OrderedDict")
+        from collections import OrderedDict
+        assert cls is OrderedDict
+
+    def test_invalid_module_raises_import_error(self):
+        with pytest.raises(ImportError, match="Module not found"):
+            import_class("nonexistent.module.ClassName")
+
+    def test_missing_class_raises_import_error(self):
+        with pytest.raises(ImportError, match="Class not found"):
+            import_class("pathlib.NonExistentClass")
+
+    def test_invalid_format_raises_import_error(self):
+        with pytest.raises(ImportError, match="Invalid class path"):
+            import_class("no_dots_at_all")
+
+    def test_pandas_class_import(self):
+        cls = import_class("pandas.DataFrame")
+        import pandas as pd
+        assert cls is pd.DataFrame
 
 
 if __name__ == "__main__":
