@@ -83,10 +83,24 @@ def import_class(class_path: str) -> Any:
     Returns
     -------
         class of `class_path`
+
+    Raises
+    ------
+    ImportError
+        If module or class cannot be found.
     """
-    module_path, class_name = class_path.rsplit(".", 1)
-    module = importlib.import_module(module_path)
-    return getattr(module, class_name)
+    try:
+        module_path, class_name = class_path.rsplit(".", 1)
+    except ValueError:
+        raise ImportError(f"Invalid class path: {class_path!r}")
+    try:
+        module = importlib.import_module(module_path)
+    except ModuleNotFoundError as e:
+        raise ImportError(f"Module not found: {module_path!r}") from e
+    try:
+        return getattr(module, class_name)
+    except AttributeError as e:
+        raise ImportError(f"Class not found: {class_name!r} in {module_path!r}") from e
 
 
 class CacheSeedGen:
