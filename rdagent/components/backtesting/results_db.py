@@ -166,7 +166,7 @@ class ResultsDatabase:
         self.conn.commit()
         return c.lastrowid
     
-    def add_loop(self, loop_idx: int, success: int, fail: int, best_ic: float = None, status: str = "completed") -> int:
+    def add_loop(self, loop_idx: int, success: int, fail: int, best_ic: float | None = None, status: str = "completed") -> int:
         c = self.conn.cursor()
         rate = success / (success + fail) if (success + fail) > 0 else 0
         c.execute("""INSERT INTO loop_results (loop_index, factors_success, factors_fail, success_rate, best_ic, status)
