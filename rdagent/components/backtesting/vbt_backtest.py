@@ -83,7 +83,8 @@ def _cross_check_with_vbt(
             init_cash=10_000.0,
             freq=freq,
         )
-        return float(pf.total_return())
+        tr = float(pf.total_return())
+        return tr if np.isfinite(tr) else None
     except Exception:
         return None
 
