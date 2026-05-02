@@ -749,18 +749,15 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 }
 
             # Align factor values with common index
-            if not factor_values:
-                df_factors = pd.DataFrame()
-            else:
-                # Find common index across all series
-                common_idx = None
-                for name, s in factor_values.items():
-                    if common_idx is None:
-                        common_idx = s.index
-                    else:
-                        common_idx = common_idx.intersection(s.index)
+            # Find common index across all series
+            common_idx = None
+            for name, s in factor_values.items():
+                if common_idx is None:
+                    common_idx = s.index
+                else:
+                    common_idx = common_idx.intersection(s.index)
 
-                if common_idx is not None and len(common_idx) > 100:
+            if common_idx is not None and len(common_idx) > 100:
                     df_factors = pd.DataFrame({
                         name: s.reindex(common_idx) for name, s in factor_values.items()
                     }).dropna()
@@ -826,15 +823,14 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                     "factors_used": factor_names,
                 }
 
-            if "signal" not in local_vars:
+            signal = local_vars.get("signal")
+            if signal is None or (isinstance(signal, pd.Series) and signal.empty):
                 return {
                     "strategy_name": strategy_name,
                     "status": "rejected",
-                    "reason": "Strategy did not produce 'signal' variable",
+                    "reason": "Strategy did not produce valid 'signal' variable",
                     "factors_used": factor_names,
                 }
-
-            signal = local_vars["signal"]
 
             logger.info(
                 f"[DEBUG] {strategy_name}: signal stats: "
@@ -852,7 +848,7 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                 backtest_signal_ftmo,
             )
 
-            close = self.load_ohlcv_close()
+            # Reuse the already-loaded close from above; create a synthetic proxy if unavailable
             if close is None:
                 logger.warning("OHLCV data unavailable, using factor-mean proxy")
                 proxy = df_factors.mean(axis=1).astype(float)
