@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import fire
-
 from rdagent.app.qlib_rd_loop.conf import QUANT_PROP_SETTING
 from rdagent.components.workflow.conf import BasePropSetting
 from rdagent.components.workflow.rd_loop import RDLoop
@@ -44,11 +43,11 @@ class QuantRDLoop(RDLoop):
         logger.log_object(self.hypothesis_gen, tag="quant hypothesis generator")
 
         self.factor_hypothesis2experiment: Hypothesis2Experiment = import_class(
-            PROP_SETTING.factor_hypothesis2experiment
+            PROP_SETTING.factor_hypothesis2experiment,
         )()
         logger.log_object(self.factor_hypothesis2experiment, tag="factor hypothesis2experiment")
         self.model_hypothesis2experiment: Hypothesis2Experiment = import_class(
-            PROP_SETTING.model_hypothesis2experiment
+            PROP_SETTING.model_hypothesis2experiment,
         )()
         logger.log_object(self.model_hypothesis2experiment, tag="model hypothesis2experiment")
 
@@ -133,7 +132,6 @@ class QuantRDLoop(RDLoop):
         """
         import json
         from datetime import datetime
-        from pathlib import Path
 
         try:
             project_root = Path(__file__).parent.parent.parent.parent
@@ -196,11 +194,11 @@ class QuantRDLoop(RDLoop):
         if prev_out["direct_exp_gen"]["propose"].action == "factor":
             exp = self.factor_runner.develop(prev_out["coding"])
             if exp is None:
-                logger.error(f"Factor extraction failed.")
+                logger.error("Factor extraction failed.")
                 raise FactorEmptyError("Factor extraction failed.")
 
             # Increment factor count for tracking
-            if hasattr(self, 'trace') and hasattr(self.trace, 'increment_factor_count'):
+            if hasattr(self, "trace") and hasattr(self.trace, "increment_factor_count"):
                 self.trace.increment_factor_count()
 
             # Handle failed experiments gracefully (don't break the loop)
@@ -211,7 +209,7 @@ class QuantRDLoop(RDLoop):
                     factor_name = getattr(exp.hypothesis, "hypothesis", "unknown")
                 logger.warning(
                     f"Factor '{factor_name}' failed evaluation: {reason}. "
-                    f"Continuing with next factor."
+                    f"Continuing with next factor.",
                 )
                 # Return exp anyway - loop will continue
         elif prev_out["direct_exp_gen"]["propose"].action == "model":
@@ -220,7 +218,7 @@ class QuantRDLoop(RDLoop):
         return exp
 
     def feedback(self, prev_out: dict[str, Any]):
-        e = prev_out.get(self.EXCEPTION_KEY, None)
+        e = prev_out.get(self.EXCEPTION_KEY)
         if e is not None:
             feedback = HypothesisFeedback(
                 observations=str(e),
@@ -246,11 +244,10 @@ class QuantRDLoop(RDLoop):
                     reason=reason,
                     decision=False,
                 )
-            else:
-                if prev_out["direct_exp_gen"]["propose"].action == "factor":
-                    feedback = self.factor_summarizer.generate_feedback(prev_out["running"], self.trace)
-                elif prev_out["direct_exp_gen"]["propose"].action == "model":
-                    feedback = self.model_summarizer.generate_feedback(prev_out["running"], self.trace)
+            elif prev_out["direct_exp_gen"]["propose"].action == "factor":
+                feedback = self.factor_summarizer.generate_feedback(prev_out["running"], self.trace)
+            elif prev_out["direct_exp_gen"]["propose"].action == "model":
+                feedback = self.model_summarizer.generate_feedback(prev_out["running"], self.trace)
 
             # NOTE: DB save is handled by factor_runner.py _save_result_to_database()
             # which runs immediately after Docker execution. No duplicate save needed here.
@@ -259,20 +256,20 @@ class QuantRDLoop(RDLoop):
         factor_count = self.trace.get_factor_count()
 
         # Check for auto-strategies trigger
-        auto_strategies = getattr(self, '_auto_strategies', False)
-        auto_threshold = getattr(self, '_auto_strategies_threshold', 500)
+        auto_strategies = getattr(self, "_auto_strategies", False)
+        auto_threshold = getattr(self, "_auto_strategies_threshold", 500)
 
         if auto_strategies and factor_count > 0 and factor_count % auto_threshold == 0:
             logger.info(
                 f"Auto-strategy trigger: {factor_count} factors evaluated. "
-                f"Suggesting strategy generation now..."
+                f"Suggesting strategy generation now...",
             )
             self._build_strategies_with_ai()
         elif factor_count > 0 and factor_count % 50 == 0 and not auto_strategies:
             # Standard periodic suggestion (every 50 factors)
             logger.info(
                 f"Periodic check: {factor_count} factors evaluated. "
-                f"Consider running 'rdagent generate_strategies' for AI strategy generation."
+                f"Consider running 'rdagent generate_strategies' for AI strategy generation.",
             )
 
         feedback = self._interact_feedback(feedback)
@@ -293,10 +290,11 @@ class QuantRDLoop(RDLoop):
         - Optuna hyperparameter optimization
         """
         try:
-            from rdagent.components.coder.strategy_orchestrator import StrategyOrchestrator
             from pathlib import Path
+
             import yaml
-            
+            from rdagent.components.coder.strategy_orchestrator import StrategyOrchestrator
+
             # Load improved prompt
             project_root = Path(__file__).parent.parent.parent.parent
             prompt_path = project_root / "prompts" / "strategy_generation_v2.yaml"
@@ -336,44 +334,47 @@ class QuantRDLoop(RDLoop):
 
             logger.info(f"StrategyOrchestrator: Building strategies from {len(top_factors)} top factors...")
             logger.info(f"  - Using improved prompt: {improved_prompt is not None}")
-            logger.info(f"  - Optuna optimization: enabled (20 trials)")
-            logger.info(f"  - Real OHLCV backtest: enabled")
+            logger.info("  - Optuna optimization: enabled (20 trials)")
+            logger.info("  - Real OHLCV backtest: enabled")
 
             # Initialize orchestrator with Optuna
             orchestrator = StrategyOrchestrator(
                 top_factors=20,
-                trading_style='swing',
+                trading_style="swing",
                 min_sharpe=0.5,
                 max_drawdown=-0.20,
                 min_win_rate=0.40,
                 use_optuna=True,
                 optuna_trials=20,
             )
-            
+
             # Override with improved prompt if available
             if improved_prompt:
-                orchestrator.strategy_prompt = improved_prompt.get('strategy_generation', {})
+                orchestrator.strategy_prompt = improved_prompt.get("strategy_generation", {})
 
             # Generate 3 strategies per cycle
             n_strategies = 3
             logger.info(f"Generating {n_strategies} strategies...")
-            
+
             # Load top factors for generation
             orch_factors = orchestrator.load_top_factors()
-            
+            if len(orch_factors) < 2:
+                logger.warning(f"Not enough factors for strategy generation (need >= 2, got {len(orch_factors)}). Skipping.")
+                return
+
             for i in range(n_strategies):
+                strategy_name = f"auto_gen_v{i+1}"
                 try:
                     # Select random factor combination
                     import random
                     n_factors = random.randint(2, min(5, len(orch_factors)))
                     factor_subset = random.sample(orch_factors, n_factors)
-                    
-                    strategy_name = f"auto_gen_v{i+1}"
+
                     code = orchestrator.generate_strategy_code(factor_subset, strategy_name)
-                    
+
                     if code:
                         result = orchestrator.evaluate_strategy(code, strategy_name, factor_subset)
-                        
+
                         if result.get("status") == "accepted":
                             logger.info(f"✅ Strategy {strategy_name} accepted!")
                             logger.info(f"   Sharpe: {result.get('sharpe_ratio', 0):.2f}")
@@ -431,7 +432,7 @@ def main(
         quant_loop._auto_strategies = True
         quant_loop._auto_strategies_threshold = auto_strategies_threshold
         logger.info(
-            f"Auto-strategies enabled. Will trigger after {auto_strategies_threshold} factors."
+            f"Auto-strategies enabled. Will trigger after {auto_strategies_threshold} factors.",
         )
     else:
         quant_loop._auto_strategies = False

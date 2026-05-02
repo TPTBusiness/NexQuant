@@ -9,7 +9,6 @@ import datetime
 from typing import TYPE_CHECKING
 
 import pytz
-
 from rdagent.core.conf import RD_AGENT_SETTINGS
 from rdagent.log.timer import RD_Agent_TIMER_wrapper
 
@@ -85,12 +84,13 @@ class WorkflowTracker:
             if self.loop_base.timer.started:
                 remain_time = self.loop_base.timer.remain_time()
                 if remain_time is None:
-                    raise AssertionError("remain_time should not be None")
-                mlflow.log_metric("remain_time", remain_time.total_seconds())
-                mlflow.log_metric(
-                    "remain_percent",
-                    remain_time / self.loop_base.timer.all_duration * 100,
-                )
+                    logger.warning("remain_time is None despite timer.started, skipping timer metrics")
+                else:
+                    mlflow.log_metric("remain_time", remain_time.total_seconds())
+                    mlflow.log_metric(
+                        "remain_percent",
+                        remain_time / self.loop_base.timer.all_duration * 100,
+                    )
 
         # Keep only the log_workflow_state method as it's the primary entry point now
         except Exception as e:
