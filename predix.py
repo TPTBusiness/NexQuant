@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent / ".env")
 
 import typer
@@ -114,7 +115,7 @@ def _ensure_kronos_factor_in_pool(con) -> None:
         color = "green" if abs(ic) > 0.01 else "yellow"
         con.print(
             f"  [bold {color}]Kronos Factor ready:[/bold {color}] IC={ic:.4f}, "
-            f"Hit-Rate={hit_rate:.1%} — added to strategy pool"
+            f"Hit-Rate={hit_rate:.1%} — added to strategy pool",
         )
 
     except Exception as e:
@@ -201,9 +202,9 @@ def quant(
         predix health - Check system health and configuration
     """
     import subprocess
+    import sys
     import threading
     import time
-    import sys
 
     # ---- Parallel Run Isolation ----
     # When run_id > 0, isolate all outputs (logs, results, workspace)
@@ -226,10 +227,9 @@ def quant(
         console.print(f"   [dim]Log: {log_file}[/dim]")
         console.print(f"   [dim]Results: results/runs/run{run_id}/[/dim]")
         console.print(f"   [dim]Workspace: {workspace_dir.name}/[/dim]")
-    else:
-        # Single run mode: default log file
-        if log_file is None:
-            log_file = "fin_quant.log"
+    # Single run mode: default log file
+    elif log_file is None:
+        log_file = "fin_quant.log"
 
     # ---- Log File Setup (daily-rotated) ----
     from datetime import datetime as _dt
@@ -237,10 +237,14 @@ def quant(
     _daily_dir = Path(__file__).parent / "logs" / _today
     _daily_dir.mkdir(parents=True, exist_ok=True)
 
+    _log_f = None
+    _orig_stdout = sys.stdout
+    _orig_stderr = sys.stderr
+
     if log_file.lower() != "none":
         log_path = _daily_dir / log_file
         # Open log file for appending (raw stdout/stderr capture)
-        log_f = open(log_path, "a", encoding="utf-8")
+        _log_f = open(log_path, "a", encoding="utf-8")
 
         # Redirect stdout and stderr to both console and log file
         class TeeWriter:
@@ -252,18 +256,18 @@ def quant(
                     try:
                         s.write(data)
                         s.flush()
-                    except:
+                    except Exception:
                         pass
 
             def flush(self):
                 for s in self._streams:
                     try:
                         s.flush()
-                    except:
+                    except Exception:
                         pass
 
-        sys.stdout = TeeWriter(sys.__stdout__, log_f)
-        sys.stderr = TeeWriter(sys.__stderr__, log_f)
+        sys.stdout = TeeWriter(_orig_stdout, _log_f)
+        sys.stderr = TeeWriter(_orig_stderr, _log_f)
 
         console.print(f"\n[dim]📝 Logging to: logs/{_today}/{log_file}[/dim]")
     else:
@@ -276,7 +280,7 @@ def quant(
         if not api_key:
             console.print("\n[bold red]❌ OPENROUTER_API_KEY not set in .env[/bold red]")
             console.print("[yellow]Add your API key to .env:[/yellow]")
-            console.print('  OPENROUTER_API_KEY=sk-or-your-key-here')
+            console.print("  OPENROUTER_API_KEY=sk-or-your-key-here")
             raise typer.Exit(code=1)
 
         # Setup both API keys for load balancing
@@ -289,7 +293,7 @@ def quant(
             os.environ["LITELLM_PARALLEL_CALLS"] = "2"
             console.print(f"\n[bold blue]🌐 Using OpenRouter (2 API Keys):[/bold blue] [cyan]{os.environ['CHAT_MODEL']}[/cyan]")
             console.print(f"   [dim]Keys: {api_key[:15]}*** + {api_key_2[:15]}***[/dim]")
-            console.print(f"   [dim]Parallel: 2 concurrent requests[/dim]")
+            console.print("   [dim]Parallel: 2 concurrent requests[/dim]")
         else:
             os.environ["OPENAI_API_KEY"] = api_key
             console.print(f"\n[bold blue]🌐 Using OpenRouter:[/bold blue] [cyan]{os.environ['CHAT_MODEL']}[/cyan]")
@@ -307,7 +311,7 @@ def quant(
     # ---- Dashboards ----
     if dashboard:
         def start_web_dashboard():
-            console.print(f"\n[bold green]🚀 Web Dashboard: http://localhost:5000[/bold green]")
+            console.print("\n[bold green]🚀 Web Dashboard: http://localhost:5000[/bold green]")
             subprocess.run(
                 ["python", "web/dashboard_api.py"],
                 cwd=str(Path(__file__).parent),
@@ -332,7 +336,7 @@ def quant(
     from rdagent.app.qlib_rd_loop.quant import main as fin_quant
     from rdagent.log.daily_log import session as _daily_session
 
-    console.print(f"\n[bold cyan]📊 Starting EURUSD Trading Loop...[/bold cyan]\n")
+    console.print("\n[bold cyan]📊 Starting EURUSD Trading Loop...[/bold cyan]\n")
 
     _ctx = {"model": model}
     if run_id:
@@ -342,11 +346,17 @@ def quant(
     if step_n:
         _ctx["steps"] = step_n
 
-    with _daily_session("fin_quant", **_ctx):
-        fin_quant(
-            step_n=step_n,
-            loop_n=loop_n,
-        )
+    try:
+        with _daily_session("fin_quant", **_ctx):
+            fin_quant(
+                step_n=step_n,
+                loop_n=loop_n,
+            )
+    finally:
+        if _log_f is not None:
+            sys.stdout = _orig_stdout
+            sys.stderr = _orig_stderr
+            _log_f.close()
 
 
 @app.command()
@@ -415,8 +425,8 @@ def evaluate(
         predix portfolio - Select a diversified portfolio of uncorrelated factors
         predix quant - Generate new factors via LLM trading loop
     """
-    from rich.panel import Panel
     from rdagent.log.daily_log import session as _daily_session
+    from rich.panel import Panel
 
     console.print(Panel(
         "[bold cyan]📊 Predix Factor Evaluator[/bold cyan]\n"
@@ -496,11 +506,12 @@ def top(
         predix portfolio - Select diversified portfolio from top factors
         predix build-strategies - Combine factors into trading strategies
     """
-    import json
     import glob as glob_module
+    import json
+
     import numpy as np
-    from rich.table import Table
     from rich.panel import Panel
+    from rich.table import Table
 
     factors_dir = Path(__file__).parent / "results" / "factors"
     if not factors_dir.exists():
@@ -642,16 +653,16 @@ def portfolio(
         predix top - View top factors before portfolio selection
         predix build-strategies - Build strategies from selected factors
     """
-    import json
     import glob as glob_module
+    import json
+    import shutil
     import subprocess
     import tempfile
-    import shutil
-    import numpy as np
+
     import pandas as pd
-    from rich.table import Table
     from rich.panel import Panel
-    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
+    from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn, TimeElapsedColumn
+    from rich.table import Table
 
     factors_dir = Path(__file__).parent / "results" / "factors"
     if not factors_dir.exists():
@@ -683,12 +694,12 @@ def portfolio(
     # 2. Evaluate candidates to get time-series values for correlation
     # We need to run the factor code to get the series of values.
     # We do this sequentially to avoid OOM.
-    
+
     # Locate data file
     data_file = Path(__file__).parent / "git_ignore_folder" / "factor_implementation_source_data" / "intraday_pv.h5"
     if not data_file.exists():
         data_file = Path(__file__).parent / "git_ignore_folder" / "factor_implementation_source_data_debug" / "intraday_pv.h5"
-    
+
     if not data_file.exists():
         console.print("[red]Source data file (intraday_pv.h5) not found.[/red]")
         return
@@ -705,11 +716,11 @@ def portfolio(
         console=console,
     ) as progress:
         task = progress.add_task(f"Computing values for {len(candidates)} factors...", total=len(candidates))
-        
+
         for cand in candidates:
             fname = cand.get("factor_name", "unknown")
             fcode = cand.get("factor_code", "")
-            
+
             if not fcode:
                 errors.append((fname, "No code in JSON"))
                 progress.advance(task)
@@ -725,10 +736,10 @@ def portfolio(
                     # If symlink fails, copy the file
                     import shutil
                     shutil.copy(str(data_file), str(tmp_path / "intraday_pv.h5"))
-                
+
                 # Write code
                 (tmp_path / "factor.py").write_text(fcode)
-                
+
                 try:
                     # Run factor
                     result = subprocess.run(
@@ -736,16 +747,16 @@ def portfolio(
                         cwd=tmp_path,
                         capture_output=True,
                         text=True,
-                        timeout=120 # 2 min timeout per factor
+                        timeout=120, # 2 min timeout per factor
                     )
-                    
+
                     # Read result
                     res_file = tmp_path / "result.h5"
                     if res_file.exists():
                         df = pd.read_hdf(str(res_file), key="data")
                         # Get the series (first column)
                         series = df.iloc[:, 0]
-                        
+
                         # Count non-NaN values
                         non_nan = series.count()
                         if non_nan < 1000:
@@ -765,7 +776,7 @@ def portfolio(
                 except Exception as e:
                     errors.append((fname, str(e)[:100]))
                     progress.update(task, description=f"{fname} ❌ (Error)")
-            
+
             progress.advance(task)
 
     # Show summary of errors
@@ -779,7 +790,7 @@ def portfolio(
     if len(factor_series) < 3:
         console.print("[red]Not enough valid factor series to build portfolio (need at least 3).[/red]")
         console.print("[yellow]Tip: Factors might be producing mostly NaN values or failing execution.[/yellow]")
-        
+
         # Fallback: Show top factors by IC without diversification
         console.print("\n[dim]Showing top factors by IC instead:[/dim]")
         table = Table(
@@ -797,50 +808,49 @@ def portfolio(
                 str(i),
                 cand.get("factor_name", "unknown")[:38],
                 f"{cand.get('ic', 0):.6f}",
-                f"{cand.get('sharpe', 0):.4f}" if cand.get('sharpe') else "N/A",
+                f"{cand.get('sharpe', 0):.4f}" if cand.get("sharpe") else "N/A",
             )
-        
+
         console.print(table)
         return
 
     # 3. Build Correlation Matrix
     console.print(f"\n[dim]Building correlation matrix from {len(factor_series)} factors...[/dim]")
-    
+
     # Align indices and drop NaN
     combined = pd.DataFrame(factor_series).dropna()
-    
+
     if combined.empty or len(combined) < 100:
         console.print("[red]Not enough valid overlapping data to compute correlation.[/red]")
         console.print("[dim]This means the factors produce values at different times or have too many NaN values.[/dim]")
         return
 
     corr_matrix = combined.corr().fillna(0)
-    ic_map = {cand['factor_name']: cand.get('ic', 0) for cand in candidates}
+    ic_map = {cand["factor_name"]: cand.get("ic", 0) for cand in candidates}
 
     # 4. Greedy Selection
     selected = []
     remaining = list(corr_matrix.columns)
-    
+
     # Sort remaining by IC to prioritize high IC factors
     remaining.sort(key=lambda x: abs(ic_map.get(x, 0)), reverse=True)
 
     for factor in remaining:
         if len(selected) >= target:
             break
-        
+
         # If it's the first one, just take it
         if not selected:
             selected.append(factor)
             continue
-        
+
         # Check correlation with already selected
         # We want max(|corr|) < max_corr
         max_c = 0
         for sel in selected:
             c = abs(corr_matrix.loc[factor, sel])
-            if c > max_c:
-                max_c = c
-        
+            max_c = max(max_c, c)
+
         if max_c < max_corr:
             selected.append(factor)
 
@@ -858,23 +868,23 @@ def portfolio(
 
     for i, fname in enumerate(selected, 1):
         # Find original data for display
-        data = next((c for c in candidates if c['factor_name'] == fname), {})
-        ic = data.get('ic')
-        sharpe = data.get('sharpe')
-        
+        data = next((c for c in candidates if c["factor_name"] == fname), {})
+        ic = data.get("ic")
+        sharpe = data.get("sharpe")
+
         # Calculate max corr with other selected factors
         max_c_val = 0
         for s in selected:
             if s != fname:
                 val = abs(corr_matrix.loc[fname, s])
-                if val > max_c_val: max_c_val = val
+                max_c_val = max(max_c_val, val)
 
         table.add_row(
             str(i),
             fname[:38],
             f"{ic:.6f}" if ic is not None else "N/A",
             f"{sharpe:.4f}" if sharpe is not None else "N/A",
-            f"{max_c_val:.4f}" if max_c_val > 0 else "-"
+            f"{max_c_val:.4f}" if max_c_val > 0 else "-",
         )
 
     console.print(table)
@@ -884,20 +894,20 @@ def portfolio(
         "selected_factors": selected,
         "max_correlation": max_corr,
         "pool_size": top,
-        "timestamp": pd.Timestamp.now().isoformat()
+        "timestamp": pd.Timestamp.now().isoformat(),
     }
-    
+
     out_dir = Path(__file__).parent / "results" / "portfolio"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / "selected_factors.json"
-    
+
     with open(out_file, "w") as f:
         json.dump(portfolio_data, f, indent=2)
-    
+
     console.print(Panel(
         f"[bold]Portfolio saved to results/portfolio/selected_factors.json[/bold]\n"
         f"Selected {len(selected)} unique factors from {top} candidates.",
-        border_style="green"
+        border_style="green",
     ))
 
 
@@ -943,13 +953,12 @@ def portfolio_simple(
         predix top - View top factors before portfolio selection
         predix build-strategies - Build strategies from selected factors
     """
-    import json
     import glob as glob_module
-    import re
-    import numpy as np
+    import json
+
     import pandas as pd
-    from rich.table import Table
     from rich.panel import Panel
+    from rich.table import Table
 
     factors_dir = Path(__file__).parent / "results" / "factors"
     if not factors_dir.exists():
@@ -993,14 +1002,14 @@ def portfolio_simple(
     for cand in candidates:
         fname = cand.get("factor_name", "").lower()
         assigned = False
-        
+
         # Check each category's keywords
         for cat, keywords in categories.items():
             if any(kw in fname for kw in keywords):
                 categorized[cat].append(cand)
                 assigned = True
                 break
-        
+
         if not assigned:
             categorized["other"].append(cand)
 
@@ -1011,7 +1020,7 @@ def portfolio_simple(
             best = categorized[cat][0]  # Already sorted by IC
             selected.append({
                 "factor": best,
-                "category": cat.capitalize() if cat != "other" else "Other"
+                "category": cat.capitalize() if cat != "other" else "Other",
             })
 
     # 5. Display Results
@@ -1034,7 +1043,7 @@ def portfolio_simple(
             cand.get("factor_name", "unknown")[:38],
             cat,
             f"{cand.get('ic', 0):.6f}",
-            f"{cand.get('sharpe', 0):.4f}" if cand.get('sharpe') else "N/A",
+            f"{cand.get('sharpe', 0):.4f}" if cand.get("sharpe") else "N/A",
         )
 
     console.print(table)
@@ -1044,7 +1053,7 @@ def portfolio_simple(
         "selected_factors": [item["factor"]["factor_name"] for item in selected],
         "categories": {item["category"]: item["factor"]["factor_name"] for item in selected},
         "method": "simple_keyword_categorization",
-        "timestamp": str(pd.Timestamp.now().isoformat())
+        "timestamp": str(pd.Timestamp.now().isoformat()),
     }
 
     out_dir = Path(__file__).parent / "results" / "portfolio"
@@ -1057,7 +1066,7 @@ def portfolio_simple(
     console.print(Panel(
         f"[bold]Simple Portfolio saved to results/portfolio/portfolio_simple.json[/bold]\n"
         f"Selected {len(selected)} factors across {len([c for c in categorized if categorized[c]])} categories.",
-        border_style="green"
+        border_style="green",
     ))
 
 
@@ -1120,12 +1129,10 @@ def build_strategies(
         predix portfolio - Select diversified factors before combining
         predix top - View top factors before building strategies
     """
-    import pandas as pd
     import numpy as np
-    from rich.table import Table
-    from rich.panel import Panel
-
     from rdagent.scenarios.qlib.developer.strategy_builder import StrategyBuilder
+    from rich.panel import Panel
+    from rich.table import Table
 
     console.print(Panel(
         "[bold cyan]🏗️  Predix Strategy Builder[/bold cyan]\n"
@@ -1281,8 +1288,9 @@ def build_strategies_ai(
         predix quant - Generate new alpha factors via LLM trading loop
         predix evaluate - Evaluate factors before strategy building
     """
-    from rich.panel import Panel
     from pathlib import Path
+
+    from rich.panel import Panel
 
     console.print(Panel(
         "[bold cyan]🧠 StrategyCoSTEER - AI Strategy Builder[/bold cyan]\n"
@@ -1309,7 +1317,7 @@ def build_strategies_ai(
     # Setup LLM environment (same as quant command)
     api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY", "")
     api_key_2 = os.getenv("OPENROUTER_API_KEY_2", "")
-    
+
     if api_key and not api_key.startswith("sk-or-"):
         # OPENROUTER_API_KEY not set, try to use what we have
         api_key = os.getenv("OPENROUTER_API_KEY", api_key)
@@ -1336,8 +1344,8 @@ def build_strategies_ai(
         return
 
     # Load evaluated factors
-    import json
     import glob as glob_module
+    import json
 
     factors = []
     for f in glob_module.glob(str(factors_dir / "*.json")):
@@ -1421,15 +1429,15 @@ def build_strategies_ai(
 
             for i, r in enumerate(results, 1):
                 # Monthly return: use real backtest if available, else estimate
-                rb = r.get('real_backtest', {})
-                if isinstance(rb, dict) and rb.get('status') == 'success':
-                    monthly_pct = rb.get('monthly_return_pct', r.get('monthly_return_pct', 0))
-                    n_trades = rb.get('n_trades', '-')
-                    real_ic = rb.get('ic', 0)
+                rb = r.get("real_backtest", {})
+                if isinstance(rb, dict) and rb.get("status") == "success":
+                    monthly_pct = rb.get("monthly_return_pct", r.get("monthly_return_pct", 0))
+                    n_trades = rb.get("n_trades", "-")
+                    real_ic = rb.get("ic", 0)
                 else:
-                    monthly_pct = r.get('monthly_return_pct', r.get('real_monthly_return', 0))
-                    n_trades = '-'
-                    real_ic = rb.get('ic', 0) if isinstance(rb, dict) else 0
+                    monthly_pct = r.get("monthly_return_pct", r.get("real_monthly_return", 0))
+                    n_trades = "-"
+                    real_ic = rb.get("ic", 0) if isinstance(rb, dict) else 0
 
                 table.add_row(
                     str(i),
@@ -1522,7 +1530,7 @@ def status():
     # Process check
     result = subprocess.run(
         ["pgrep", "-f", "fin_quant"],
-        capture_output=True, text=True
+        capture_output=True, text=True,
     )
     if result.returncode == 0:
         console.print("[bold green]✅ Trading Loop: RUNNING[/bold green]")
@@ -1540,7 +1548,7 @@ def status():
         factors = c.fetchone()[0]
         conn.close()
 
-        console.print(f"\n📊 Results:")
+        console.print("\n📊 Results:")
         console.print(f"  Backtest runs: {runs}")
         console.print(f"  Factors: {factors}")
 
@@ -1617,6 +1625,7 @@ def best(
         $ predix best -n 50 --export /tmp/top.json
     """
     import json
+
     from rich.table import Table
 
     items = _load_strategies()
@@ -1733,7 +1742,7 @@ def kronos_factor(
         console.print("Run data conversion first — see README Data Setup section.")
         raise typer.Exit(1)
 
-    console.print(f"[bold]Kronos Factor Generator[/bold]")
+    console.print("[bold]Kronos Factor Generator[/bold]")
     console.print(f"  Context: [cyan]{context}[/cyan] bars  |  Pred: [cyan]{pred}[/cyan] bars  |  Device: [cyan]{_device}[/cyan]")
 
     from rdagent.components.coder.kronos_adapter import build_kronos_factor
@@ -1816,7 +1825,7 @@ def kronos_eval(
         console.print(f"[red]ERROR: Data not found at {data_path}[/red]")
         raise typer.Exit(1)
 
-    console.print(f"[bold]Kronos Model Evaluator[/bold] (alongside LightGBM)")
+    console.print("[bold]Kronos Model Evaluator[/bold] (alongside LightGBM)")
     console.print(f"  Context: [cyan]{context}[/cyan] bars  |  Pred: [cyan]{pred}[/cyan] bars  |  Device: [cyan]{_device}[/cyan]")
     console.print("  Running evaluation...")
 
@@ -1831,12 +1840,12 @@ def kronos_eval(
         batch_size=batch_size,
     )
 
-    console.print(f"\n[bold]Kronos-mini Results[/bold]")
+    console.print("\n[bold]Kronos-mini Results[/bold]")
     console.print(f"  Predictions: [cyan]{metrics['n_predictions']}[/cyan]")
     console.print(f"  IC (mean):   [{'green' if metrics['IC_mean'] > 0.02 else 'yellow'}]{metrics['IC_mean']:.4f}[/]")
     console.print(f"  IC IR:       [{'green' if metrics['IC_IR'] > 0.5 else 'yellow'}]{metrics['IC_IR']:.4f}[/]  (>0.5 = strong signal)")
     console.print(f"  Hit Rate:    [{'green' if metrics['hit_rate'] > 0.52 else 'yellow'}]{metrics['hit_rate']:.2%}[/]  (>50% = directionally useful)")
-    console.print(f"\n[dim]Reference: LightGBM baseline IC typically 0.01–0.05 on 1-min EUR/USD[/dim]")
+    console.print("\n[dim]Reference: LightGBM baseline IC typically 0.01–0.05 on 1-min EUR/USD[/dim]")
 
     import json as _json
     out_dir = Path("results/kronos")
