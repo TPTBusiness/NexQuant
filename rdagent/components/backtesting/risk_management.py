@@ -26,7 +26,7 @@ class PortfolioOptimizer:
         try:
             w = np.linalg.inv(cov.values) @ exp_ret.values
             return w / np.sum(w)
-        except np.linalg.LinAlgError:
+        except (np.linalg.LinAlgError, ValueError):
             return np.ones(len(exp_ret)) / len(exp_ret)
 
     def risk_parity(self, cov: pd.DataFrame, max_iter: int = 100) -> np.ndarray:
