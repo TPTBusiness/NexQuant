@@ -1,8 +1,7 @@
-import logging
 import json
+import logging
 import os
 import random
-from typing import Tuple
 
 from rdagent.app.qlib_rd_loop.conf import QUANT_PROP_SETTING
 from rdagent.components.proposal import FactorAndModelHypothesisGen
@@ -42,7 +41,7 @@ class QlibQuantHypothesis(Hypothesis):
         action: str,
     ) -> None:
         super().__init__(
-            hypothesis, reason, concise_reason, concise_observation, concise_justification, concise_knowledge
+            hypothesis, reason, concise_reason, concise_observation, concise_justification, concise_knowledge,
         )
         self.action = action
 
@@ -54,10 +53,10 @@ Reason: {self.reason}
 
 
 class QlibQuantHypothesisGen(FactorAndModelHypothesisGen):
-    def __init__(self, scen: Scenario) -> Tuple[dict, bool]:
+    def __init__(self, scen: Scenario) -> None:
         super().__init__(scen)
 
-    def prepare_context(self, trace: Trace) -> Tuple[dict, bool]:
+    def prepare_context(self, trace: Trace) -> tuple[dict, bool]:
 
         # ========= Bandit ==========
         if QUANT_PROP_SETTING.action_selection == "bandit":
@@ -85,7 +84,7 @@ class QlibQuantHypothesisGen(FactorAndModelHypothesisGen):
 
             last_hypothesis_and_feedback = (
                 T("scenarios.qlib.prompts:last_hypothesis_and_feedback").r(
-                    experiment=trace.hist[-1][0], feedback=trace.hist[-1][1]
+                    experiment=trace.hist[-1][0], feedback=trace.hist[-1][1],
                 )
                 if len(trace.hist) > 0
                 else "No previous hypothesis and feedback available since it's the first round."
@@ -195,7 +194,7 @@ class QlibQuantHypothesisGen(FactorAndModelHypothesisGen):
         for i in range(len(trace.hist) - 1, -1, -1):
             if trace.hist[i][0].hypothesis.action == action:
                 last_hypothesis_and_feedback = T("scenarios.qlib.prompts:last_hypothesis_and_feedback").r(
-                    experiment=trace.hist[i][0], feedback=trace.hist[i][1]
+                    experiment=trace.hist[i][0], feedback=trace.hist[i][1],
                 )
                 break
 
@@ -204,7 +203,7 @@ class QlibQuantHypothesisGen(FactorAndModelHypothesisGen):
             for i in range(len(trace.hist) - 1, -1, -1):
                 if trace.hist[i][0].hypothesis.action == "model" and trace.hist[i][1].decision is True:
                     sota_hypothesis_and_feedback = T("scenarios.qlib.prompts:sota_hypothesis_and_feedback").r(
-                        experiment=trace.hist[i][0], feedback=trace.hist[i][1]
+                        experiment=trace.hist[i][0], feedback=trace.hist[i][1],
                     )
                     break
 
