@@ -357,23 +357,29 @@ def evaluate_factor_full(factor: FactorInfo, full_data: pd.DataFrame,
                 ic = factor_val.loc[valid_idx].corr(forward_ret.loc[valid_idx])
                 rank_ic = factor_val.loc[valid_idx].corr(forward_ret.loc[valid_idx], method="spearman")
 
-            # Compute Sharpe
-            factor_mean = factor_val.loc[valid_idx].mean()
-            factor_std = factor_val.loc[valid_idx].std()
-            sharpe = factor_mean / factor_std if factor_std > 0 else 0
+            # Compute strategy returns from factor signal
+            signal = np.where(factor_val.loc[valid_idx] > 0, 1.0, -1.0)
+            strategy_ret = signal * forward_ret.loc[valid_idx]
+
+            bars_per_year = 252 * 1440
+            ann_factor = np.sqrt(bars_per_year / forward_return_bars)
+
+            # Sharpe: annualized mean/vol of strategy returns
+            ret_mean = strategy_ret.mean()
+            ret_std = strategy_ret.std()
+            sharpe = float(ret_mean / ret_std * ann_factor) if ret_std > 0 else 0.0
 
             # Annualized return
-            ann_factor = np.sqrt(252 * 1440 / forward_return_bars)
-            annualized_return = float(factor_mean * ann_factor * 100)
+            annualized_return = float(ret_mean * bars_per_year / forward_return_bars * 100)
 
-            # Max drawdown
-            cum_perf = factor_val.loc[valid_idx].cumsum()
-            running_max = cum_perf.expanding().max()
-            drawdown = (cum_perf - running_max) / running_max.replace(0, np.nan)
-            max_drawdown = float(drawdown.min()) if len(drawdown) > 0 else 0
+            # Max drawdown on equity curve
+            equity = (1.0 + strategy_ret).cumprod()
+            running_max = equity.expanding().max()
+            drawdown = (equity - running_max) / running_max.replace(0, np.nan)
+            max_drawdown = float(drawdown.min()) if len(drawdown) > 0 else 0.0
 
-            # Win rate
-            win_rate = float((factor_val.loc[valid_idx] > 0).sum()) / len(valid_idx)
+            # Win rate: fraction of positive strategy returns
+            win_rate = float((strategy_ret > 0).sum()) / len(strategy_ret) if len(strategy_ret) > 0 else 0.0
 
             return EvalResult(
                 factor_name=factor.factor_name,
