@@ -21,11 +21,10 @@ load_dotenv(".env")
 
 import subprocess
 from importlib.resources import path as rpath
-from typing import Dict, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
-from typing_extensions import Annotated
 
 try:
     from rdagent.utils.env import logger
@@ -146,10 +145,10 @@ def ds_user_interact(port=19900):
 
 @app.command(name="fin_factor")
 def fin_factor_cli(
-    path: Optional[str] = None,
-    step_n: Optional[int] = None,
-    loop_n: Optional[int] = None,
-    all_duration: Optional[str] = None,
+    path: str | None = None,
+    step_n: int | None = None,
+    loop_n: int | None = None,
+    all_duration: str | None = None,
     checkout: CheckoutOption = True,
 ):
     fin_factor(path=path, step_n=step_n, loop_n=loop_n, all_duration=all_duration, checkout=checkout)
@@ -157,10 +156,10 @@ def fin_factor_cli(
 
 @app.command(name="fin_model")
 def fin_model_cli(
-    path: Optional[str] = None,
-    step_n: Optional[int] = None,
-    loop_n: Optional[int] = None,
-    all_duration: Optional[str] = None,
+    path: str | None = None,
+    step_n: int | None = None,
+    loop_n: int | None = None,
+    all_duration: str | None = None,
     checkout: CheckoutOption = True,
 ):
     fin_model(path=path, step_n=step_n, loop_n=loop_n, all_duration=all_duration, checkout=checkout)
@@ -168,10 +167,10 @@ def fin_model_cli(
 
 @app.command(name="fin_quant")
 def fin_quant_cli(
-    path: Optional[str] = None,
-    step_n: Optional[int] = None,
-    loop_n: Optional[int] = None,
-    all_duration: Optional[str] = None,
+    path: str | None = None,
+    step_n: int | None = None,
+    loop_n: int | None = None,
+    all_duration: str | None = None,
     checkout: CheckoutOption = True,
     with_dashboard: bool = typer.Option(False, "--with-dashboard/-d", help="Start web dashboard automatically"),
     with_cli_dashboard: bool = typer.Option(False, "--cli-dashboard/-c", help="Show beautiful CLI dashboard"),
@@ -231,7 +230,7 @@ def fin_quant_cli(
         if not api_key:
             console.print("\n[bold red]❌ OPENROUTER_API_KEY not set in .env[/bold red]")
             console.print("[yellow]Add your API key to .env and retry:[/yellow]")
-            console.print('  OPENROUTER_API_KEY=sk-or-your-key-here')
+            console.print("  OPENROUTER_API_KEY=sk-or-your-key-here")
             raise typer.Exit(code=1)
 
         os.environ["OPENAI_API_KEY"] = api_key
@@ -250,8 +249,8 @@ def fin_quant_cli(
         console.print(f"   [dim]Base URL: {os.environ['OPENAI_API_BASE']}[/dim]")
 
         # Wait until the llama.cpp server is fully loaded before starting the pipeline
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         base_url = os.environ["OPENAI_API_BASE"].removesuffix("/v1").rstrip("/")
         health_url = f"{base_url}/health"
@@ -285,7 +284,7 @@ def fin_quant_cli(
             subprocess.run(
                 ["python", "web/dashboard_api.py"],
                 cwd=str(Path(__file__).parent.parent.parent),
-                env={**os.environ, "FLASK_ENV": "development"}
+                env={**os.environ, "FLASK_ENV": "development"},
             )
 
         dashboard_thread = threading.Thread(target=start_web_dashboard, daemon=True)
@@ -327,9 +326,9 @@ def fin_quant_cli(
 
 @app.command(name="fin_factor_report")
 def fin_factor_report_cli(
-    report_folder: Optional[str] = None,
-    path: Optional[str] = None,
-    all_duration: Optional[str] = None,
+    report_folder: str | None = None,
+    path: str | None = None,
+    all_duration: str | None = None,
     checkout: CheckoutOption = True,
 ):
     fin_factor_report(report_folder=report_folder, path=path, all_duration=all_duration, checkout=checkout)
@@ -342,12 +341,12 @@ def general_model_cli(report_file_path: str):
 
 @app.command(name="data_science")
 def data_science_cli(
-    path: Optional[str] = None,
+    path: str | None = None,
     checkout: CheckoutOption = True,
-    step_n: Optional[int] = None,
-    loop_n: Optional[int] = None,
-    timeout: Optional[str] = None,
-    competition: Optional[str] = None,
+    step_n: int | None = None,
+    loop_n: int | None = None,
+    timeout: str | None = None,
+    competition: str | None = None,
 ):
     data_science(
         path=path,
@@ -361,16 +360,16 @@ def data_science_cli(
 
 @app.command(name="llm_finetune")
 def llm_finetune_cli(
-    path: Optional[str] = None,
+    path: str | None = None,
     checkout: CheckoutOption = True,
-    benchmark: Optional[str] = None,
-    benchmark_description: Optional[str] = None,
-    dataset: Optional[str] = None,
-    base_model: Optional[str] = None,
-    upper_data_size_limit: Optional[int] = None,
-    step_n: Optional[int] = None,
-    loop_n: Optional[int] = None,
-    timeout: Optional[str] = None,
+    benchmark: str | None = None,
+    benchmark_description: str | None = None,
+    dataset: str | None = None,
+    base_model: str | None = None,
+    upper_data_size_limit: int | None = None,
+    step_n: int | None = None,
+    loop_n: int | None = None,
+    timeout: str | None = None,
 ):
     llm_finetune(
         path=path,
@@ -436,6 +435,7 @@ def rl_trading_cli(
         rdagent rl_trading --mode backtest --no-with-protections
     """
     from pathlib import Path
+
     import yaml
 
     console = Console()
@@ -447,18 +447,18 @@ def rl_trading_cli(
         with open(config_path) as f:
             config = yaml.safe_load(f) or {}
 
-    console.print(f"\n[bold blue]🤖 RL Trading Agent[/bold blue]")
+    console.print("\n[bold blue]🤖 RL Trading Agent[/bold blue]")
     console.print(f"Mode: [cyan]{mode}[/cyan]")
     console.print(f"Algorithm: [cyan]{algorithm.upper()}[/cyan]")
     console.print(f"Protections: {'[green]Enabled[/green]' if with_protections else '[red]Disabled[/red]'}")
 
     try:
-        from rdagent.components.coder.rl import RLTradingAgent, RLCosteer, TradingEnv
+        from rdagent.components.coder.rl import RLCosteer, RLTradingAgent, TradingEnv
     except ImportError as e:
-        console.print(f"[bold red]Error: RL components not available.[/bold red]")
+        console.print("[bold red]Error: RL components not available.[/bold red]")
         console.print(f"Details: {e}")
-        console.print(f"\n[yellow]Install RL dependencies:[/yellow]")
-        console.print(f"  pip install stable-baselines3 gymnasium")
+        console.print("\n[yellow]Install RL dependencies:[/yellow]")
+        console.print("  pip install stable-baselines3 gymnasium")
         raise typer.Exit(code=1)
 
     if mode == "train":
@@ -474,8 +474,8 @@ def rl_trading_cli(
             console.print("[dim]Loading market data...[/dim]")
             # TODO: Load actual data from config
             # For now, create mock environment
-            import numpy as np
             import gymnasium as gym
+            import numpy as np
 
             # Create simple mock environment for demonstration
             class MockTradingEnv(gym.Env):
@@ -511,7 +511,7 @@ def rl_trading_cli(
             model_path_out.parent.mkdir(parents=True, exist_ok=True)
             agent.save(model_path_out)
 
-            console.print(f"\n[bold green]✅ Training complete![/bold green]")
+            console.print("\n[bold green]✅ Training complete![/bold green]")
             console.print(f"Model saved to: [cyan]{model_path_out}[/cyan]")
             console.print(f"Algorithm: {result['algorithm']}")
             console.print(f"Timesteps: {result['total_timesteps']:,}")
@@ -537,9 +537,9 @@ def rl_trading_cli(
                 agent = RLTradingAgent(algorithm=algorithm.upper())
 
             # Run backtest
-            from rdagent.components.backtesting import FactorBacktester
-            import pandas as pd
             import numpy as np
+            import pandas as pd
+            from rdagent.components.backtesting import FactorBacktester
 
             backtester = FactorBacktester()
 
@@ -548,8 +548,8 @@ def rl_trading_cli(
             n_steps = 500
             mock_prices = pd.Series(100 + np.cumsum(np.random.randn(n_steps) * 0.5))
             mock_indicators = pd.DataFrame({
-                'rsi': np.random.uniform(30, 70, n_steps),
-                'macd': np.random.randn(n_steps) * 0.1,
+                "rsi": np.random.uniform(30, 70, n_steps),
+                "macd": np.random.randn(n_steps) * 0.1,
             })
 
             console.print("[yellow]Running backtest...[/yellow]")
@@ -560,7 +560,7 @@ def rl_trading_cli(
                 enable_protections=with_protections,
             )
 
-            console.print(f"\n[bold green]✅ Backtest complete![/bold green]")
+            console.print("\n[bold green]✅ Backtest complete![/bold green]")
             console.print(f"  Final Equity: [green]${metrics.get('final_equity', 0):,.2f}[/green]")
             console.print(f"  Sharpe Ratio: {metrics.get('sharpe_ratio', 0):.3f}")
             console.print(f"  Max Drawdown: {metrics.get('max_drawdown', 0):.2%}")
@@ -634,7 +634,7 @@ def generate_strategies_cli(
         rdagent generate_strategies -n 3 -i 10 --optuna-trials 50  # Deep optimization
     """
     from rich.console import Console
-    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn
+    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeRemainingColumn
     from rich.table import Table
 
     console = Console()
@@ -653,7 +653,7 @@ def generate_strategies_cli(
         raise typer.Exit(code=1)
 
     console.print(f"\n[bold blue]{'='*60}[/bold blue]")
-    console.print(f"[bold blue]  PREDIX Strategy Generator[/bold blue]")
+    console.print("[bold blue]  PREDIX Strategy Generator[/bold blue]")
     console.print(f"[bold blue]{'='*60}[/bold blue]")
     console.print(f"  Strategies:  [cyan]{count}[/cyan]")
     console.print(f"  Workers:     [cyan]{workers}[/cyan]")
@@ -680,12 +680,12 @@ def generate_strategies_cli(
     _slog = _dlog.setup("strategies", **_strat_ctx)
 
     try:
-        from rdagent.components.coder.strategy_orchestrator import StrategyOrchestrator
         import pandas as pd
+        from rdagent.components.coder.strategy_orchestrator import StrategyOrchestrator
 
         all_results = []
         best_strategy = None
-        best_sharpe = float('-inf')
+        best_sharpe = float("-inf")
 
         # CONTINUOUS OPTIMIZATION LOOP
         for iteration in range(1, max_iterations + 1):
@@ -734,7 +734,7 @@ def generate_strategies_cli(
 
             # Track best strategy
             for r in results:
-                sharpe = r.get("sharpe_ratio", float('-inf'))
+                sharpe = r.get("sharpe_ratio", float("-inf"))
                 if sharpe > best_sharpe:
                     best_sharpe = sharpe
                     best_strategy = r
@@ -754,7 +754,7 @@ def generate_strategies_cli(
         rejected = [r for r in results if r.get("status") == "rejected"]
 
         console.print(f"\n[bold green]{'='*60}[/bold green]")
-        console.print(f"[bold green]  Strategy Generation Summary[/bold green]")
+        console.print("[bold green]  Strategy Generation Summary[/bold green]")
         console.print(f"[bold green]{'='*60}[/bold green]")
 
         table = Table(show_header=True, header_style="bold magenta", show_lines=True)
@@ -783,7 +783,7 @@ def generate_strategies_cli(
         # Show best strategy details
         if best_strategy:
             console.print(f"\n[bold gold1]{'='*60}[/bold gold1]")
-            console.print(f"[bold gold1]  BEST STRATEGY[/bold gold1]")
+            console.print("[bold gold1]  BEST STRATEGY[/bold gold1]")
             console.print(f"[bold gold1]{'='*60}[/bold gold1]")
             console.print(f"  Name:        [cyan]{best_strategy.get('strategy_name', 'Unknown')}[/cyan]")
             console.print(f"  Sharpe:      [green]{best_strategy.get('sharpe_ratio', 0):.4f}[/green]")
@@ -791,13 +791,13 @@ def generate_strategies_cli(
             console.print(f"  Max DD:      [yellow]{best_strategy.get('max_drawdown', 0):.2%}[/yellow]")
             console.print(f"  Win Rate:    [cyan]{best_strategy.get('win_rate', 0):.2%}[/cyan]")
             if best_strategy.get("best_params"):
-                console.print(f"\n  [bold]Optimized Parameters:[/bold]")
+                console.print("\n  [bold]Optimized Parameters:[/bold]")
                 for param, val in best_strategy["best_params"].items():
                     console.print(f"    {param}: [cyan]{val}[/cyan]")
             console.print(f"[bold gold1]{'='*60}[/bold gold1]")
 
         if accepted:
-            console.print(f"\n[bold]Accepted Strategies:[/bold]")
+            console.print("\n[bold]Accepted Strategies:[/bold]")
             acc_table = Table(show_header=True, header_style="bold cyan")
             acc_table.add_column("#", width=4)
             acc_table.add_column("Strategy", width=30)
@@ -820,13 +820,13 @@ def generate_strategies_cli(
                 )
             console.print(acc_table)
 
-        console.print(f"\n[bold green]Strategies saved to:[/bold green] [cyan]results/strategies_new/[/cyan]")
+        console.print("\n[bold green]Strategies saved to:[/bold green] [cyan]results/strategies_new/[/cyan]")
         console.print(f"[bold blue]{'='*60}[/bold blue]\n")
         _slog.success(f"Generated {len(all_results)} strategies ({len([r for r in all_results if r.get('status')=='accepted'])} accepted)")
 
     except ImportError as e:
         _slog.error(f"Strategy components not available: {e}")
-        console.print(f"[bold red]Error: Strategy components not available.[/bold red]")
+        console.print("[bold red]Error: Strategy components not available.[/bold red]")
         console.print(f"Details: {e}")
         raise typer.Exit(code=1)
     except Exception as e:
@@ -862,16 +862,17 @@ def optimize_portfolio_cli(
         raise typer.Exit(code=1)
 
     console.print(f"\n[bold blue]{'='*60}[/bold blue]")
-    console.print(f"[bold blue]  PREDIX Portfolio Optimizer[/bold blue]")
+    console.print("[bold blue]  PREDIX Portfolio Optimizer[/bold blue]")
     console.print(f"[bold blue]{'='*60}[/bold blue]")
     console.print(f"  Top N:    [cyan]{top_n}[/cyan]")
     console.print(f"  Method:   [cyan]{method}[/cyan]")
     console.print(f"[bold blue]{'='*60}[/bold blue]\n")
 
     try:
-        from rdagent.components.backtesting.risk_management import PortfolioOptimizer
         import json
         from pathlib import Path
+
+        from rdagent.components.backtesting.risk_management import PortfolioOptimizer
 
         project_root = Path(__file__).parent.parent.parent
         strategies_dir = project_root / "results" / "strategies_new"
@@ -1009,14 +1010,15 @@ def strategies_report_cli(
         rdagent strategies_report -s path/to/strategy.json  # Single strategy
         rdagent strategies_report -o custom/reports/      # Custom output dir
     """
+    from pathlib import Path
+
     from rich.console import Console
     from rich.progress import Progress, SpinnerColumn, TextColumn
-    from pathlib import Path
 
     console = Console()
 
     console.print(f"\n[bold blue]{'='*60}[/bold blue]")
-    console.print(f"[bold blue]  PREDIX Strategy Report Generator[/bold blue]")
+    console.print("[bold blue]  PREDIX Strategy Report Generator[/bold blue]")
     console.print(f"[bold blue]{'='*60}[/bold blue]\n")
 
     project_root = Path(__file__).parent.parent.parent
@@ -1068,20 +1070,20 @@ def strategies_report_cli(
                 progress.update(task, completed=1)
 
     console.print(f"\n[bold green]{'='*60}[/bold green]")
-    console.print(f"[bold green]  Report Generation Complete[/bold green]")
+    console.print("[bold green]  Report Generation Complete[/bold green]")
     console.print(f"[bold green]{'='*60}[/bold green]")
     console.print(f"  Reports generated: [cyan]{reports_generated}/{len(strategy_files)}[/cyan]")
     console.print(f"  Output directory:  [cyan]{output_dir_path}[/cyan]")
     console.print(f"[bold green]{'='*60}[/bold green]\n")
 
 
-def _generate_single_strategy_report(strategy_file: Path, output_dir: Path) -> Dict:
+def _generate_single_strategy_report(strategy_file: Path, output_dir: Path) -> dict:
     """Generate a report for a single strategy."""
     import json
+
     import matplotlib
     matplotlib.use("Agg")  # Non-interactive backend
     import matplotlib.pyplot as plt
-    import seaborn as sns
 
     with open(strategy_file, encoding="utf-8") as f:
         strategy = json.load(f)
@@ -1156,7 +1158,7 @@ if __name__ == "__main__":
 @app.command(name="start_llama")
 def start_llama_cli(
     model: str = typer.Option(
-        None, "--model", "-m", help="Path to model file"
+        None, "--model", "-m", help="Path to model file",
     ),
     port: int = typer.Option(8081, "--port", "-p", help="Server port"),
     gpu_layers: int = typer.Option(30, "--gpu-layers", "-g", help="GPU layers"),
@@ -1178,8 +1180,6 @@ def start_llama_cli(
       rdagent start_llama --gpu-layers 40 --ctx-size 4096
       rdagent start_llama --reasoning
     """
-    import subprocess
-    import sys
     import os
 
     model_path = model or os.getenv(
@@ -1216,7 +1216,7 @@ def start_llama_cli(
     if not reasoning:
         cmd.extend(["--reasoning", "off"])
 
-    print(f"🚀 Starting llama.cpp server...")
+    print("🚀 Starting llama.cpp server...")
     print(f"   Model: {Path(model_path).name}")
     print(f"   Port: {port}")
     print(f"   GPU Layers: {gpu_layers}")
@@ -1249,15 +1249,14 @@ def start_loop_cli(
       rdagent start_loop
       rdagent start_loop --target 5 --max-wait 3600
     """
-    import subprocess
-    import signal
-    import sys
     import os
-    from datetime import datetime
+    import signal
+    import subprocess
     import time
+    from datetime import datetime
 
-    script_dir = str(Path(__file__).parent.parent.parent.parent)
-    generator = f"python {script_dir}/scripts/predix_smart_strategy_gen.py"
+    script_dir = str(Path(__file__).parent.parent.parent)
+    generator = [sys.executable, f"{script_dir}/scripts/predix_smart_strategy_gen.py"]
     logfile = f"{script_dir}/results/logs/generator_loop.log"
     pidfile = "/tmp/predix_loop.pid"  # nosec B108 — administrative PID file, single-process daemon
 
@@ -1270,12 +1269,19 @@ def start_loop_cli(
         with open(logfile, "a") as f:
             f.write(line + "\n")
 
+    child_proc = None  # track current child PID for targeted cleanup
+
     def cleanup(signum=None, frame=None):
         log("Received termination signal. Cleaning up...")
-        try:
-            subprocess.run(["pkill", "-f", "predix_smart_strategy_gen.py"], capture_output=True)
-        except Exception:
-            pass
+        if child_proc is not None:
+            try:
+                child_proc.terminate()
+                child_proc.wait(timeout=10)
+            except Exception:
+                try:
+                    child_proc.kill()
+                except Exception:
+                    pass
         try:
             os.remove(pidfile)
         except FileNotFoundError:
@@ -1321,26 +1327,32 @@ def start_loop_cli(
         strat_count = len(list(strat_dir.glob("*.json"))) if strat_dir.exists() else 0
         log(f"📁 Existing strategies: {strat_count}")
 
-        # Kill stale processes
-        try:
-            subprocess.run(["pkill", "-9", "-f", "predix_smart_strategy_gen.py"], capture_output=True)
-        except Exception:
-            pass
-        time.sleep(2)
+        # Kill stale child from previous iteration
+        if child_proc is not None:
+            try:
+                child_proc.terminate()
+                child_proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                child_proc.kill()
+                child_proc.wait()
+            except Exception:
+                pass
+            child_proc = None
+            time.sleep(2)
 
         # Start generator
         log("🤖 Starting generator...")
-        proc = subprocess.Popen(
-            generator.split(),
+        child_proc = subprocess.Popen(
+            generator,
             cwd=script_dir,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        log(f"   PID: {proc.pid}")
+        log(f"   PID: {child_proc.pid}")
 
         # Monitor progress
         elapsed = 0
-        while proc.poll() is None:
+        while child_proc.poll() is None:
             time.sleep(30)
             elapsed += 30
 
@@ -1349,11 +1361,12 @@ def start_loop_cli(
 
             if elapsed >= max_wait:
                 log(f"   ⏰ Timeout after {elapsed}s. Killing...")
-                proc.kill()
+                child_proc.kill()
                 break
 
         # Check results
-        exit_code = proc.wait()
+        exit_code = child_proc.wait()
+        child_proc = None
         if exit_code == 0:
             log("✅ Generator completed successfully")
         elif exit_code == -9:
@@ -1394,24 +1407,24 @@ def parallel_cli(
       rdagent parallel -n 10 -k 2
     """
     import subprocess
-    import sys
     from pathlib import Path
+
     from rdagent.log import daily_log as _dlog
 
-    project_root = Path(__file__).parent.parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent
     script = project_root / "scripts" / "predix_parallel.py"
 
     if not script.exists():
         typer.echo(f"❌ Script not found: {script}")
         raise typer.Exit(code=1)
 
-    cmd = [sys.executable, str(script), "--runs", str(runs), "--api-keys", str(api_keys), "-m", "local"]
+    cmd = [sys.executable, str(script), "--runs", str(runs), "--api-keys", str(api_keys)]
 
     _plog = _dlog.setup("parallel", runs=runs, api_keys=api_keys, model="local")
     typer.echo(f"🚀 Starting {runs} parallel runs...")
     typer.echo(f"   Script: {script}")
     typer.echo(f"   API Keys: {api_keys}")
-    typer.echo(f"   Model: local (llama.cpp)")
+    typer.echo("   Model: local (llama.cpp)")
 
     try:
         result = subprocess.run(cmd, cwd=str(project_root))
@@ -1445,11 +1458,11 @@ def eval_all_cli(
       rdagent eval_all -n 500 -p 8
     """
     import subprocess
-    import sys
     from pathlib import Path
+
     from rdagent.log import daily_log as _dlog
 
-    project_root = Path(__file__).parent.parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent
     script = project_root / "scripts" / "predix_full_eval.py"
 
     if not script.exists():
@@ -1500,10 +1513,9 @@ def batch_backtest_cli(
       rdagent batch_backtest --all
     """
     import subprocess
-    import sys
     from pathlib import Path
 
-    project_root = Path(__file__).parent.parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent
     script = project_root / "scripts" / "predix_batch_backtest.py"
 
     if not script.exists():
@@ -1553,10 +1565,9 @@ def simple_eval_cli(
       rdagent simple_eval --all
     """
     import subprocess
-    import sys
     from pathlib import Path
 
-    project_root = Path(__file__).parent.parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent
     script = project_root / "scripts" / "predix_simple_eval.py"
 
     if not script.exists():
@@ -1586,7 +1597,7 @@ def simple_eval_cli(
 @app.command(name="rebacktest")
 def rebacktest_cli(
     strategies_dir: str = typer.Option(
-        None, "--strategies-dir", "-d", help="Directory containing strategy JSON files"
+        None, "--strategies-dir", "-d", help="Directory containing strategy JSON files",
     ),
 ):
     """
@@ -1600,10 +1611,9 @@ def rebacktest_cli(
       rdagent rebacktest -d results/strategies_new/
     """
     import subprocess
-    import sys
     from pathlib import Path
 
-    project_root = Path(__file__).parent.parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent
     script = project_root / "scripts" / "predix_rebacktest_strategies.py"
 
     if not script.exists():
@@ -1628,10 +1638,10 @@ def rebacktest_cli(
 @app.command(name="report")
 def report_cli(
     strategy_path: str = typer.Option(
-        None, "--strategy", "-s", help="Path to single strategy JSON (default: all strategies)"
+        None, "--strategy", "-s", help="Path to single strategy JSON (default: all strategies)",
     ),
     output: str = typer.Option(
-        None, "--output", "-o", help="Output directory (default: results/strategy_reports/)"
+        None, "--output", "-o", help="Output directory (default: results/strategy_reports/)",
     ),
 ):
     """
@@ -1654,10 +1664,9 @@ def report_cli(
       rdagent report -o custom/reports/
     """
     import subprocess
-    import sys
     from pathlib import Path
 
-    project_root = Path(__file__).parent.parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent
     script = project_root / "scripts" / "predix_strategy_report.py"
 
     if not script.exists():
