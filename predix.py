@@ -1468,6 +1468,90 @@ def build_strategies_ai(
 
 
 @app.command()
+def generate_strategies(
+    count: int = typer.Option(10, "--count", "-n", help="Number of strategies to generate"),
+    workers: int = typer.Option(2, "--workers", "-w", help="Parallel workers"),
+    style: str = typer.Option("swing", "--style", "-s", help="Trading style: daytrading or swing"),
+    optuna: bool = typer.Option(True, "--optuna/--no-optuna", help="Enable Optuna optimization"),
+    optuna_trials: int = typer.Option(30, "--optuna-trials", help="Number of Optuna trials per strategy"),
+    top_factors: int = typer.Option(20, "--top-factors", help="Number of top factors to consider"),
+    min_sharpe: float = typer.Option(1.5, "--min-sharpe", help="Minimum Sharpe for acceptance"),
+    max_drawdown: float = typer.Option(-0.30, "--max-dd", help="Maximum drawdown allowed"),
+    min_win_rate: float = typer.Option(0.40, "--min-winrate", help="Minimum win rate for acceptance"),
+):
+    """
+    Generate trading strategies from top factors using LLM + Optuna optimization.
+
+    Loads top evaluated factors, uses LLM to generate strategy code,
+    evaluates with real EUR/USD OHLCV backtest (2.26M 1min bars),
+    and optimizes hyperparameters with Optuna (3-stage: 10→15→5 trials).
+
+    Uses the verified backtest engine (Sharpe on strategy returns,
+    MaxDD on equity curve, WinRate on trade P&L) with runtime verification.
+
+    Examples:
+        $ predix generate-strategies                    # 10 strategies, Optuna, swing
+        $ predix generate-strategies -n 20 -w 4         # 20 strategies, 4 workers
+        $ predix generate-strategies --min-sharpe 3.0   # Stricter acceptance
+        $ predix generate-strategies -s daytrading      # Day trading style
+        $ predix generate-strategies --no-optuna        # Skip optimization
+    """
+    from rich.console import Console as RichConsole
+    from rich.table import Table as RichTable
+
+    console.print(f"\n[bold cyan]{'='*60}[/bold cyan]")
+    console.print("[bold cyan]  Predix Strategy Generator[/bold cyan]")
+    console.print(f"[bold cyan]{'='*60}[/bold cyan]")
+    console.print(f"  Strategies: [cyan]{count}[/cyan]  Workers: [cyan]{workers}[/cyan]  Style: [cyan]{style}[/cyan]")
+    console.print(f"  Optuna: {'[green]Yes[/green]' if optuna else '[yellow]No[/yellow]'} (trials={optuna_trials})  Factors: [cyan]{top_factors}[/cyan]")
+    console.print(f"  Accept: Sharpe≥[green]{min_sharpe}[/green]  DD≥[green]{max_drawdown}[/green]  WR≥[green]{min_win_rate}[/green]")
+    console.print(f"[bold cyan]{'='*60}[/bold cyan]\n")
+
+    try:
+        from rdagent.scenarios.qlib.local.strategy_orchestrator import StrategyOrchestrator
+
+        orchestrator = StrategyOrchestrator(
+            top_factors=top_factors,
+            trading_style=style,
+            min_sharpe=min_sharpe,
+            max_drawdown=max_drawdown,
+            min_win_rate=min_win_rate,
+            use_optuna=optuna,
+            optuna_trials=optuna_trials,
+            continuous_optimization=optuna,
+        )
+
+        results = orchestrator.generate_strategies(count=count, workers=workers)
+
+        accepted = [r for r in results if r.get("status") == "success"]
+        rejected = len(results) - len(accepted)
+
+        console.print(f"\n[bold green]✓ {len(accepted)} accepted[/bold green]  [yellow]{rejected} rejected[/yellow]")
+
+        if accepted:
+            accepted.sort(key=lambda r: r.get("sharpe_ratio", 0), reverse=True)
+            table = RichTable(title="Top Generated Strategies", show_header=True, header_style="bold cyan")
+            table.add_column("#", width=4)
+            table.add_column("Strategy", width=30)
+            table.add_column("Sharpe", width=8, justify="right")
+            table.add_column("MaxDD", width=8, justify="right")
+            table.add_column("WinRate", width=8, justify="right")
+            table.add_column("Trades", width=7, justify="right")
+            for i, r in enumerate(accepted[:10], 1):
+                table.add_row(
+                    str(i), r.get("strategy_name", "?")[:28],
+                    f"{r.get('sharpe_ratio', 0):.2f}", f"{r.get('max_drawdown', 0):.1%}",
+                    f"{r.get('win_rate', 0):.1%}", str(r.get('num_trades', '?')),
+                )
+            console.print(table)
+
+    except ImportError as e:
+        console.print(f"[yellow]Strategy generator not available: {e}[/yellow]")
+    except Exception as e:
+        console.print(f"[bold red]❌ {e}[/bold red]")
+
+
+@app.command()
 def health():
     """Check system health and configuration status.
 
