@@ -72,7 +72,7 @@ class BacktestMetrics:
 class FactorBacktester:
     def __init__(self):
         self.metrics = BacktestMetrics()
-        self.results_path = Path(__file__).parent.parent.parent / "results" / "backtests"
+        self.results_path = Path(__file__).parent.parent.parent.parent / "results" / "backtests"
         self.results_path.mkdir(parents=True, exist_ok=True)
 
     def run_backtest(

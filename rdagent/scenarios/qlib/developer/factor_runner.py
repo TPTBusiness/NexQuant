@@ -143,6 +143,8 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         )
         IC_max.index = pd.MultiIndex.from_product([range(SOTA_feature.shape[1]), range(new_feature.shape[1])])
         IC_max = IC_max.unstack().max(axis=0)
+        if not hasattr(IC_max, "index"):
+            return new_feature
         return new_feature.iloc[:, IC_max[IC_max < 0.99].index]
 
     def develop(self, exp: QlibFactorExperiment) -> QlibFactorExperiment:
@@ -757,19 +759,19 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             db_file = db_path / "backtest_results.db"
 
             # Parallel run isolation: use run-specific subdirectory if PARALLEL_RUN_ID is set
-            run_id = os.getenv("PARALLEL_RUN_ID", "0")
-            if run_id != "0":
+            parallel_run_id = os.getenv("PARALLEL_RUN_ID", "0")
+            if parallel_run_id != "0":
                 # For parallel runs, save to isolated results directory
-                isolated_db_path = project_root / "results" / "runs" / f"run{run_id}" / "db"
+                isolated_db_path = project_root / "results" / "runs" / f"run{parallel_run_id}" / "db"
                 isolated_db_path.mkdir(parents=True, exist_ok=True)
                 db_file = isolated_db_path / "backtest_results.db"
 
             # Save to database
             db = ResultsDatabase(db_path=str(db_file))
-            run_id = db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
+            db_run_id = db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
             logger.info(
                 f"Factor result saved to DB: {factor_name[:60]} "
-                f"(IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}, run_id={run_id})",
+                f"(IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}, run_id={db_run_id})"
             )
 
             # Extract factor code and description from experiment
@@ -777,7 +779,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
             # Also write a JSON summary to results/factors/ for file-based access
             self._save_factor_json(
-                factor_name, metrics, run_id,
+                factor_name, metrics, db_run_id,
                 factor_code=factor_code,
                 factor_description=factor_description,
                 exp=exp,
@@ -963,12 +965,17 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 shutil.copy(str(full_data), str(tmp / "intraday_pv.h5"))
 
                 ret = subprocess.run(
-                    ["sys.executable", "factor.py"],
+                    [sys.executable, "factor.py"],
                     cwd=str(tmp),
                     capture_output=True,
                     timeout=300,
+                    check=False,
                 )
                 if ret.returncode != 0:
+                    logger.warning(
+                        f"Full-data factor run failed (exit {ret.returncode}): "
+                        f"{ret.stderr[:500] if ret.stderr else '(no stderr)'}"
+                    )
                     # Fall back to debug-data result if full-data run fails
                     result_h5 = workspace_path / "result.h5"
                     if not result_h5.exists():
