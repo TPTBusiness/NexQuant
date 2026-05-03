@@ -926,6 +926,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
         import os as _os
         import shutil
         import subprocess
+        import sys
         import tempfile
 
         try:
