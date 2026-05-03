@@ -617,6 +617,9 @@ def generate_strategies_cli(
     top_factors: int = typer.Option(20, "--top-factors", help="Number of top factors to consider"),
     continuous: bool = typer.Option(True, "--continuous/--single-pass", help="Optimize ALL strategies including rejected ones"),
     max_iterations: int = typer.Option(1, "--max-iterations", "-i", help="Number of generation-optimization cycles (1 = single pass, >1 = continuous)"),
+    min_sharpe: float = typer.Option(1.5, "--min-sharpe", help="Minimum Sharpe ratio for acceptance"),
+    max_drawdown: float = typer.Option(-0.30, "--max-dd", help="Maximum drawdown allowed"),
+    min_win_rate: float = typer.Option(0.40, "--min-winrate", help="Minimum win rate for acceptance"),
 ):
     """
     Generate trading strategies from evaluated factors.
@@ -698,6 +701,9 @@ def generate_strategies_cli(
             orchestrator = StrategyOrchestrator(
                 top_factors=top_factors,
                 trading_style=style,
+                min_sharpe=min_sharpe,
+                max_drawdown=max_drawdown,
+                min_win_rate=min_win_rate,
                 use_optuna=optuna,
                 optuna_trials=optuna_trials,
                 continuous_optimization=continuous,
