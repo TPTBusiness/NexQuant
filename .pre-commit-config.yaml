@@ -2,6 +2,26 @@
 # See https://pre-commit.com for more information
 
 repos:
+  # ── Test Coverage Check: new modules must have tests ──────────────
+  - repo: local
+    hooks:
+      - id: check-test-coverage
+        name: Check new rdagent modules have tests
+        entry: python scripts/check_test_coverage.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+  # ── MyPy Ratchet: no new type errors allowed ────────────────────
+  - repo: local
+    hooks:
+      - id: mypy-ratchet
+        name: MyPy ratchet (no new type errors)
+        entry: python scripts/check_mypy_ratchet.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
   # ── Qlib Unit Tests (MANDATORY) ──────────────────────────────────
   - repo: local
     hooks:
@@ -14,10 +34,11 @@ repos:
           - test/backtesting/
           - -v
           - --tb=short
-          - --no-cov
+          - --cov=rdagent
+          - --cov-fail-under=33
+          - --cov-report=term
           - --ignore=test/backtesting/test_ftmo_oos.py
           - --ignore=test/backtesting/test_kronos_adapter.py
-          - --ignore=test/backtesting/test_results_db.py
           - --ignore=test/qlib/test_fin_quant_integration.py
         pass_filenames: false
         always_run: true
