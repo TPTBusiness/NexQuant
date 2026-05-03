@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/TPTBusiness/Predix/compare/v1.4.1...v1.4.2) (2026-05-03)
+
+
+### Bug Fixes
+
+* add missing sys import and fix undefined acc_rate in factor eval ([c45f990](https://github.com/TPTBusiness/Predix/commit/c45f9908ee321400f0a19c57f1482e4cd1394a50))
+
 ## [1.4.1](https://github.com/TPTBusiness/Predix/compare/v1.4.0...v1.4.1) (2026-05-03)
 
 
