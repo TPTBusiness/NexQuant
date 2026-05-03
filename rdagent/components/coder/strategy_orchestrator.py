@@ -337,6 +337,12 @@ class StrategyOrchestrator:
             user_prompt = user_prompt.replace("{{ additional_context }}", f"Strategy name: {strategy_name}")
             user_prompt = user_prompt.replace("{{ trading_style }}", self.trading_style)
             user_prompt = user_prompt.replace("{{ min_sharpe }}", str(self.min_sharpe))
+
+            if "{{" in user_prompt:
+                unreplaced = [w for w in user_prompt.split() if "{{" in w]
+                logger.warning(
+                    f"Unreplaced template variables in prompt for '{strategy_name}': {unreplaced}"
+                )
             user_prompt = user_prompt.replace("{{ max_drawdown }}", str(self.max_drawdown))
             system_prompt = self.strategy_prompt.get("system", "")
         else:
@@ -758,11 +764,11 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
                     common_idx = common_idx.intersection(s.index)
 
             if common_idx is not None and len(common_idx) > 100:
-                    df_factors = pd.DataFrame({
-                        name: s.reindex(common_idx) for name, s in factor_values.items()
-                    }).dropna()
-                else:
-                    df_factors = pd.DataFrame()
+                df_factors = pd.DataFrame({
+                    name: s.reindex(common_idx) for name, s in factor_values.items()
+                }).dropna()
+            else:
+                df_factors = pd.DataFrame()
 
             if len(df_factors) < 100:
                 return {
@@ -816,6 +822,11 @@ signal = signal.rolling(window=3, min_periods=1).mean().round().astype(int)
             try:
                 exec(strategy_code, {"np": np, "pd": pd, "numpy": np}, local_vars)
             except Exception as e:
+                import traceback
+                logger.error(
+                    f"Strategy code execution failed for '{strategy_name}': {e}\n"
+                    f"{traceback.format_exc()[-2000:]}"
+                )
                 return {
                     "strategy_name": strategy_name,
                     "status": "rejected",

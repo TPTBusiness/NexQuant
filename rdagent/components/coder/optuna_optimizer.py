@@ -23,7 +23,7 @@ import pandas as pd
 
 from rdagent.log import rdagent_logger as logger
 
-logger = logging.getLogger(__name__)
+_optuna_logger = logging.getLogger(__name__)
 
 try:
     import optuna

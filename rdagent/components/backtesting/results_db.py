@@ -330,13 +330,13 @@ class ResultsDatabase:
         worst_drawdown = all_results['max_drawdown'].min() if total_runs > 0 and all_results['max_drawdown'].notna().any() else None
 
         # Scan factors directory for JSON files
-        factors_dir = Path(__file__).parent.parent.parent / "results" / "factors"
+        factors_dir = Path(__file__).parent.parent.parent.parent / "results" / "factors"
         json_factor_files = 0
         if factors_dir.exists():
             json_factor_files = len(list(factors_dir.glob("*.json")))
 
         # Scan failed runs
-        failed_dir = Path(__file__).parent.parent.parent / "results" / "failed_runs"
+        failed_dir = Path(__file__).parent.parent.parent.parent / "results" / "failed_runs"
         failed_runs_file = failed_dir / "failed_runs.json"
         failed_runs_count = 0
         failed_runs_data = []

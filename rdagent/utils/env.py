@@ -923,7 +923,11 @@ def _prepare_conda_env(env_name: str, requirements_file: Path, python_version: s
     """
     # 1. Create conda environment if not exists
     env_list = subprocess.run(["conda", "env", "list"], capture_output=True, text=True, check=False)
-    env_exists = any(line.split()[0] == env_name for line in env_list.stdout.splitlines() if line and not line.startswith("#"))
+    env_exists = any(
+        line.split()[0] == env_name
+        for line in env_list.stdout.splitlines()
+        if line and not line.startswith("#") and len(line.split()) > 0
+    )
     if not env_exists:
         print(f"[yellow]Creating conda env '{env_name}' (Python {python_version})...[/yellow]")
         subprocess.check_call(["conda", "create", "-y", "-n", env_name, f"python={python_version}"])
@@ -1189,7 +1193,7 @@ class DockerEnv(Env[DockerConf]):
             with Progress(SpinnerColumn(), TextColumn("{task.description}")) as p:
                 task = p.add_task("[cyan]Building image...")
                 for part in resp_stream:
-                    lines = part.decode("utf-8").split("\r\n")
+                    lines = part.decode("utf-8", errors="replace").split("\r\n")
                     for line in lines:
                         if line.strip():
                             status_dict = json.loads(line)
