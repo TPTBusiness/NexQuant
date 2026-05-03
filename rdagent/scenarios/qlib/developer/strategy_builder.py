@@ -173,8 +173,10 @@ class StrategyEvaluator:
         df_norm = (df - df.mean()) / df.std()
         signal = df_norm.mean(axis=1)
 
-        # Calculate returns (forward returns approximation)
-        # Use factor values as proxy for returns
+        # Strategy returns: signal direction * forward returns
+        # Approximate forward returns from signal changes (no OHLCV in this context)
+        # Fall back to qlib-style: use signal sign as position, diff as P&L proxy
+        # This is approximate — real evaluation needs OHLCV data
         returns = signal.diff().fillna(0)
 
         # Apply transaction costs
@@ -184,15 +186,16 @@ class StrategyEvaluator:
 
         # Calculate metrics
         total_return = returns.sum()
-        ann_factor = np.sqrt(252 * 1440 / 96)  # Annualization for 1min data
+        bars_per_year = 252 * 1440
+        ann_factor = np.sqrt(bars_per_year / 96)  # Annualization for 1min data
         ann_return = total_return * ann_factor
-        volatility = returns.std() * np.sqrt(252 * 1440 / 96)
+        volatility = returns.std() * ann_factor
         sharpe = ann_return / volatility if volatility > 0 else 0
 
-        # Max drawdown
-        cum = returns.cumsum()
-        running_max = cum.expanding().max()
-        drawdown = (cum - running_max) / running_max.replace(0, np.nan)
+        # Max drawdown on equity curve
+        equity = (1.0 + returns).cumprod()
+        running_max = equity.expanding().max()
+        drawdown = (equity - running_max) / running_max.replace(0, np.nan)
         max_dd = drawdown.min() if len(drawdown) > 0 else 0
 
         # Win rate
