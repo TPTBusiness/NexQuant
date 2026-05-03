@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.1](https://github.com/TPTBusiness/Predix/compare/v1.4.0...v1.4.1) (2026-05-03)
+
+
+### Bug Fixes
+
+* 15 bug fixes across orchestrator, runner, backtest, and infrastructure ([163687d](https://github.com/TPTBusiness/Predix/commit/163687d7e1c278a085d7052a3f958a3edb501e77))
+* also catch ValueError in mean_variance for dimension mismatch ([ed73b72](https://github.com/TPTBusiness/Predix/commit/ed73b7253f7dc6459ee30dd81a1ce1194e46e9af))
+* close log file handle, fix FTMO equity double-count, remove bare except ([76219a5](https://github.com/TPTBusiness/Predix/commit/76219a53efddaafc2b8bd48a0f76c1d4325e6ea5))
+* correct project root paths and subprocess handling in parallel runner and CLI ([9735e3a](https://github.com/TPTBusiness/Predix/commit/9735e3a4d8f01e7b16fb9b185a002396a915cea4))
+* filter NaN in max(), remove redundant ternary, handle non-finite vbt results ([f89fbb3](https://github.com/TPTBusiness/Predix/commit/f89fbb3421faf6ccdc8e68a911fd9db2c166120f))
+* fix type annotation, remove unused parameter, improve import_class errors ([8b6ab73](https://github.com/TPTBusiness/Predix/commit/8b6ab735c05629bf6b76ddc2fd8b15617600cad7))
+* resolve dead code, shell injection risk, mutable defaults, and other bugs ([afff262](https://github.com/TPTBusiness/Predix/commit/afff26287f7c4df7ddfde4e816d280fe845e11eb))
+* resolve unbound variable, logger shadowing, withdraw_loop edge case, and other bugs in main scripts ([748cf9b](https://github.com/TPTBusiness/Predix/commit/748cf9b214a3e8447f1289fc4cf1e92ad6cc2f1a))
+
 ## [1.4.0](https://github.com/TPTBusiness/Predix/compare/v1.3.11...v1.4.0) (2026-05-01)
 
 
