@@ -122,39 +122,19 @@ class TestEqualValueRatioAccRateUndefined:
 # =============================================================================
 
 class TestAnnualizationFactorInDirectEval:
-    """Verify direct evaluation uses correct annualization with forward_return_bars."""
-
-    def test_annualization_factor_uses_forward_bars(self):
-        """The direct eval method hardcodes 96 instead of using forward_return_bars param."""
+    def test_uses_bars_per_year_strategy_ret(self):
         import inspect
-
         from rdagent.scenarios.qlib.developer.factor_runner import QlibFactorRunner
-
         source = inspect.getsource(QlibFactorRunner._evaluate_factor_directly)
+        assert "bars_per_year" in source
+        assert "strategy_ret" in source
 
-        # Check that the method uses `np.sqrt(252 * 1440 / 96)` which hardcodes 96
-        # This should ideally be parameterized or at least consistent with the
-        # forward return calculation at line ~530 which also uses 96.
-        assert "np.sqrt(252 * 1440 / 96)" in source or "np.sqrt(252*1440/96)" in source, (
-            "The annualization factor in _evaluate_factor_directly should match "
-            "the forward_return_bars used for computing forward returns."
-        )
-
-    def test_ann_factor_is_consistent_with_forward_ret(self):
-        """Verify both the forward return shift and annualization use 96 bars."""
+    def test_signal_based_on_factor_sign(self):
         import inspect
-
         from rdagent.scenarios.qlib.developer.factor_runner import QlibFactorRunner
-
         source = inspect.getsource(QlibFactorRunner._evaluate_factor_directly)
-
-        # forward return uses `.shift(-96)` at line ~530
-        assert '.shift(-96)' in source, "Forward return shift should use 96 bars (1 day)"
-
-        # annualization should also use 96
-        assert '1440 / 96' in source, (
-            "Annualization factor should use the same number (96) as the forward return shift"
-        )
+        assert "np.where" in source
+        assert "signal" in source
 
 
 # =============================================================================

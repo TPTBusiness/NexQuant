@@ -544,23 +544,32 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
             except Exception:
                 rank_ic = ic
 
-            # Compute Sharpe-like metric
-            factor_mean = factor_col.loc[valid_idx].mean()
-            factor_std = factor_col.loc[valid_idx].std()
-            sharpe = factor_mean / factor_std if factor_std > 0 else 0
+            # Compute strategy returns from factor signal + forward returns
+            # signal: long(1) when factor > 0, short(-1) when factor <= 0
+            signal = np.where(factor_col.loc[valid_idx] > 0, 1.0, -1.0)
+            strategy_ret = signal * forward_ret.loc[valid_idx]
 
-            # Annualized return (approximate)
-            ann_factor = np.sqrt(252 * 1440 / 96)
-            annualized_return = factor_mean * ann_factor * 100
+            # Annualization factor for 1-minute bars
+            bars_per_year = 252 * 1440  # ~362880
+            bars_per_forward = 96
+            ann_factor = np.sqrt(bars_per_year / bars_per_forward)
 
-            # Max drawdown (approximate)
-            cum_perf = factor_col.loc[valid_idx].cumsum()
-            running_max = cum_perf.expanding().max()
-            drawdown = (cum_perf - running_max) / running_max.replace(0, np.nan)
-            max_drawdown = drawdown.min() if len(drawdown) > 0 else 0
+            # Sharpe: annualized mean/vol of strategy returns
+            ret_mean = strategy_ret.mean()
+            ret_std = strategy_ret.std()
+            sharpe = (ret_mean / ret_std * ann_factor) if ret_std > 0 else 0.0
 
-            # Win rate
-            win_rate = (factor_col.loc[valid_idx] > 0).sum() / len(valid_idx)
+            # Annualized return
+            annualized_return = float(ret_mean * bars_per_year / bars_per_forward * 100)
+
+            # Max drawdown on equity curve
+            equity = (1.0 + strategy_ret).cumprod()
+            running_max = equity.expanding().max()
+            drawdown = (equity - running_max) / running_max.replace(0, np.nan)
+            max_drawdown = float(drawdown.min()) if len(drawdown) > 0 else 0.0
+
+            # Win rate: fraction of positive strategy returns
+            win_rate = float((strategy_ret > 0).sum()) / len(strategy_ret) if len(strategy_ret) > 0 else 0.0
 
             # Create result series compatible with Qlib backtest result format
             result = pd.Series({
@@ -570,7 +579,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                 "1day.excess_return_with_cost.max_drawdown": max_drawdown,
                 "win_rate": win_rate,
                 "1day.excess_return_with_cost.information_ratio": rank_ic,
-                "1day.excess_return_with_cost.std": factor_std,
+                "1day.excess_return_with_cost.std": float(ret_std),
                 "1day.pos": len(valid_idx),
                 "factor_name": factor_name,
             })
