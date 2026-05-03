@@ -267,6 +267,10 @@ def backtest_signal(
             freq=freq,
         )
 
+    from rdagent.components.backtesting.verify import verify_and_log
+
+    verify_and_log(result, factor_name="backtest_signal")
+
     return result
 
 
@@ -589,6 +593,10 @@ def backtest_signal_ftmo(
         trade_pnl = _compute_trade_pnl(position, strat_ret)
         result["mc_pvalue"]        = monte_carlo_trade_pvalue(trade_pnl, mc_n_permutations)
         result["mc_n_permutations"] = mc_n_permutations
+
+    from rdagent.components.backtesting.verify import verify_and_log
+
+    verify_and_log(result, factor_name="backtest_from_forward_returns")
 
     return result
 
