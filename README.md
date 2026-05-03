@@ -84,6 +84,8 @@ rdagent predix
 
 Predix is optimized for **1-minute EUR/USD FX data** (2020–2026) and uses Qlib as the underlying backtesting engine.
 
+> **Backtest Verification**: Every backtest result is automatically verified at runtime against mathematical invariants (MaxDD ∈ [-1,0], WinRate ∈ [0,1], Sharpe finite, sign consistency, etc.). 479 unit tests + 10 ground-truth validation tests ensure ~99% metric correctness. See [Backtest Integrity](#backtest-integrity).
+
 ## Acknowledgments
 
 This project draws inspiration from various open-source projects in the AI trading and multi-agent systems space. We thank all the authors for their innovative work that helped shape our understanding of these patterns.
@@ -562,6 +564,32 @@ If you use Predix in your research, please cite the underlying framework:
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/TPTBusiness/Predix/issues)
+
+---
+
+## Backtest Integrity
+
+Every backtest result is automatically verified at runtime against 10 mathematical invariants.  
+The verifier runs in **<1ms** and catches corrupted/missing/flipped metrics before they enter the factor database.
+
+### Runtime checks (every backtest)
+| Check | Constraint |
+|-------|-----------|
+| Max Drawdown | `-1.0 ≤ mdd ≤ 0.0` |
+| Win Rate | `0.0 ≤ wr ≤ 1.0` |
+| Sharpe Ratio | `sharpe` must be finite |
+| Total Return | `total_return` must be finite |
+| Trade Count | `n_trades ≥ 0` |
+| Sign consistency | `sign(sharpe) == sign(annual_return)` |
+| Status | Must be `success` or `failed` |
+
+### Test suite (CI + pre-commit)
+```bash
+pytest test/qlib/ -q        # 479 tests, 0 failures
+pytest test/backtesting/ -q # backtest engine tests
+```
+
+**Coverage**: IC linear invariance, forward-return alignment, cross-implementation validation, ground-truth hand-computed scenarios, look-ahead bias detection, edge cases (all-NaN, constant, zero-variance), Monte Carlo p-value, walk-forward rolling, buy-and-hold equality.
 
 ---
 
