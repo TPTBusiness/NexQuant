@@ -16,7 +16,8 @@ def load_factors(names, vdir):
                     if df is not None and len(df.columns) > 0:
                         dfs[n] = df.iloc[:, 0]
                         break
-                except: pass
+                except Exception:
+                    pass
     return dfs
 
 def fix_code(code, available):
@@ -79,7 +80,7 @@ except Exception as e:
             if r.returncode != 0:
                 return None
             sig = pd.read_pickle(str(tdp / "s.pkl"))
-        except:
+        except Exception:
             return None
     
     fwd = df.mean(axis=1).shift(-96).dropna()
@@ -124,7 +125,7 @@ def main(count=None):
             d = json.load(open(f))
             if isinstance(d, dict) and 'strategy_name' in d:
                 files.append(f)
-        except: pass
+        except Exception: pass
     if count: files = files[:count]
     
     print(f"Re-evaluating {len(files)} strategies...\n")
@@ -147,7 +148,7 @@ def main(count=None):
                         with open(f, 'w') as out: json.dump(data, out, indent=2, ensure_ascii=False)
                         updated += 1
                         results.append({'name':data['strategy_name'], **bt})
-            except:
+            except Exception:
                 pass
             p.update(task, advance=1)
     

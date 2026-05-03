@@ -230,16 +230,20 @@ class ParallelRunner:
         log_path = self.project_root / run_state.log_file
         log_f = open(log_path, "a", encoding="utf-8")
 
-        # Start subprocess
-        run_state.process = subprocess.Popen(
-            cmd,
-            env=env,
-            cwd=str(self.project_root),
-            stdout=log_f,
-            stderr=subprocess.STDOUT,
-        )
-        run_state.status = "running"
-        run_state.start_time = datetime.now()
+        try:
+            # Start subprocess
+            run_state.process = subprocess.Popen(
+                cmd,
+                env=env,
+                cwd=str(self.project_root),
+                stdout=log_f,
+                stderr=subprocess.STDOUT,
+            )
+            run_state.status = "running"
+            run_state.start_time = datetime.now()
+        except Exception:
+            log_f.close()
+            raise
 
         console.print(
             f"[dim]  ▶️  Run {run_state.run_id} started (PID: {run_state.process.pid}, "
