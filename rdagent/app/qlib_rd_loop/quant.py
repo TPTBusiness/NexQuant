@@ -341,7 +341,7 @@ class QuantRDLoop(RDLoop):
             orchestrator = StrategyOrchestrator(
                 top_factors=20,
                 trading_style="swing",
-                min_sharpe=0.5,
+                min_sharpe=1.5,
                 max_drawdown=-0.20,
                 min_win_rate=0.40,
                 use_optuna=True,
