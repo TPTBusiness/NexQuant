@@ -6,7 +6,7 @@ repos:
   - repo: local
     hooks:
       - id: qlib-unit-tests
-        name: Qlib Unit Tests (~445 tests)
+        name: Qlib Unit Tests (~460 tests)
         entry: pytest
         language: system
         args:
