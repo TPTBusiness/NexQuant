@@ -203,12 +203,14 @@ class QlibModelRunner(CachedRunner[QlibModelExperiment]):
 
             # Save to database
             db = ResultsDatabase()
-            run_id = db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
-            logger.info(
-                f"Model result saved to DB: {factor_name[:50]} "
-                f"(IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}, run_id={run_id})"
-            )
-            db.close()
+            try:
+                run_id = db.add_backtest(factor_name=factor_name[:100], metrics=metrics)
+                logger.info(
+                    f"Model result saved to DB: {factor_name[:50]} "
+                    f"(IC={metrics.get('ic')}, Sharpe={metrics.get('sharpe_ratio')}, run_id={run_id})"
+                )
+            finally:
+                db.close()
 
         except Exception as e:
             logger.warning(f"Database save failed for model {getattr(exp.hypothesis, 'hypothesis', 'unknown')}: {e}")
