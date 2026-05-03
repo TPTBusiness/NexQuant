@@ -19,19 +19,16 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.live import Live
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
-from rich.markdown import Markdown
-from rich.layout import Layout
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 # Load environment variables from .env file
-load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 console = Console()
 
@@ -43,12 +40,12 @@ class RunState:
         self.run_id = run_id
         self.api_key_idx = api_key_idx
         self.model = model
-        self.process: Optional[subprocess.Popen] = None
+        self.process: subprocess.Popen | None = None
         self.status: str = "pending"  # pending, running, success, failed, stopped
-        self.start_time: Optional[datetime] = None
-        self.end_time: Optional[datetime] = None
-        self.exit_code: Optional[int] = None
-        self.error_message: Optional[str] = None
+        self.start_time: datetime | None = None
+        self.end_time: datetime | None = None
+        self.exit_code: int | None = None
+        self.error_message: str | None = None
         self.log_file: str = f"fin_quant_run{run_id}.log"
 
     @property
@@ -105,8 +102,8 @@ class ParallelRunner:
         self.num_runs = num_runs
         self.num_api_keys = num_api_keys
         self.model = model
-        self.runs: List[RunState] = []
-        self.project_root = Path(__file__).parent
+        self.runs: list[RunState] = []
+        self.project_root = Path(__file__).parent.parent
         self._shutdown_requested = False
 
         # Read API keys from environment
@@ -115,10 +112,10 @@ class ParallelRunner:
         # Validate we have enough API keys
         if self.model == "openrouter" and len(self.api_keys) < num_api_keys:
             console.print(
-                f"[yellow]⚠️  Requested {num_api_keys} API keys, but only {len(self.api_keys)} found in .env[/yellow]"
+                f"[yellow]⚠️  Requested {num_api_keys} API keys, but only {len(self.api_keys)} found in .env[/yellow]",
             )
             console.print(
-                f"[dim]Distributing across {len(self.api_keys)} available key(s)[/dim]"
+                f"[dim]Distributing across {len(self.api_keys)} available key(s)[/dim]",
             )
             self.num_api_keys = len(self.api_keys)
 
@@ -129,7 +126,7 @@ class ParallelRunner:
             run_state = RunState(run_id=i, api_key_idx=api_key_idx, model=model)
             self.runs.append(run_state)
 
-    def _load_api_keys(self) -> List[str]:
+    def _load_api_keys(self) -> list[str]:
         """Load API keys from environment variables."""
         keys = []
 
@@ -149,7 +146,7 @@ class ParallelRunner:
 
         return keys
 
-    def _build_env(self, run_state: RunState) -> Dict[str, str]:
+    def _build_env(self, run_state: RunState) -> dict[str, str]:
         """
         Build isolated environment for a subprocess.
 
@@ -174,16 +171,14 @@ class ParallelRunner:
         env["RD_AGENT_WORKSPACE"] = str(workspace_dir)
 
         # Configure API key for this run
-        if self.model == "openrouter" and run_state.api_key_idx < len(self.api_keys):
-            api_key = self.api_keys[run_state.api_key_idx]
-            env["OPENAI_API_KEY"] = api_key
-            env["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
-            env["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/google/gemma-4-26b-a4b-it:free")
-
-            # If we configured multiple API keys AND have enough keys, use load balancing
+        if self.model == "openrouter":
             if self.num_api_keys >= 2 and len(self.api_keys) >= 2:
                 env["OPENAI_API_KEY"] = f"{self.api_keys[0]},{self.api_keys[1]}"
                 env["LITELLM_PARALLEL_CALLS"] = "2"
+            elif run_state.api_key_idx < len(self.api_keys):
+                env["OPENAI_API_KEY"] = self.api_keys[run_state.api_key_idx]
+            env["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
+            env["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/google/gemma-4-26b-a4b-it:free")
         elif self.model == "local":
             env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "local")
             env["OPENAI_API_BASE"] = os.getenv("OPENAI_API_BASE", "http://localhost:8081/v1")
@@ -191,7 +186,7 @@ class ParallelRunner:
 
         return env
 
-    def _build_command(self, run_state: RunState) -> List[str]:
+    def _build_command(self, run_state: RunState) -> list[str]:
         """
         Build the subprocess command to run predix quant.
 
@@ -248,7 +243,7 @@ class ParallelRunner:
 
         console.print(
             f"[dim]  ▶️  Run {run_state.run_id} started (PID: {run_state.process.pid}, "
-            f"API Key: {run_state.api_key_idx + 1}, Model: {run_state.model})[/dim]"
+            f"API Key: {run_state.api_key_idx + 1}, Model: {run_state.model})[/dim]",
         )
 
     def _check_run(self, run_state: RunState) -> None:
@@ -273,14 +268,14 @@ class ParallelRunner:
                 run_state.status = "success"
                 console.print(
                     f"[bold green]  ✅ Run {run_state.run_id} completed "
-                    f"({run_state.elapsed})[/bold green]"
+                    f"({run_state.elapsed})[/bold green]",
                 )
             else:
                 run_state.status = "failed"
                 run_state.error_message = f"Exit code: {poll_result}"
                 console.print(
                     f"[bold red]  ❌ Run {run_state.run_id} failed "
-                    f"({run_state.elapsed}, exit code: {poll_result})[/bold red]"
+                    f"({run_state.elapsed}, exit code: {poll_result})[/bold red]",
                 )
 
     def _stop_run(self, run_state: RunState) -> None:
@@ -386,7 +381,7 @@ class ParallelRunner:
             if run.status == "running":
                 self._stop_run(run)
 
-    def run(self) -> Dict[str, int]:
+    def run(self) -> dict[str, int]:
         """
         Execute all parallel runs and show live dashboard.
 
@@ -400,7 +395,7 @@ class ParallelRunner:
         signal.signal(signal.SIGTERM, self._signal_handler)
 
         console.print(f"\n[bold cyan]{'=' * 60}[/bold cyan]")
-        console.print(f"[bold cyan]🔀 Predix Parallel Runner[/bold cyan]")
+        console.print("[bold cyan]🔀 Predix Parallel Runner[/bold cyan]")
         console.print(f"[bold cyan]{'=' * 60}[/bold cyan]")
         console.print(f"  Runs: {self.num_runs}")
         console.print(f"  API Keys: {self.num_api_keys} ({len(self.api_keys)} available)")
@@ -451,7 +446,7 @@ class ParallelRunner:
         stopped_count = sum(1 for r in self.runs if r.status == "stopped")
 
         console.print(f"\n[bold cyan]{'=' * 60}[/bold cyan]")
-        console.print(f"[bold cyan]📊 Parallel Run Summary[/bold cyan]")
+        console.print("[bold cyan]📊 Parallel Run Summary[/bold cyan]")
         console.print(f"[bold cyan]{'=' * 60}[/bold cyan]")
         console.print(f"  ✅ Success: {success_count}/{self.num_runs}")
         console.print(f"  ❌ Failed: {failed_count}/{self.num_runs}")
@@ -463,7 +458,7 @@ class ParallelRunner:
             if run.start_time and run.end_time:
                 delta = run.end_time - run.start_time
                 console.print(
-                    f"    Run #{run.run_id}: {run.status} ({delta.total_seconds():.0f}s)"
+                    f"    Run #{run.run_id}: {run.status} ({delta.total_seconds():.0f}s)",
                 )
 
         return {
@@ -478,7 +473,7 @@ def main(
     runs: int = 5,
     api_keys: int = 2,
     model: str = "openrouter",
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """
     Run multiple factor experiments in parallel.
 
@@ -504,7 +499,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Predix Parallel Runner - Run multiple factor experiments concurrently"
+        description="Predix Parallel Runner - Run multiple factor experiments concurrently",
     )
     parser.add_argument(
         "--runs", "-n",
@@ -542,7 +537,7 @@ if __name__ == "__main__":
     elif args.runs > 25:
         console.print(f"\n[yellow]⚠️  {args.runs} runs - high resource usage expected[/yellow]")
         console.print(f"   Estimated RAM: ~{args.runs * 0.65:.0f} GB")
-        console.print(f"   Use --force to confirm.\n")
+        console.print("   Use --force to confirm.\n")
         import time
         time.sleep(2)
 
