@@ -328,12 +328,13 @@ class FactorEqualValueRatioEvaluator(FactorEvaluator):
                 "The source dataframe is None. Please check the implementation.",
                 -1,
             )
+        acc_rate = -1
         try:
             close_values = gen_df.sub(gt_df).abs().lt(1e-6)
             result_int = close_values.astype(int)
             pos_num = result_int.sum().sum()
             acc_rate = pos_num / close_values.size
-        except:
+        except Exception:
             close_values = gen_df
         if close_values.all().iloc[0]:
             return (
