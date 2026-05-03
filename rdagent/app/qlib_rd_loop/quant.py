@@ -293,7 +293,7 @@ class QuantRDLoop(RDLoop):
             from pathlib import Path
 
             import yaml
-            from rdagent.components.coder.strategy_orchestrator import StrategyOrchestrator
+            from rdagent.scenarios.qlib.local.strategy_orchestrator import StrategyOrchestrator
 
             # Load improved prompt
             project_root = Path(__file__).parent.parent.parent.parent

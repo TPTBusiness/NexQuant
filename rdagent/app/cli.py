@@ -681,7 +681,7 @@ def generate_strategies_cli(
 
     try:
         import pandas as pd
-        from rdagent.components.coder.strategy_orchestrator import StrategyOrchestrator
+        from rdagent.scenarios.qlib.local.strategy_orchestrator import StrategyOrchestrator
 
         all_results = []
         best_strategy = None
