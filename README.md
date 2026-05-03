@@ -517,16 +517,15 @@ Core dependencies (see [`requirements.txt`](requirements.txt) for full list):
 
 ## License
 
-This project is licensed under the **MIT License** – see the [`LICENSE`](LICENSE) file for details.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
-### Attribution Requirements
+Key points of AGPL-3.0:
+- You may use, modify, and distribute this software freely
+- If you distribute modified versions, you MUST publish your changes under the same AGPL-3.0 license
+- If you run this software as a network service (e.g., trading API), you MUST make the complete source code available to users
+- Includes patent protection and anti-tivoization clauses
 
-If you use this code or concepts in your project, you **must**:
-1. Include the MIT License text
-2. Keep the copyright notice: "Copyright (c) 2025 Predix Team"
-3. Provide attribution to the original project
-
-See [`ATTRIBUTION.md`](ATTRIBUTION.md) for detailed guidelines and examples.
+See the full license text in [`LICENSE`](LICENSE) or at <https://www.gnu.org/licenses/agpl-3.0.en.html>.
 
 ---
 
