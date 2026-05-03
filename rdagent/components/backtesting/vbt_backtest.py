@@ -3,8 +3,8 @@ Unified, verifiable backtesting engine.
 
 Single entry point (`backtest_signal`) used by:
   - scripts/predix_gen_strategies_real_bt.py
-  - rdagent/components/coder/strategy_orchestrator.py
-  - rdagent/components/coder/optuna_optimizer.py
+  - rdagent/scenarios/qlib/local/strategy_orchestrator.py
+  - rdagent/scenarios/qlib/local/optuna_optimizer.py
   - rdagent/components/backtesting/backtest_engine.py
 
 Design goals
