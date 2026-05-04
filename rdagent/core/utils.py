@@ -225,11 +225,27 @@ def cache_with_pickle(hash_func: Callable, post_process_func: Callable | None = 
     return cache_decorator
 
 
-def safe_resolve_path(user_path: Path, safe_root: Path | None = None) -> Path:
+def safe_resolve_path(user_path: Path | str, safe_root: Path | str | None = None) -> Path:
+    """Resolve a user-provided path safely against an allowed root directory.
+
+    Args:
+        user_path: Path provided by user/LLM/config
+        safe_root: If provided, the resolved path must be within this directory
+
+    Raises:
+        ValueError: If path resolves outside safe_root
+        OSError: If path cannot be resolved
+    """
+    resolved = Path(user_path).expanduser().resolve()
+
     if safe_root is not None:
-        root_real = os.path.realpath(str(safe_root.expanduser()))
-        path_real = os.path.realpath(str(user_path.expanduser()))  # nosec B614 — validated against safe_root below
-        if not (path_real == root_real or path_real.startswith(root_real + os.sep)):
-            raise ValueError(f"Path {user_path} resolves to {path_real}, outside allowed root {safe_root}")
-        return Path(path_real)
-    return user_path.expanduser().resolve()
+        root_resolved = Path(safe_root).expanduser().resolve()
+        try:
+            resolved.relative_to(root_resolved)
+        except ValueError:
+            raise ValueError(
+                f"Path {user_path} resolves to {resolved}, "
+                f"outside allowed root {root_resolved}"
+            )
+
+    return resolved
