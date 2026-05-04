@@ -11,7 +11,7 @@
 stable-baselines3[extra]>=2.8.0
 
 # Gymnasium environment (OpenAI Gym successor)
-gymnasium>=0.29.0
+gymnasium>=0.29.1
 
 # Optional: TensorBoard for training visualization
 tensorboard
