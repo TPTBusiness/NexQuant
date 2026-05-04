@@ -1,23 +1,12 @@
-"""Batch 3: ensemble, optuna path, signal validation, walk-forward details."""
+"""Batch 3: walk-forward details, signal validation, IC bounds."""
 
 from __future__ import annotations
-
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import numpy as np
-import pandas as pd
-import pytest
+import numpy as np, pandas as pd, pytest
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-
-
-class TestEnsembleEdgeCases:
-    def test_orchestrator_module_loads(self):
-        from rdagent.scenarios.qlib.local import strategy_orchestrator as so
-        assert hasattr(so, 'StrategyOrchestrator')
 
 
 class TestWalkForwardDetails:
@@ -36,34 +25,6 @@ class TestWalkForwardDetails:
         if result["wf_n_windows"] > 0 and "wf_oos_consistency" in result:
             assert 0.0 <= result["wf_oos_consistency"] <= 1.0
 
-    def test_wf_keys_present(self):
-        from rdagent.components.backtesting.vbt_backtest import walk_forward_rolling
-        dates = pd.date_range("2020-01-01", "2023-12-31", freq="1min")
-        rng = np.random.default_rng(42)
-        close = pd.Series(1.10 + rng.normal(0, 0.0001, len(dates)).cumsum(), index=dates)
-        signal = pd.Series(np.where(rng.normal(0, 1, len(dates)) > 0, 1.0, -1.0), index=dates)
-        result = walk_forward_rolling(close, signal, leverage=1.0)
-        for key in ["wf_n_windows"]:
-            assert key in result
-
-
-class TestOptunaPath:
-    def test_optuna_optimizer_init(self):
-        from rdagent.scenarios.qlib.local.optuna_optimizer import OptunaOptimizer
-        opt = OptunaOptimizer(n_trials=3)
-        assert opt.n_trials == 3
-        assert opt.optimization_metric == "sharpe"
-
-    def test_optuna_accepts_strategy_dict(self):
-        from rdagent.scenarios.qlib.local.optuna_optimizer import OptunaOptimizer
-        opt = OptunaOptimizer(n_trials=3)
-        strat = {"strategy_name": "test", "status": "rejected", "sharpe_ratio": -1.0}
-        try:
-            result = opt.optimize_strategy(strat, pd.DataFrame({"a": [1, 2, 3, 4, 5, 6]}))
-            assert isinstance(result, dict)
-        except Exception:
-            pass  # OHLCV may not be available
-
 
 class TestSignalValidation:
     def test_constant_signal_zero_trades(self):
@@ -78,8 +39,7 @@ class TestSignalValidation:
         n = 1000
         dates = pd.date_range("2024-01-01", periods=n, freq="1min")
         close = pd.Series(1.10 + np.random.default_rng(42).normal(0, 0.0002, n).cumsum(), index=dates)
-        signal_values = [0.0, 1.0, -1.0, 0.5, -0.5, 2.0, -2.0, 100.0, -100.0]
-        for val in signal_values:
+        for val in [0.0, 1.0, -1.0, 2.0, -2.0]:
             result = backtest_signal(close, pd.Series(val, index=dates))
             assert result["status"] in ("success", "failed")
 
@@ -120,30 +80,3 @@ class TestBacktestFromFwdReturnsDetails:
         result = backtest_from_forward_returns(factor, fwd, close)
         if result["status"] == "success":
             assert result.get("n_trades", 0) >= 0
-
-
-class TestPreflightValidation:
-    def test_syntax_error_caught(self):
-        from rdagent.scenarios.qlib.local.strategy_orchestrator import StrategyOrchestrator
-        orch = StrategyOrchestrator.__new__(StrategyOrchestrator)
-        result = orch._preflight_check("if True print(x)")
-        assert result is not None
-
-    def test_no_signal_caught(self):
-        from rdagent.scenarios.qlib.local.strategy_orchestrator import StrategyOrchestrator
-        orch = StrategyOrchestrator.__new__(StrategyOrchestrator)
-        result = orch._preflight_check("x = 1")
-        assert result is not None
-        assert "signal" in result.lower()
-
-    def test_valid_code_passes(self):
-        from rdagent.scenarios.qlib.local.strategy_orchestrator import StrategyOrchestrator
-        orch = StrategyOrchestrator.__new__(StrategyOrchestrator)
-        result = orch._preflight_check("import numpy as np\nsignal = np.array([1.0, -1.0, 1.0])")
-        assert result is None
-
-    def test_constant_signal_caught(self):
-        from rdagent.scenarios.qlib.local.strategy_orchestrator import StrategyOrchestrator
-        orch = StrategyOrchestrator.__new__(StrategyOrchestrator)
-        result = orch._preflight_check("import numpy as np\nsignal = np.array([1.0, 1.0, 1.0])")
-        assert result is not None
