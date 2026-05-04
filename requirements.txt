@@ -95,7 +95,7 @@ pytest-cov
 optuna>=3.6.2
 
 # News & Data (Polymarket, ForexFactory, CryptoPanic)
-beautifulsoup4>=4.12.0
+beautifulsoup4>=4.14.3
 
 # ML Training Pipeline
 lightgbm>=3.3.5
