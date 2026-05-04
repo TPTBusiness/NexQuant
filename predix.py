@@ -329,8 +329,15 @@ def quant(
         threading.Thread(target=start_cli_dash, daemon=True).start()
         time.sleep(1)
 
-    # ---- Kronos Factor: auto-generate if not in pool ----
-    _ensure_kronos_factor_in_pool(console)
+    # ---- Kronos Factor: skip if GPU unavailable (CUDA OOM with llama-server) ----
+    try:
+        import torch
+        if torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory > 20 * 1024**3:
+            _ensure_kronos_factor_in_pool(console)
+        else:
+            console.print("[dim]Kronos Factor skipped — GPU < 20GB or CUDA unavailable[/dim]")
+    except Exception:
+        console.print("[dim]Kronos Factor skipped — torch not available[/dim]")
 
     # ---- Start fin_quant ----
     from rdagent.app.qlib_rd_loop.quant import main as fin_quant
