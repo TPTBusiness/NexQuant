@@ -477,7 +477,7 @@ def backtest_signal_ftmo(
     bars_per_year: int = DEFAULT_BARS_PER_YEAR,
     forward_returns: pd.Series | None = None,
     oos_start: str | None = OOS_START_DEFAULT,
-    wf_rolling: bool = False,
+    wf_rolling: bool = True,
     mc_n_permutations: int = 0,
 ) -> dict[str, Any]:
     """
