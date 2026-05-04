@@ -46,7 +46,7 @@ docker
 webdriver-manager
 
 # demo related
-streamlit>=1.47  # to support  input_c.text_area(..., height="content", ...)
+streamlit>=1.57.0  # to support  input_c.text_area(..., height="content", ...)
 plotly
 st-theme
 randomname
