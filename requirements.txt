@@ -92,7 +92,7 @@ pytest
 pytest-cov
 
 # Parameter Optimization
-optuna>=3.5.0
+optuna>=3.6.2
 
 # News & Data (Polymarket, ForexFactory, CryptoPanic)
 beautifulsoup4>=4.12.0
