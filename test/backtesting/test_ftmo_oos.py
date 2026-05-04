@@ -227,10 +227,11 @@ def test_wf_rolling_keys_in_result(close_6yr):
     assert "wf_n_windows" in r
 
 
-def test_wf_rolling_disabled_by_default(close_6yr):
+def test_wf_rolling_enabled_by_default(close_6yr):
     signal = _random_signal(close_6yr.index)
     r = backtest_signal_ftmo(close_6yr, signal, oos_start="2024-01-01")
-    assert "wf_n_windows" not in r
+    assert "wf_n_windows" in r
+    assert "wf_oos_sharpe_mean" in r
 
 
 def test_wf_consistency_range(close_6yr):
