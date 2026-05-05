@@ -585,6 +585,24 @@ class APIBackend(ABC):
                         f"Original error: {e}"
                     ) from e
 
+                # Handle llama.cpp 400: "Cannot have 2 or more assistant messages at the end of the list"
+                if (
+                    openai_imported
+                    and isinstance(e, openai.BadRequestError)
+                    and hasattr(e, "message")
+                    and "Cannot have 2 or more assistant messages" in e.message
+                ):
+                    if "messages" in kwargs:
+                        merged = []
+                        for msg in kwargs["messages"]:
+                            if merged and merged[-1]["role"] == "assistant" and msg["role"] == "assistant":
+                                merged[-1]["content"] += "\n" + msg["content"]
+                            else:
+                                merged.append(msg)
+                        kwargs["messages"] = merged
+                    logger.warning("Fixed consecutive assistant messages, retrying...")
+                    continue
+
                 if embedding and too_long_error_message:
                     if not embedding_truncated:
                         # Handle embedding text too long error - truncate once and retry
@@ -654,9 +672,11 @@ class APIBackend(ABC):
         add json related content in the prompt if add_json_in_prompt is True
         """
         for message in messages[::-1]:
-            message["content"] = message["content"] + "\nPlease respond in json format."
+            if message["role"] == "user":
+                message["content"] = message["content"] + "\nPlease respond in json format."
+                break
             if message["role"] == LLM_SETTINGS.system_prompt_role:
-                # NOTE: assumption: systemprompt is always the first message
+                message["content"] = message["content"] + "\nPlease respond in json format."
                 break
 
     def _create_chat_completion_auto_continue(
