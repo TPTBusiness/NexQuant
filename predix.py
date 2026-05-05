@@ -329,13 +329,9 @@ def quant(
         threading.Thread(target=start_cli_dash, daemon=True).start()
         time.sleep(1)
 
-    # ---- Kronos Factor: skip if GPU unavailable (CUDA OOM with llama-server) ----
+    # ---- Kronos Factor: CPU inference to avoid GPU conflict with llama-server ----
     try:
-        import torch
-        if torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory > 20 * 1024**3:
-            _ensure_kronos_factor_in_pool(console)
-        else:
-            console.print("[dim]Kronos Factor skipped — GPU < 20GB or CUDA unavailable[/dim]")
+        _ensure_kronos_factor_in_pool(console)
     except Exception:
         console.print("[dim]Kronos Factor skipped — torch not available[/dim]")
 
