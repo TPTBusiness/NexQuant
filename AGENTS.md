@@ -127,37 +127,21 @@ Dann TPTBusiness auswählen. Erst danach committen und pushen.
 
 ### PR Merge Policy
 - **Dependabot / dependency PRs**: merge autonomously after `pytest test/backtesting/ -v` passes — no user confirmation needed
-- **release-please PRs**: merge autonomously after every push if CI is green — `gh pr merge <n> --squash`. This cuts a release automatically with each batch of commits.
 - **Feature/fix PRs**: run relevant tests, then merge if green
 - Always use `gh pr merge <n> --squash` for clean history
 
-### Auto-release schema — run this after every `git push`
-
-```
-1. unset GITHUB_TOKEN && gh pr list --state open -R TPTBusiness/Predix
-2. For each open PR:
-   - release-please PR  → merge immediately (--squash), then gh release list to verify tag
-   - Dependabot PR      → merge immediately if CI green (--squash --auto)
-   - Other PRs          → merge if tests pass and change is clearly ready
-```
-
-**Always merge the release-please PR right after pushing** — no user confirmation needed.
-This is the standing authorization: every push → release.
+### 🚀 Release Policy — MANUAL, not bot-driven
+Releases werden **manuell** nach sinnvollen Commit-Batches erstellt, nicht automatisch bei jedem Push.
+- Nach ~20-50 substantiellen Commits (features, fixes, tests) → Release cutten
+- Version: `fix:` → patch (1.2.3), `feat:` → minor (1.3.0), BREAKING → major (2.0.0)
+- Nur Open-Source-Änderungen in Release Notes erwähnen
+- Release-please Bot und `release-please--branches--master` Branch werden ignoriert/gelöscht
 
 ```bash
-# Full post-push sequence:
-unset GITHUB_TOKEN
-gh pr list --state open -R TPTBusiness/Predix --json number,title,author
-# merge release-please PR:
-gh pr merge <n> --squash -R TPTBusiness/Predix
-# verify:
-gh release list -R TPTBusiness/Predix --limit 3
+# Release manuell erstellen:
+git tag -a v1.5.0 -m "v1.5.0: ..." && git push --tags
+gh release create v1.5.0 --title "v1.5.0" --notes-file /tmp/release_notes.md
 ```
-
-### Release Cadence
-- Version bumps: `fix:` / `feat:` → patch (1.2.x), `feat!:` / BREAKING CHANGE → minor (1.x.0)
-- Only mention open-source changes in release notes — never closed-source strategies/models/prompts
-- If the release-please PR doesn't exist yet (CI still running), wait ~60 s then check again
 
 ### Git Commit Signing — SSH ("Verified" badge)
 - Configured globally: `gpg.format=ssh`, `commit.gpgsign=true`
