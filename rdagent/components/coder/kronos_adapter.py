@@ -91,7 +91,7 @@ class KronosAdapter:
     TOKENIZER_ID = "NeoQuasar/Kronos-Tokenizer-2k"
 
     def __init__(self, device: Optional[str] = None, max_context: int = 512):
-        self.device = device or ("cuda" if _cuda_available() else "cpu")
+        self.device = device or "cpu"
         self.max_context = max_context
         self._predictor = None
 
@@ -236,7 +236,7 @@ def build_kronos_factor(
     Returns:
         MultiIndex (datetime, instrument) DataFrame with column "KronosPredReturn".
     """
-    device = device or ("cuda" if _cuda_available() else "cpu")
+    device = device or "cpu"
     logger.info(f"Loading data from {hdf5_path}...")
     raw = pd.read_hdf(hdf5_path, key="data")
 
@@ -312,7 +312,7 @@ def evaluate_kronos_model(
     Returns:
         dict with keys: IC_mean, IC_std, IC_IR (IC / std), hit_rate, n_predictions
     """
-    device = device or ("cuda" if _cuda_available() else "cpu")
+    device = device or "cpu"
     raw = pd.read_hdf(hdf5_path, key="data")
     instrument = raw.index.get_level_values("instrument").unique()[0]
     df = raw.xs(instrument, level="instrument")
