@@ -278,4 +278,4 @@ class TestAllImportsDontCrash:
         import rdagent.scenarios.qlib.developer.model_runner  # noqa: F401
 
     def test_optuna_optimizer_imports(self):
-        # moved to local/  # noqa: F401
+        pass  # moved to local/
