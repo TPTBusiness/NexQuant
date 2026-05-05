@@ -131,16 +131,32 @@ Dann TPTBusiness auswählen. Erst danach committen und pushen.
 - Always use `gh pr merge <n> --squash` for clean history
 
 ### 🚀 Release Policy — MANUAL, not bot-driven
-Releases werden **manuell** nach sinnvollen Commit-Batches erstellt, nicht automatisch bei jedem Push.
-- Nach ~20-50 substantiellen Commits (features, fixes, tests) → Release cutten
-- Version: `fix:` → patch (1.2.3), `feat:` → minor (1.3.0), BREAKING → major (2.0.0)
-- Nur Open-Source-Änderungen in Release Notes erwähnen
-- Release-please Bot und `release-please--branches--master` Branch werden ignoriert/gelöscht
+
+Releases werden **manuell** nach sinnvollen Commit-Batches erstellt. Release-Trigger
+(sobald EINER dieser Schwellwerte seit dem letzten Release erreicht ist):
+
+| Schwelle | Version | Beispiel |
+|----------|---------|----------|
+| **5+ `feat:` Commits** | minor (1.4.0 → 1.5.0) | Neue Features sammeln |
+| **10+ `fix:` Commits** | patch (1.5.0 → 1.5.1) | Bugfixes sammeln |
+| **30+ Commits total** | minor (1.5.0 → 1.6.0) | Großer Batch |
+| **1 Major-Feature** | minor | Runtime-Verifier, OOS-Default |
+| **Security-Fix (HIGH/CRITICAL)** | patch | Sofort releasen |
+
+**Versionierung:** `fix:` → patch (1.5.1), `feat:` → minor (1.6.0), `feat!:` / BREAKING → major (2.0.0)
+
+**Nicht releasen für:** reine Test-Commits, Dependabot-Merges, Docs, Refactoring ohne Funktionsänderung.
+Erst wenn genug Features/Fixes zusammengekommen sind → Release.
 
 ```bash
-# Release manuell erstellen:
-git tag -a v1.5.0 -m "v1.5.0: ..." && git push --tags
-gh release create v1.5.0 --title "v1.5.0" --notes-file /tmp/release_notes.md
+# Prüfen ob Release fällig:
+git log v1.5.0..HEAD --oneline | grep -c "feat:"
+git log v1.5.0..HEAD --oneline | grep -c "fix:"
+git rev-list v1.5.0..HEAD --count
+
+# Release erstellen:
+git tag -a v1.6.0 -m "v1.6.0: <summary>" && git push --tags
+gh release create v1.6.0 --title "v1.6.0" --notes-file /tmp/release_notes.md
 ```
 
 ### Git Commit Signing — SSH ("Verified" badge)
