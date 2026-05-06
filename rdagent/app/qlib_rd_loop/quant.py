@@ -73,6 +73,83 @@ class QuantRDLoop(RDLoop):
         self.trace = QuantTrace(scen=scen)
         super(RDLoop, self).__init__()
 
+    def _ensure_kronos_factors_in_pool(self) -> None:
+        """Generate Kronos foundation model factors with varying prediction horizons.
+
+        Generates KronosPredReturn_p24, KronosPredReturn_p48, KronosPredReturn_p96
+        if they don't already exist in results/factors/.  Uses CPU inference so it
+        co-exists peacefully with the llama-server GPU process.
+        """
+        import json as _json
+        from datetime import datetime as _dt
+        from pathlib import Path as _Path
+
+        data_path = _Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
+        if not data_path.exists():
+            logger.warning("Kronos: intraday_pv.h5 missing, skipping factor generation")
+            return
+
+        factors_dir = _Path("results/factors")
+        values_dir = factors_dir / "values"
+
+        for pred_bars in (24, 48, 96):
+            factor_name = f"KronosPredReturn_p{pred_bars}"
+            json_path = factors_dir / f"{factor_name}.json"
+            parquet_path = values_dir / f"{factor_name}.parquet"
+
+            if json_path.exists() and parquet_path.exists():
+                try:
+                    existing = _json.loads(json_path.read_text())
+                    if existing.get("ic") is not None:
+                        logger.info(f"Kronos: {factor_name} exists (IC={existing['ic']:.4f}), skip")
+                        continue
+                except Exception:
+                    pass
+
+            try:
+                from rdagent.components.coder.kronos_adapter import build_kronos_factor, evaluate_kronos_model
+
+                logger.info(f"Kronos: generating {factor_name} (pred={pred_bars}, stride=500, CPU)...")
+                factor_df = build_kronos_factor(
+                    hdf5_path=data_path,
+                    context_bars=100,
+                    pred_bars=pred_bars,
+                    stride_bars=500,
+                    device="cpu",
+                    batch_size=16,
+                )
+
+                values_dir.mkdir(parents=True, exist_ok=True)
+                factor_df.to_parquet(parquet_path)
+
+                logger.info(f"Kronos: computing IC for {factor_name}...")
+                metrics = evaluate_kronos_model(
+                    hdf5_path=data_path,
+                    context_bars=100,
+                    pred_bars=pred_bars,
+                    stride_bars=2000,
+                    device="cpu",
+                    batch_size=16,
+                )
+                ic = metrics.get("IC_mean", 0.0) or 0.0
+
+                factors_dir.mkdir(parents=True, exist_ok=True)
+                meta = {
+                    "factor_name": factor_name,
+                    "status": "success",
+                    "ic": ic,
+                    "model": "NeoQuasar/Kronos-mini",
+                    "context_bars": 100,
+                    "pred_bars": pred_bars,
+                    "device": "cpu",
+                    "generated_at": _dt.now().isoformat(),
+                }
+                json_path.write_text(_json.dumps(meta, indent=2))
+                logger.info(f"Kronos: {factor_name} ready — IC={ic:.4f}")
+
+            except Exception as e:
+                logger.warning(f"Kronos: {factor_name} failed — {e}")
+
     async def direct_exp_gen(self, prev_out: dict[str, Any]):
         while True:
             if self.get_unfinished_loop_cnt(self.loop_idx) < RD_AGENT_SETTINGS.get_max_parallel():
@@ -423,6 +500,7 @@ def main(
     else:
         quant_loop = QuantRDLoop.load(path, checkout=checkout)
     quant_loop._init_base_features(base_features_path)
+    quant_loop._ensure_kronos_factors_in_pool()
     if "user_interaction_queues" in kwargs and kwargs["user_interaction_queues"] is not None:
         quant_loop._set_interactor(*kwargs["user_interaction_queues"])
         quant_loop._interact_init_params()
