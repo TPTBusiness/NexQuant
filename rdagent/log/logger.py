@@ -160,6 +160,9 @@ class RDAgentLog(SingletonBaseClass):
         log_func = getattr(patched_logger, level)
         log_func(msg)
 
+    def debug(self, msg: str, *, tag: str = "", raw: bool = False) -> None:
+        self._log("debug", msg, tag=tag, raw=raw)
+
     def info(self, msg: str, *, tag: str = "", raw: bool = False) -> None:
         self._log("info", msg, tag=tag, raw=raw)
 
