@@ -100,7 +100,7 @@ class QuantRDLoop(RDLoop):
             if json_path.exists() and parquet_path.exists():
                 try:
                     existing = _json.loads(json_path.read_text())
-                    if existing.get("ic") is not None:
+                    if existing.get("ic") is not None and existing.get("model_size") == "small":
                         logger.info(f"Kronos: {factor_name} exists (IC={existing['ic']:.4f}), skip")
                         continue
                 except Exception:
@@ -109,14 +109,23 @@ class QuantRDLoop(RDLoop):
             try:
                 from rdagent.components.coder.kronos_adapter import build_kronos_factor, evaluate_kronos_model
 
-                logger.info(f"Kronos: generating {factor_name} (pred={pred_bars}, stride=500, CPU)...")
+                has_cuda = False
+                try:
+                    import torch
+                    has_cuda = torch.cuda.is_available()
+                except Exception:
+                    pass
+                device = "cuda" if has_cuda else "cpu"
+
+                logger.info(f"Kronos-small: generating {factor_name} (pred={pred_bars}, stride=500, {device})...")
                 factor_df = build_kronos_factor(
                     hdf5_path=data_path,
                     context_bars=100,
                     pred_bars=pred_bars,
                     stride_bars=500,
-                    device="cpu",
-                    batch_size=16,
+                    device=device,
+                    batch_size=32,
+                    model_size="small",
                 )
 
                 values_dir.mkdir(parents=True, exist_ok=True)
@@ -128,8 +137,9 @@ class QuantRDLoop(RDLoop):
                     context_bars=100,
                     pred_bars=pred_bars,
                     stride_bars=2000,
-                    device="cpu",
-                    batch_size=16,
+                    device=device,
+                    batch_size=32,
+                    model_size="small",
                 )
                 ic = metrics.get("IC_mean", 0.0) or 0.0
 
@@ -138,6 +148,7 @@ class QuantRDLoop(RDLoop):
                     "factor_name": factor_name,
                     "status": "success",
                     "ic": ic,
+                    "model_size": "small",
                     "model": "NeoQuasar/Kronos-mini",
                     "context_bars": 100,
                     "pred_bars": pred_bars,
