@@ -116,6 +116,7 @@ class KronosAdapter:
         tokenizer = KronosTokenizer.from_pretrained(self.TOKENIZER_ID)
         model = Kronos.from_pretrained(self.MODEL_ID)
         logger.info(f"Kronos-{self.model_size} loaded.")
+        self._predictor = KronosPredictor(model, tokenizer, device=self.device, max_context=self.max_context)
         return self
 
     def predict_next_bars(
