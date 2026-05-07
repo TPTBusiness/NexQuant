@@ -90,9 +90,19 @@ class KronosAdapter:
     MODEL_ID = "NeoQuasar/Kronos-mini"
     TOKENIZER_ID = "NeoQuasar/Kronos-Tokenizer-2k"
 
-    def __init__(self, device: Optional[str] = None, max_context: int = 512):
+    # Mapping for larger Kronos variants
+    _MODEL_MAP = {
+        "mini": ("NeoQuasar/Kronos-mini", "NeoQuasar/Kronos-Tokenizer-2k"),
+        "small": ("NeoQuasar/Kronos-small", "NeoQuasar/Kronos-Tokenizer-base"),
+        "base": ("NeoQuasar/Kronos-base", "NeoQuasar/Kronos-Tokenizer-base"),
+    }
+
+    def __init__(self, device: Optional[str] = None, max_context: int = 512, model_size: str = "mini"):
         self.device = device or "cpu"
         self.max_context = max_context
+        self.model_size = model_size
+        if model_size in self._MODEL_MAP:
+            self.MODEL_ID, self.TOKENIZER_ID = self._MODEL_MAP[model_size]
         self._predictor = None
 
     def load(self) -> "KronosAdapter":
@@ -102,11 +112,10 @@ class KronosAdapter:
             raise RuntimeError("Kronos not available — see warning above.")
         from model import Kronos, KronosTokenizer, KronosPredictor  # type: ignore
 
-        logger.info(f"Loading Kronos-mini from HuggingFace ({self.MODEL_ID})...")
+        logger.info(f"Loading Kronos-{self.model_size} from HuggingFace ({self.MODEL_ID})...")
         tokenizer = KronosTokenizer.from_pretrained(self.TOKENIZER_ID)
         model = Kronos.from_pretrained(self.MODEL_ID)
-        self._predictor = KronosPredictor(model, tokenizer, device=self.device, max_context=self.max_context)
-        logger.info("Kronos-mini loaded.")
+        logger.info(f"Kronos-{self.model_size} loaded.")
         return self
 
     def predict_next_bars(
@@ -223,6 +232,7 @@ def build_kronos_factor(
     stride_bars: int = 96,
     device: Optional[str] = None,
     batch_size: int = 32,
+    model_size: str = "mini",
 ) -> pd.DataFrame:
     """
     Generate the Kronos predicted-return factor for all EUR/USD 1-min bars.
@@ -244,7 +254,7 @@ def build_kronos_factor(
     df = raw.xs(instrument, level="instrument")
     ohlcv = _ohlcv_from_predix(df)
 
-    adapter = KronosAdapter(device=device, max_context=min(context_bars, 512))
+    adapter = KronosAdapter(device=device, max_context=min(context_bars, 512), model_size=model_size)
     adapter.load()
 
     bar_indices = list(range(context_bars, len(ohlcv), stride_bars))
@@ -302,6 +312,7 @@ def evaluate_kronos_model(
     stride_bars: int = 30,
     device: Optional[str] = None,
     batch_size: int = 32,
+    model_size: str = "mini",
 ) -> dict:
     """
     Evaluate Kronos as a standalone model (Option B, alongside LightGBM).
@@ -318,7 +329,7 @@ def evaluate_kronos_model(
     df = raw.xs(instrument, level="instrument")
     ohlcv = _ohlcv_from_predix(df)
 
-    adapter = KronosAdapter(device=device, max_context=min(context_bars, 512))
+    adapter = KronosAdapter(device=device, max_context=min(context_bars, 512), model_size=model_size)
     adapter.load()
 
     n = len(ohlcv)
