@@ -1,5 +1,5 @@
 """
-FX Validator Graph — Multi-Agent Validierung für Predix Faktoren
+FX Validator Graph — Multi-Agent Validierung für NexQuant Faktoren
 
 Implementiert Multi-Agenten-System für Trading-Entscheidungen:
 - Session Analyst: Analysiert aktuelle FX-Session
@@ -88,10 +88,10 @@ def create_fx_validator(config: dict = None):
 
 def validate_factor(factor_report: str, trade_date: str = None) -> dict:
     """
-    Hauptfunktion — validiert einen Predix-Faktor durch Multi-Agent Debatte
+    Hauptfunktion — validiert einen NexQuant-Faktor durch Multi-Agent Debatte
 
     Args:
-        factor_report: Der Faktor-Report von Predix RD-Agent
+        factor_report: Der Faktor-Report von NexQuant RD-Agent
         trade_date: Datum/Zeit in ISO Format (default: jetzt)
 
     Returns:

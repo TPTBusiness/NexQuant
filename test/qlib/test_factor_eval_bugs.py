@@ -196,7 +196,7 @@ class TestInfNanHandlingInsertion:
 
 
 # =============================================================================
-# Bug 5: scan_factors reads factor_code twice (predix_full_eval.py:174 + 195)
+# Bug 5: scan_factors reads factor_code twice (nexquant_full_eval.py:174 + 195)
 # =============================================================================
 
 class TestScanFactorsDoubleRead:
@@ -205,9 +205,9 @@ class TestScanFactorsDoubleRead:
     def test_factor_code_read_only_when_needed(self):
         """Confirm the scan_factors double-read behavior (line 174+195)."""
         import inspect
-        from scripts import predix_full_eval
+        from scripts import nexquant_full_eval
 
-        source = inspect.getsource(predix_full_eval.scan_factors)
+        source = inspect.getsource(nexquant_full_eval.scan_factors)
 
         # Count occurrences of `.read_text()`
         count = source.count(".read_text()")

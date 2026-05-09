@@ -2,7 +2,7 @@
 Fallback RL implementation for users without stable-baselines3.
 
 Provides simple rule-based trading when RL library is not available.
-This ensures the Predix system works for all GitHub users, even
+This ensures the NexQuant system works for all GitHub users, even
 without the optional stable-baselines3 dependency.
 
 The fallback implements a momentum-based strategy as a placeholder

@@ -2,7 +2,7 @@
 RL Trading Agent wrapper for Stable Baselines3.
 
 Provides an easy-to-use interface for training, evaluating, and deploying
-RL trading agents within the Predix framework.
+RL trading agents within the NexQuant framework.
 
 Supported algorithms:
 - PPO: Proximal Policy Optimization (most stable, recommended for production)

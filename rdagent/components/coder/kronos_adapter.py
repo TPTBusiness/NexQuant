@@ -1,5 +1,5 @@
 """
-Kronos Foundation Model Adapter for Predix.
+Kronos Foundation Model Adapter for NexQuant.
 
 Wraps the Kronos-mini OHLCV foundation model (4.1M params, AAAI 2026, MIT)
 for use as:
@@ -55,8 +55,8 @@ def _ensure_kronos() -> bool:
     return _KRONOS_AVAILABLE
 
 
-def _ohlcv_from_predix(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert Predix HDF5 format ($open/$close/...) to Kronos format (open/close/...)."""
+def _ohlcv_from_nexquant(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert NexQuant HDF5 format ($open/$close/...) to Kronos format (open/close/...)."""
     col_map = {"$open": "open", "$high": "high", "$low": "low", "$close": "close", "$volume": "volume"}
     renamed = df.rename(columns=col_map)
     cols = [c for c in ["open", "high", "low", "close", "volume"] if c in renamed.columns]
@@ -253,7 +253,7 @@ def build_kronos_factor(
 
     instrument = raw.index.get_level_values("instrument").unique()[0]
     df = raw.xs(instrument, level="instrument")
-    ohlcv = _ohlcv_from_predix(df)
+    ohlcv = _ohlcv_from_nexquant(df)
 
     adapter = KronosAdapter(device=device, max_context=min(context_bars, 512), model_size=model_size)
     adapter.load()
@@ -328,7 +328,7 @@ def evaluate_kronos_model(
     raw = pd.read_hdf(hdf5_path, key="data")
     instrument = raw.index.get_level_values("instrument").unique()[0]
     df = raw.xs(instrument, level="instrument")
-    ohlcv = _ohlcv_from_predix(df)
+    ohlcv = _ohlcv_from_nexquant(df)
 
     adapter = KronosAdapter(device=device, max_context=min(context_bars, 512), model_size=model_size)
     adapter.load()

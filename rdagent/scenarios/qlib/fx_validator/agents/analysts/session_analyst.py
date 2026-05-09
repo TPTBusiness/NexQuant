@@ -47,7 +47,7 @@ Active Session: {session}
 Expected Regime: {regime}
 Session Notes: {session_note}
 
-Factor Report from Predix RD-Agent:
+Factor Report from NexQuant RD-Agent:
 {factor_report}
 
 Analyze whether the proposed factor is suitable for the current session regime.

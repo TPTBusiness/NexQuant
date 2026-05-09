@@ -1,5 +1,5 @@
 """
-Comprehensive Integration Test Suite for Predix
+Comprehensive Integration Test Suite for NexQuant
 Tests all 13 implemented features to ensure they work correctly.
 
 Usage:
@@ -1457,22 +1457,22 @@ class TestFinQuantCriticalIntegrations:
 
 
 # =============================================================================
-# CLI Model Selection Tests (predix.py, cli.py)
+# CLI Model Selection Tests (nexquant.py, cli.py)
 # =============================================================================
 
 class TestCLIModelSelection:
     """Test CLI model selection (--model/-m flag) for local vs OpenRouter."""
 
-    def test_predix_cli_imports(self):
-        """Test that predix.py CLI module can be imported."""
+    def test_nexquant_cli_imports(self):
+        """Test that nexquant.py CLI module can be imported."""
         import importlib.util
         spec = importlib.util.spec_from_file_location(
-            "predix", Path(__file__).parent.parent.parent / "predix.py"
+            "nexquant", Path(__file__).parent.parent.parent / "nexquant.py"
         )
-        predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
-        assert hasattr(predix, "app")
-        assert hasattr(predix, "quant")
+        nexquant = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nexquant)
+        assert hasattr(nexquant, "app")
+        assert hasattr(nexquant, "quant")
 
     def test_fin_quant_cli_has_model_option(self):
         """Test that fin_quant CLI has --model option."""
@@ -1488,36 +1488,36 @@ class TestCLIModelSelection:
         # (Typer auto-generates help from function signatures)
         assert isinstance(result.output, str)
 
-    def test_predix_quant_has_model_option(self):
-        """Test that predix quant CLI has --model option."""
+    def test_nexquant_quant_has_model_option(self):
+        """Test that nexquant quant CLI has --model option."""
         from typer.testing import CliRunner
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "predix", Path(__file__).parent.parent.parent / "predix.py"
+            "nexquant", Path(__file__).parent.parent.parent / "nexquant.py"
         )
-        predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        nexquant = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nexquant)
 
         runner = CliRunner()
-        result = runner.invoke(predix.app, ["quant", "--help"])
+        result = runner.invoke(nexquant.app, ["quant", "--help"])
 
         assert result.exit_code == 0
         assert "--model" in result.output or "-m" in result.output
 
-    def test_predix_quant_has_log_file_option(self):
-        """Test that predix quant CLI has --log-file option."""
+    def test_nexquant_quant_has_log_file_option(self):
+        """Test that nexquant quant CLI has --log-file option."""
         from typer.testing import CliRunner
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "predix", Path(__file__).parent.parent.parent / "predix.py"
+            "nexquant", Path(__file__).parent.parent.parent / "nexquant.py"
         )
-        predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        nexquant = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nexquant)
 
         runner = CliRunner()
-        result = runner.invoke(predix.app, ["quant", "--help"])
+        result = runner.invoke(nexquant.app, ["quant", "--help"])
 
         assert result.exit_code == 0
         assert "--log-file" in result.output
@@ -1541,12 +1541,12 @@ class TestCLIModelSelection:
             import inspect
             import importlib.util
             spec = importlib.util.spec_from_file_location(
-                "predix", Path(__file__).parent.parent.parent / "predix.py"
+                "nexquant", Path(__file__).parent.parent.parent / "nexquant.py"
             )
-            predix = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(predix)
+            nexquant = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(nexquant)
 
-            source = inspect.getsource(predix.quant)
+            source = inspect.getsource(nexquant.quant)
             assert "OPENROUTER_API_KEY" in source
             assert "not set" in source or "not set in" in source
         finally:
@@ -1554,50 +1554,50 @@ class TestCLIModelSelection:
             os.environ["OPENROUTER_API_KEY"] = original_key
 
     def test_tee_writer_class_exists(self):
-        """Test that TeeWriter class is defined in predix.py."""
+        """Test that TeeWriter class is defined in nexquant.py."""
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "predix", Path(__file__).parent.parent.parent / "predix.py"
+            "nexquant", Path(__file__).parent.parent.parent / "nexquant.py"
         )
-        predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        nexquant = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nexquant)
 
         # TeeWriter is defined inside the quant function
         # Verify the function source contains TeeWriter
         import inspect
-        source = inspect.getsource(predix.quant)
+        source = inspect.getsource(nexquant.quant)
         assert "TeeWriter" in source
 
-    def test_predix_health_command(self):
-        """Test that predix health command exists."""
+    def test_nexquant_health_command(self):
+        """Test that nexquant health command exists."""
         from typer.testing import CliRunner
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "predix", Path(__file__).parent.parent.parent / "predix.py"
+            "nexquant", Path(__file__).parent.parent.parent / "nexquant.py"
         )
-        predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        nexquant = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nexquant)
 
         runner = CliRunner()
-        result = runner.invoke(predix.app, ["health", "--help"])
+        result = runner.invoke(nexquant.app, ["health", "--help"])
 
         assert result.exit_code == 0
 
-    def test_predix_status_command(self):
-        """Test that predix status command exists."""
+    def test_nexquant_status_command(self):
+        """Test that nexquant status command exists."""
         from typer.testing import CliRunner
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "predix", Path(__file__).parent.parent.parent / "predix.py"
+            "nexquant", Path(__file__).parent.parent.parent / "nexquant.py"
         )
-        predix = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(predix)
+        nexquant = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nexquant)
 
         runner = CliRunner()
-        result = runner.invoke(predix.app, ["status", "--help"])
+        result = runner.invoke(nexquant.app, ["status", "--help"])
 
         assert result.exit_code == 0
 

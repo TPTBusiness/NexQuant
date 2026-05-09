@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run all Predix integration tests
+# Run all NexQuant integration tests
 # Usage:
 #   ./scripts/run_all_tests.sh           # Full test suite
 #   ./scripts/run_all_tests.sh --quick   # Skip slow tests
@@ -12,7 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 echo "========================================="
-echo "Predix Integration Test Suite"
+echo "NexQuant Integration Test Suite"
 echo "========================================="
 echo "Project: $PROJECT_ROOT"
 echo "Date: $(date '+%Y-%m-%d %H:%M:%S')"

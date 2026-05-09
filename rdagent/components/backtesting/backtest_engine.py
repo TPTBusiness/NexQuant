@@ -1,5 +1,5 @@
 """
-Predix Backtesting Engine - IC, Sharpe, Drawdown
+NexQuant Backtesting Engine - IC, Sharpe, Drawdown
 
 Thin wrapper around the unified ``vbt_backtest.backtest_signal`` engine.
 All metric formulas live in ``vbt_backtest``; this module exists for

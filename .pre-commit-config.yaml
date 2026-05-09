@@ -1,4 +1,4 @@
-# Pre-commit hooks configuration for Predix
+# Pre-commit hooks configuration for NexQuant
 # See https://pre-commit.com for more information
 
 repos:

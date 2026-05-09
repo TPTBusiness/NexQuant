@@ -25,8 +25,8 @@ def _make_ohlcv(n: int = 600, freq: str = "1min") -> pd.DataFrame:
     }, index=idx)
 
 
-def _make_predix_hdf5(tmp_path: Path, n: int = 300) -> Path:
-    """Write a minimal Predix-format HDF5 file and return its path."""
+def _make_nexquant_hdf5(tmp_path: Path, n: int = 300) -> Path:
+    """Write a minimal NexQuant-format HDF5 file and return its path."""
     idx = pd.MultiIndex.from_arrays(
         [pd.date_range("2024-01-01", periods=n, freq="1min"), ["EURUSD"] * n],
         names=["datetime", "instrument"],
@@ -63,12 +63,12 @@ def _make_mock_adapter():
 
 
 # ---------------------------------------------------------------------------
-# Unit tests: _ohlcv_from_predix
+# Unit tests: _ohlcv_from_nexquant
 # ---------------------------------------------------------------------------
 
 class TestOhlcvConversion:
     def test_renames_dollar_columns(self):
-        from rdagent.components.coder.kronos_adapter import _ohlcv_from_predix
+        from rdagent.components.coder.kronos_adapter import _ohlcv_from_nexquant
         idx = pd.MultiIndex.from_arrays(
             [pd.date_range("2024-01-01", periods=3, freq="1min"), ["EURUSD"] * 3],
             names=["datetime", "instrument"],
@@ -78,17 +78,17 @@ class TestOhlcvConversion:
             "$low": [1.05, 1.15, 1.25], "$close": [1.12, 1.22, 1.32],
             "$volume": [100.0, 200.0, 300.0],
         }, index=idx)
-        result = _ohlcv_from_predix(df)
+        result = _ohlcv_from_nexquant(df)
         assert list(result.columns) == ["open", "high", "low", "close", "volume"]
 
     def test_no_dollar_columns_passthrough(self):
-        from rdagent.components.coder.kronos_adapter import _ohlcv_from_predix
+        from rdagent.components.coder.kronos_adapter import _ohlcv_from_nexquant
         df = pd.DataFrame({"open": [1.0], "close": [1.1], "high": [1.2], "low": [0.9], "volume": [100.0]})
-        result = _ohlcv_from_predix(df)
+        result = _ohlcv_from_nexquant(df)
         assert "close" in result.columns
 
     def test_output_is_float64(self):
-        from rdagent.components.coder.kronos_adapter import _ohlcv_from_predix
+        from rdagent.components.coder.kronos_adapter import _ohlcv_from_nexquant
         df = pd.DataFrame({
             "$open": np.array([1.1], dtype="float32"),
             "$close": np.array([1.1], dtype="float32"),
@@ -96,7 +96,7 @@ class TestOhlcvConversion:
             "$low": np.array([1.1], dtype="float32"),
             "$volume": np.array([100.0], dtype="float32"),
         })
-        result = _ohlcv_from_predix(df)
+        result = _ohlcv_from_nexquant(df)
         assert result["close"].dtype == np.float64
 
 
@@ -134,7 +134,7 @@ class TestBuildKronosFactor:
     def test_output_has_correct_multiindex(self, tmp_path, monkeypatch):
         import rdagent.components.coder.kronos_adapter as mod
         monkeypatch.setattr(mod, "KronosAdapter", lambda **kw: _make_mock_adapter())
-        h5 = _make_predix_hdf5(tmp_path)
+        h5 = _make_nexquant_hdf5(tmp_path)
         result = mod.build_kronos_factor(h5, context_bars=100, pred_bars=20, stride_bars=20, device="cpu")
         assert result.index.names == ["datetime", "instrument"]
         assert result.index.nlevels == 2
@@ -142,14 +142,14 @@ class TestBuildKronosFactor:
     def test_output_column_name(self, tmp_path, monkeypatch):
         import rdagent.components.coder.kronos_adapter as mod
         monkeypatch.setattr(mod, "KronosAdapter", lambda **kw: _make_mock_adapter())
-        h5 = _make_predix_hdf5(tmp_path)
+        h5 = _make_nexquant_hdf5(tmp_path)
         result = mod.build_kronos_factor(h5, context_bars=100, pred_bars=20, stride_bars=20, device="cpu")
         assert "KronosPredReturn" in result.columns
 
     def test_output_has_non_nan_values(self, tmp_path, monkeypatch):
         import rdagent.components.coder.kronos_adapter as mod
         monkeypatch.setattr(mod, "KronosAdapter", lambda **kw: _make_mock_adapter())
-        h5 = _make_predix_hdf5(tmp_path)
+        h5 = _make_nexquant_hdf5(tmp_path)
         result = mod.build_kronos_factor(h5, context_bars=100, pred_bars=20, stride_bars=20, device="cpu")
         assert result["KronosPredReturn"].notna().sum() > 0
 
@@ -157,7 +157,7 @@ class TestBuildKronosFactor:
         import rdagent.components.coder.kronos_adapter as mod
         monkeypatch.setattr(mod, "KronosAdapter", lambda **kw: _make_mock_adapter())
         n = 300
-        h5 = _make_predix_hdf5(tmp_path, n=n)
+        h5 = _make_nexquant_hdf5(tmp_path, n=n)
         result = mod.build_kronos_factor(h5, context_bars=100, pred_bars=20, stride_bars=20, device="cpu")
         assert len(result) == n
 
@@ -165,7 +165,7 @@ class TestBuildKronosFactor:
         """Values within a predicted window should be forward-filled, not NaN."""
         import rdagent.components.coder.kronos_adapter as mod
         monkeypatch.setattr(mod, "KronosAdapter", lambda **kw: _make_mock_adapter())
-        h5 = _make_predix_hdf5(tmp_path, n=300)
+        h5 = _make_nexquant_hdf5(tmp_path, n=300)
         result = mod.build_kronos_factor(h5, context_bars=100, pred_bars=20, stride_bars=20, device="cpu")
         non_nan_ratio = result["KronosPredReturn"].notna().mean()
         assert non_nan_ratio > 0.5, f"Expected >50% non-NaN, got {non_nan_ratio:.2%}"
@@ -185,7 +185,7 @@ class TestEvaluateKronosModel:
     def test_returns_required_keys(self, tmp_path, monkeypatch):
         import rdagent.components.coder.kronos_adapter as mod
         monkeypatch.setattr(mod, "KronosAdapter", lambda **kw: _make_mock_adapter())
-        h5 = _make_predix_hdf5(tmp_path, n=400)
+        h5 = _make_nexquant_hdf5(tmp_path, n=400)
         metrics = mod.evaluate_kronos_model(h5, context_bars=100, pred_bars=20, stride_bars=20, device="cpu")
         for key in ["IC_mean", "IC_std", "IC_IR", "hit_rate", "n_predictions"]:
             assert key in metrics, f"Missing key: {key}"
@@ -193,14 +193,14 @@ class TestEvaluateKronosModel:
     def test_hit_rate_in_valid_range(self, tmp_path, monkeypatch):
         import rdagent.components.coder.kronos_adapter as mod
         monkeypatch.setattr(mod, "KronosAdapter", lambda **kw: _make_mock_adapter())
-        h5 = _make_predix_hdf5(tmp_path, n=400)
+        h5 = _make_nexquant_hdf5(tmp_path, n=400)
         metrics = mod.evaluate_kronos_model(h5, context_bars=100, pred_bars=20, stride_bars=20, device="cpu")
         assert 0.0 <= metrics["hit_rate"] <= 1.0
 
     def test_n_predictions_positive(self, tmp_path, monkeypatch):
         import rdagent.components.coder.kronos_adapter as mod
         monkeypatch.setattr(mod, "KronosAdapter", lambda **kw: _make_mock_adapter())
-        h5 = _make_predix_hdf5(tmp_path, n=400)
+        h5 = _make_nexquant_hdf5(tmp_path, n=400)
         metrics = mod.evaluate_kronos_model(h5, context_bars=100, pred_bars=20, stride_bars=20, device="cpu")
         assert metrics["n_predictions"] > 0
 
@@ -213,41 +213,41 @@ class TestCLICommands:
     def test_kronos_factor_missing_data_exits(self, tmp_path, monkeypatch):
         """kronos-factor exits with code 1 when HDF5 data is missing."""
         from typer.testing import CliRunner
-        import predix as predix_mod
+        import nexquant as nexquant_mod
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
-        result = runner.invoke(predix_mod.app, ["kronos-factor"])
+        result = runner.invoke(nexquant_mod.app, ["kronos-factor"])
         assert result.exit_code == 1
 
     def test_kronos_eval_missing_data_exits(self, tmp_path, monkeypatch):
         """kronos-eval exits with code 1 when HDF5 data is missing."""
         from typer.testing import CliRunner
-        import predix as predix_mod
+        import nexquant as nexquant_mod
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
-        result = runner.invoke(predix_mod.app, ["kronos-eval"])
+        result = runner.invoke(nexquant_mod.app, ["kronos-eval"])
         assert result.exit_code == 1
 
     def test_kronos_factor_runs_with_mock(self, tmp_path, monkeypatch):
         """kronos-factor completes and saves parquet + json when adapter is mocked."""
         from typer.testing import CliRunner
         import rdagent.components.coder.kronos_adapter as mod
-        import predix as predix_mod
+        import nexquant as nexquant_mod
 
         monkeypatch.setattr(mod, "KronosAdapter", lambda **kw: _make_mock_adapter())
 
         data_dir = tmp_path / "git_ignore_folder" / "factor_implementation_source_data"
         data_dir.mkdir(parents=True)
-        _make_predix_hdf5(data_dir.parent.parent, n=300)
+        _make_nexquant_hdf5(data_dir.parent.parent, n=300)
         h5_src = tmp_path / "intraday_pv.h5"
         # Put HDF5 where the CLI expects it
         import shutil
-        src = _make_predix_hdf5(tmp_path, n=300)
+        src = _make_nexquant_hdf5(tmp_path, n=300)
         shutil.copy(src, data_dir / "intraday_pv.h5")
 
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
-        result = runner.invoke(predix_mod.app, [
+        result = runner.invoke(nexquant_mod.app, [
             "kronos-factor", "--context", "100", "--pred", "20", "--device", "cpu"
         ])
         assert result.exit_code == 0, result.output
@@ -257,20 +257,20 @@ class TestCLICommands:
         """kronos-eval completes and prints IC metrics when adapter is mocked."""
         from typer.testing import CliRunner
         import rdagent.components.coder.kronos_adapter as mod
-        import predix as predix_mod
+        import nexquant as nexquant_mod
 
         monkeypatch.setattr(mod, "KronosAdapter", lambda **kw: _make_mock_adapter())
 
         data_dir = tmp_path / "git_ignore_folder" / "factor_implementation_source_data"
         data_dir.mkdir(parents=True)
-        _make_predix_hdf5(data_dir.parent.parent, n=400)
-        src = _make_predix_hdf5(tmp_path, n=400)
+        _make_nexquant_hdf5(data_dir.parent.parent, n=400)
+        src = _make_nexquant_hdf5(tmp_path, n=400)
         import shutil
         shutil.copy(src, data_dir / "intraday_pv.h5")
 
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
-        result = runner.invoke(predix_mod.app, [
+        result = runner.invoke(nexquant_mod.app, [
             "kronos-eval", "--context", "100", "--pred", "20", "--device", "cpu"
         ])
         assert result.exit_code == 0, result.output

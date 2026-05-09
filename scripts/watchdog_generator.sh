@@ -4,13 +4,13 @@
 # Checks every 20min: is the generator running? If not, (re)start it.
 # ============================================================================
 
-SCRIPT_DIR="/home/nico/Predix"
-GENERATOR="python ${SCRIPT_DIR}/predix_smart_strategy_gen.py"
+SCRIPT_DIR="/home/nico/NexQuant"
+GENERATOR="python ${SCRIPT_DIR}/nexquant_smart_strategy_gen.py"
 TARGET_COUNT=3
 LOGFILE="${SCRIPT_DIR}/results/logs/watchdog.log"
-LOCKFILE="/tmp/predix_generator.lock"
+LOCKFILE="/tmp/nexquant_generator.lock"
 MAX_ATTEMPTS=50  # Stop after this many attempts
-PIDFILE="/tmp/predix_generator_attempt.pid"
+PIDFILE="/tmp/nexquant_generator_attempt.pid"
 
 mkdir -p "${SCRIPT_DIR}/results/logs"
 
@@ -51,7 +51,7 @@ check_progress() {
 
 # Kill any existing generator processes
 cleanup() {
-    pkill -9 -f "predix_smart_strategy_gen.py" 2>/dev/null
+    pkill -9 -f "nexquant_smart_strategy_gen.py" 2>/dev/null
     rm -f "$LOCKFILE"
     log "Cleaned up old processes"
 }
@@ -63,7 +63,7 @@ if [ "$(get_attempt_count)" -ge "$MAX_ATTEMPTS" ]; then
 fi
 
 # Check if generator is running
-if pgrep -f "predix_smart_strategy_gen.py" > /dev/null 2>&1; then
+if pgrep -f "nexquant_smart_strategy_gen.py" > /dev/null 2>&1; then
     # Check if it's making progress
     if check_progress; then
         log "Generator is running and making progress. Exiting."

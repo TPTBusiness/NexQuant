@@ -123,9 +123,9 @@ class TestWebDashboard:
 
 
 class TestScriptsImportable:
-    def test_predix_full_eval(self):
+    def test_nexquant_full_eval(self):
         import importlib
-        spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/predix_full_eval.py")
+        spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/nexquant_full_eval.py")
         assert spec is not None
 
     def test_extract_results(self):
@@ -153,24 +153,24 @@ class TestScriptsImportable:
         spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/kronos_model_eval.py")
         assert spec is not None
 
-    def test_predix_add_risk_management(self):
+    def test_nexquant_add_risk_management(self):
         import importlib
-        spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/predix_add_risk_management.py")
+        spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/nexquant_add_risk_management.py")
         assert spec is not None
 
-    def test_predix_gen_strategies(self):
+    def test_nexquant_gen_strategies(self):
         import importlib
-        spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/predix_gen_strategies_real_bt.py")
+        spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/nexquant_gen_strategies_real_bt.py")
         assert spec is not None
 
-    def test_predix_quick_daytrading(self):
+    def test_nexquant_quick_daytrading(self):
         import importlib
-        spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/predix_quick_daytrading.py")
+        spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/nexquant_quick_daytrading.py")
         assert spec is not None
 
-    def test_predix_rebacktest_unified(self):
+    def test_nexquant_rebacktest_unified(self):
         import importlib
-        spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/predix_rebacktest_unified.py")
+        spec = importlib.util.spec_from_file_location("m", PROJECT_ROOT / "scripts/nexquant_rebacktest_unified.py")
         assert spec is not None
 
     def test_realistic_backtest_all(self):

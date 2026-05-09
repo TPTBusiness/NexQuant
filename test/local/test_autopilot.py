@@ -1,4 +1,4 @@
-"""Deep tests for predix_autopilot.py — property-based, mocks, edge cases.
+"""Deep tests for nexquant_autopilot.py — property-based, mocks, edge cases.
 
 Tests the core logic of the 24/7 strategy generator by mocking
 the StrategyOrchestrator at the correct import path.
@@ -39,14 +39,14 @@ class TestMainRound:
             "rdagent.scenarios.qlib.local.strategy_orchestrator.StrategyOrchestrator",
             side_effect=RuntimeError("no data"),
         ):
-            from scripts.predix_autopilot import main_round
+            from scripts.nexquant_autopilot import main_round
             result = main_round("daytrading", 1)
             assert result == 0
 
     def test_returns_zero_on_generate_failure(self, mock_orch):
         mock_cls, instance = mock_orch
         instance.generate_strategies.side_effect = RuntimeError("crash")
-        from scripts.predix_autopilot import main_round
+        from scripts.nexquant_autopilot import main_round
         result = main_round("daytrading", 1)
         assert result == 0
 
@@ -56,7 +56,7 @@ class TestMainRound:
             {"status": "accepted", "strategy_name": "s1", "sharpe_ratio": 0.5, "oos_sharpe": 0.3},
             {"status": "rejected", "strategy_name": "s2", "reason": "low"},
         ]
-        from scripts.predix_autopilot import main_round
+        from scripts.nexquant_autopilot import main_round
         result = main_round("daytrading", 1)
         assert result == 1
 
@@ -70,7 +70,7 @@ class TestMainRound:
             "status": "success", "sharpe_ratio": 0.95, "oos_sharpe": 0.65,
             "members": ["a", "b"],
         }
-        from scripts.predix_autopilot import main_round
+        from scripts.nexquant_autopilot import main_round
         main_round("daytrading", 1)
         instance.build_ensemble.assert_called_once()
 
@@ -80,7 +80,7 @@ class TestMainRound:
             {"status": "accepted", "strategy_name": "a", "sharpe_ratio": 0.5, "oos_sharpe": 0.3},
             {"status": "rejected", "strategy_name": "b", "reason": "no"},
         ]
-        from scripts.predix_autopilot import main_round
+        from scripts.nexquant_autopilot import main_round
         main_round("daytrading", 1)
         instance.build_ensemble.assert_not_called()
 
@@ -91,14 +91,14 @@ class TestMainRound:
             {"status": "accepted", "strategy_name": "b", "sharpe_ratio": 0.6, "oos_sharpe": 0.4},
         ]
         instance.build_ensemble.side_effect = RuntimeError("boom")
-        from scripts.predix_autopilot import main_round
+        from scripts.nexquant_autopilot import main_round
         result = main_round("daytrading", 1)
         assert result == 2  # Still counts accepted
 
     def test_empty_results_returns_zero(self, mock_orch):
         mock_cls, instance = mock_orch
         instance.generate_strategies.return_value = []
-        from scripts.predix_autopilot import main_round
+        from scripts.nexquant_autopilot import main_round
         result = main_round("daytrading", 1)
         assert result == 0
 
@@ -109,7 +109,7 @@ class TestMainRound:
             {"status": "accepted", "strategy_name": "b", "sharpe_ratio": 0.6, "oos_sharpe": 0.4},
         ]
         instance.build_ensemble.return_value = None
-        from scripts.predix_autopilot import main_round
+        from scripts.nexquant_autopilot import main_round
         result = main_round("daytrading", 1)
         assert result == 2
 
@@ -130,27 +130,27 @@ class TestMainRound:
                  "reason": "test"},
             ]
             mock_cls.return_value = instance
-            from scripts.predix_autopilot import main_round
+            from scripts.nexquant_autopilot import main_round
             result = main_round("daytrading", 1)
             assert isinstance(result, int) and result >= 0
 
 
 class TestConfig:
     def test_batch_size_positive(self):
-        from scripts import predix_autopilot
-        assert predix_autopilot.BATCH_SIZE > 0
+        from scripts import nexquant_autopilot
+        assert nexquant_autopilot.BATCH_SIZE > 0
 
     def test_optuna_trials_positive(self):
-        from scripts import predix_autopilot
-        assert predix_autopilot.OPTUNA_TRIALS > 0
+        from scripts import nexquant_autopilot
+        assert nexquant_autopilot.OPTUNA_TRIALS > 0
 
     def test_cooldown_positive(self):
-        from scripts import predix_autopilot
-        assert predix_autopilot.COOLDOWN > 0
+        from scripts import nexquant_autopilot
+        assert nexquant_autopilot.COOLDOWN > 0
 
     def test_max_consecutive_fails_positive(self):
-        from scripts import predix_autopilot
-        assert predix_autopilot.MAX_CONSECUTIVE_FAILS > 0
+        from scripts import nexquant_autopilot
+        assert nexquant_autopilot.MAX_CONSECUTIVE_FAILS > 0
 
 
 class TestStyleCycling:

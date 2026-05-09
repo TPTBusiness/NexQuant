@@ -1,4 +1,4 @@
-# Predix Parallel Run System
+# NexQuant Parallel Run System
 
 ## Overview
 
@@ -10,8 +10,8 @@ The Parallel Run System enables concurrent execution of 5+ factor generation exp
 
 | File | Purpose |
 |------|---------|
-| `predix.py` | Extended with `--run-id` parameter for isolated single runs |
-| `predix_parallel.py` | Parallel runner manager with Rich live dashboard |
+| `nexquant.py` | Extended with `--run-id` parameter for isolated single runs |
+| `nexquant_parallel.py` | Parallel runner manager with Rich live dashboard |
 | `factor_runner.py` | Modified to use `PARALLEL_RUN_ID` for path isolation |
 | `CoSTEER/__init__.py` | Modified to use `PARALLEL_RUN_ID` for intermediate results |
 
@@ -57,26 +57,26 @@ RD-Agent_workspace_run2/         # Parallel run #2
 
 ```bash
 # Run with isolated results
-predix quant --run-id 1 -m openrouter
+nexquant quant --run-id 1 -m openrouter
 ```
 
 ### CLI - Parallel Runner (Direct)
 
 ```bash
 # Run 5 experiments with 2 API keys
-python predix_parallel.py --runs 5 --api-keys 2
+python nexquant_parallel.py --runs 5 --api-keys 2
 
 # Run 3 experiments with local model
-python predix_parallel.py --runs 3 --model local
+python nexquant_parallel.py --runs 3 --model local
 
 # Custom configuration
-python predix_parallel.py -n 10 -k 2 -m openrouter
+python nexquant_parallel.py -n 10 -k 2 -m openrouter
 ```
 
 ### Programmatic Usage
 
 ```python
-from predix_parallel import main
+from nexquant_parallel import main
 
 result = main(runs=5, api_keys=2, model="openrouter")
 print(f"Success: {result['success']}/{result['total']}")
@@ -132,7 +132,7 @@ The parallel runner shows a Rich-based live dashboard:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  🔀 Predix Parallel Run Dashboard                       │
+│  🔀 NexQuant Parallel Run Dashboard                       │
 ├──────┬──────────┬──────────┬─────────┬──────────┬───────┤
 │ Run  │ Status   │ Elapsed  │ API Key │ Model    │ Exit  │
 ├──────┼──────────┼──────────┼─────────┼──────────┼───────┤
@@ -222,10 +222,10 @@ if parallel_run_id != "0":
 pytest test/integration/test_all_features.py -v
 
 # Test parallel runner imports
-python -c "from predix_parallel import ParallelRunner, main; print('✅ OK')"
+python -c "from nexquant_parallel import ParallelRunner, main; print('✅ OK')"
 
 # Test CLI options
-predix quant --help  # Should show --run-id option
+nexquant quant --help  # Should show --run-id option
 ```
 
 ## Future Enhancements

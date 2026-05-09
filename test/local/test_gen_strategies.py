@@ -1,4 +1,4 @@
-"""Deep tests for predix_gen_strategies_real_bt.py — property-based, edge cases.
+"""Deep tests for nexquant_gen_strategies_real_bt.py — property-based, edge cases.
 
 Tests factor loading, threshold rescaling, backtest runner, acceptance
 criteria, and the TeeFile logger — without requiring real OHLCV data or LLM.
@@ -27,7 +27,7 @@ from hypothesis import strategies as st
 @pytest.fixture
 def gen_module():
     import importlib
-    import scripts.predix_gen_strategies_real_bt as m
+    import scripts.nexquant_gen_strategies_real_bt as m
     return m
 
 
@@ -280,7 +280,7 @@ class TestConfiguration:
         """Daytrading config uses tighter risk limits."""
         os.environ["TRADING_STYLE"] = "daytrading"
         import importlib
-        import scripts.predix_gen_strategies_real_bt as m
+        import scripts.nexquant_gen_strategies_real_bt as m
         importlib.reload(m)
         assert m.MIN_IC == 0.02
         assert m.MIN_SHARPE == 0.5
@@ -289,7 +289,7 @@ class TestConfiguration:
     def test_swing_defaults(self):
         os.environ["TRADING_STYLE"] = "swing"
         import importlib
-        import scripts.predix_gen_strategies_real_bt as m
+        import scripts.nexquant_gen_strategies_real_bt as m
         importlib.reload(m)
         assert m.MIN_TRADES == 10
         assert m.MAX_DRAWDOWN == -0.30
