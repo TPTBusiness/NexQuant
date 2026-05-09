@@ -6,12 +6,12 @@ This project uses GitHub Issues to track bugs and feature requests. Please searc
 issues before filing new issues to avoid duplicates. For new issues, file your bug or
 feature request as a new Issue.
 
-- **Issues**: [https://github.com/PredixAI/predix/issues](https://github.com/PredixAI/predix/issues)
+- **Issues**: [https://github.com/NexQuantAI/nexquant/issues](https://github.com/NexQuantAI/nexquant/issues)
 
 For help and questions about using this project, please reach out via:
 
-- **Email**: nico@predix.io
-- **GitHub Discussions**: [https://github.com/PredixAI/predix/discussions](https://github.com/PredixAI/predix/discussions)
+- **Email**: nico@nexquant.io
+- **GitHub Discussions**: [https://github.com/NexQuantAI/nexquant/discussions](https://github.com/NexQuantAI/nexquant/discussions)
 
 ## Community Support
 

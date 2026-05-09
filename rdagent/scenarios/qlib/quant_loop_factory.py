@@ -1,5 +1,5 @@
 """
-Predix Quant Loop Factory - Selects appropriate workflow based on available components.
+NexQuant Quant Loop Factory - Selects appropriate workflow based on available components.
 
 This module is the entry point for the quantitative trading loop.
 It automatically selects between:

@@ -1,7 +1,7 @@
 # Bandit Security Scanner Configuration
 # Documentation: https://bandit.readthedocs.io/
 
-title: Bandit Security Scan for Predix
+title: Bandit Security Scan for NexQuant
 
 # Tests to skip (known false positives or acceptable risks)
 skips:

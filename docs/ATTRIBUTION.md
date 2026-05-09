@@ -1,6 +1,6 @@
 # Attribution Guidelines
 
-## Using Predix in Your Project
+## Using NexQuant in Your Project
 
 If you use code, concepts, or ideas from this project, you **must**:
 
@@ -11,8 +11,8 @@ Include the full MIT License text in your project's LICENSE file or documentatio
 ### 2. Include Copyright Notice
 
 ```
-Copyright (c) 2025 Predix Team
-Original Project: https://github.com/TPTBusiness/Predix
+Copyright (c) 2025 NexQuant Team
+Original Project: https://github.com/TPTBusiness/NexQuant
 ```
 
 ### 3. Provide Attribution
@@ -22,7 +22,7 @@ Add a notice in your documentation or README:
 ```markdown
 ## Acknowledgments
 
-This project uses code/concepts from [Predix](https://github.com/TPTBusiness/Predix), 
+This project uses code/concepts from [NexQuant](https://github.com/TPTBusiness/NexQuant), 
 licensed under the [MIT License](https://opensource.org/licenses/MIT).
 ```
 
@@ -33,7 +33,7 @@ If you modified the code:
 ```markdown
 ## Modifications
 
-Based on Predix (original by Predix Team).
+Based on NexQuant (original by NexQuant Team).
 Modified by [Your Name/Organization] on [Date].
 Changes: [Brief description of changes]
 ```
@@ -63,13 +63,13 @@ Changes: [Brief description of changes]
 ```markdown
 # My Trading Project
 
-This project uses factor generation concepts from [Predix](https://github.com/TPTBusiness/Predix).
+This project uses factor generation concepts from [NexQuant](https://github.com/TPTBusiness/NexQuant).
 
 ## License
 MIT License - see LICENSE file for details.
 
 ## Credits
-- Original Predix code by Predix Team (MIT License)
+- Original NexQuant code by NexQuant Team (MIT License)
 - Modified by John Doe, 2025
 ```
 

@@ -17,7 +17,7 @@ def create_fx_trader(llm):
 
 You have received reports from your team:
 
-FACTOR ANALYSIS (Predix RD-Agent):
+FACTOR ANALYSIS (NexQuant RD-Agent):
 {factor_report}
 
 SESSION ANALYSIS:

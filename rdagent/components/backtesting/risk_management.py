@@ -1,5 +1,5 @@
 """
-Predix Risk Management - Korrelation, Portfolio-Optimierung
+NexQuant Risk Management - Korrelation, Portfolio-Optimierung
 """
 
 import numpy as np

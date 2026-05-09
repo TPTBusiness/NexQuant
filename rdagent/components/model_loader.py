@@ -1,5 +1,5 @@
 """
-Predix Model Loader
+NexQuant Model Loader
 
 Loads models from:
 1. models/local/*.py (your improved models - not in Git)
@@ -23,7 +23,7 @@ from typing import Optional, Any
 
 
 # Base paths
-BASE_DIR = Path(__file__).parent.parent.parent  # Predix/
+BASE_DIR = Path(__file__).parent.parent.parent  # NexQuant/
 MODELS_DIR = BASE_DIR / "models"
 LOCAL_MODELS_DIR = MODELS_DIR / "local"
 STANDARD_MODELS_DIR = MODELS_DIR / "standard"

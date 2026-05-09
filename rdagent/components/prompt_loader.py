@@ -1,5 +1,5 @@
 """
-Predix Prompt Loader
+NexQuant Prompt Loader
 
 Loads prompts from:
 1. prompts/local/*.yaml (your improved prompts - not in Git)
@@ -22,7 +22,7 @@ from typing import Optional, Dict, Any
 
 
 # Base paths
-BASE_DIR = Path(__file__).parent.parent.parent  # Predix/
+BASE_DIR = Path(__file__).parent.parent.parent  # NexQuant/
 PROMPTS_DIR = BASE_DIR / "prompts"
 LOCAL_PROMPTS_DIR = PROMPTS_DIR / "local"
 STANDARD_PROMPTS_FILE = PROMPTS_DIR / "standard_prompts.yaml"

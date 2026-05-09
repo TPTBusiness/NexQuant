@@ -7,7 +7,7 @@ requires = [
 
 [project]
 authors = [
-  {email = "nico@predix.io", name = "Predix Team"},
+  {email = "nico@nexquant.io", name = "NexQuant Team"},
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -16,7 +16,7 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
 ]
-description = "Predix - AI-gestützter Quantitative Trading Agent für EUR/USD"
+description = "NexQuant - AI-gestützter Quantitative Trading Agent für EUR/USD"
 dynamic = [
   "dependencies",
   "optional-dependencies",
@@ -29,7 +29,7 @@ keywords = [
   "EUR/USD",
   "Forex",
 ]
-name = "predix"
+name = "nexquant"
 readme = "README.md"
 requires-python = ">=3.10"
 
@@ -37,8 +37,8 @@ requires-python = ">=3.10"
 rdagent = "rdagent.app.cli:app"
 
 [project.urls]
-homepage = "https://github.com/PredixAI/predix/"
-issue = "https://github.com/PredixAI/predix/issues"
+homepage = "https://github.com/NexQuantAI/nexquant/"
+issue = "https://github.com/NexQuantAI/nexquant/issues"
 
 [tool.coverage.report]
 fail_under = 80

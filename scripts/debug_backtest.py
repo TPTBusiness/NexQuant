@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-OHLCV_PATH = Path('/home/nico/Predix/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5')
-FACTORS_DIR = Path('/home/nico/Predix/results/factors')
+OHLCV_PATH = Path('/home/nico/NexQuant/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5')
+FACTORS_DIR = Path('/home/nico/NexQuant/results/factors')
 VALUES_DIR = FACTORS_DIR / 'values'
 
 print("=" * 70)

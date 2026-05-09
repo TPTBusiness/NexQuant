@@ -3,7 +3,7 @@ Trading Protection System
 
 Prevents excessive losses by automatically pausing trading when risk thresholds are exceeded.
 
-Inspired by common trading protection patterns, implemented from scratch for Predix.
+Inspired by common trading protection patterns, implemented from scratch for NexQuant.
 """
 
 from abc import ABC, abstractmethod

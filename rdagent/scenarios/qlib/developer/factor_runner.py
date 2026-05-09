@@ -969,7 +969,7 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
 
             # Run factor code on full data in a temp workspace
             import pandas as pd
-            with tempfile.TemporaryDirectory(prefix="predix_fullval_") as tmp_dir:
+            with tempfile.TemporaryDirectory(prefix="nexquant_fullval_") as tmp_dir:
                 tmp = Path(tmp_dir)
                 shutil.copy(str(factor_py), str(tmp / "factor.py"))
                 shutil.copy(str(full_data), str(tmp / "intraday_pv.h5"))

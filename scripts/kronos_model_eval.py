@@ -6,7 +6,7 @@ Computes IC (Information Coefficient) and hit rate for Kronos predictions
 vs actual realized returns. Results are printed for comparison with LightGBM.
 
 Usage:
-    conda activate predix
+    conda activate nexquant
     python scripts/kronos_model_eval.py
     python scripts/kronos_model_eval.py --pred 30 --context 512 --device cuda
 """

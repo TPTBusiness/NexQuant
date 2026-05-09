@@ -1,5 +1,5 @@
 """
-Predix Factor Auto-Fixer - Automatically patches common factor code issues.
+NexQuant Factor Auto-Fixer - Automatically patches common factor code issues.
 
 This module intercepts LLM-generated factor code and automatically fixes known problems:
 1. min_periods mismatch in rolling window calculations

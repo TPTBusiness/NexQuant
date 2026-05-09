@@ -1,4 +1,4 @@
-"""RL Trading Agent components for Predix.
+"""RL Trading Agent components for NexQuant.
 
 This package provides reinforcement learning trading capabilities.
 Works with or without stable-baselines3 (graceful fallback).

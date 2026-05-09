@@ -1,6 +1,6 @@
-# Predix Models
+# NexQuant Models
 
-This directory contains all ML model definitions for Predix trading factors.
+This directory contains all ML model definitions for NexQuant trading factors.
 
 ---
 
