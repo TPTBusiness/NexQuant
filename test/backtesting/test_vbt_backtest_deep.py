@@ -1,3 +1,4 @@
+
 """Deep property-based tests for the unified backtest engine.
 
 Extends test_vbt_backtest.py with hypothesis-based property tests,
@@ -10,8 +11,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from hypothesis import assume, given, settings
 from hypothesis import strategies as st
+from hypothesis import assume, given, settings
 from hypothesis.extra.numpy import arrays
 
 from rdagent.components.backtesting.vbt_backtest import (
