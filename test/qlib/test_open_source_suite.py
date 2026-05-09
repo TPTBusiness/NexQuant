@@ -16,10 +16,10 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 
-class TestPredixCLI:
+class TestNexQuantCLI:
     def test_cli_commands_available(self):
         import subprocess
-        r = subprocess.run([sys.executable, "predix.py", "--help"], capture_output=True, text=True, timeout=10)
+        r = subprocess.run([sys.executable, "nexquant.py", "--help"], capture_output=True, text=True, timeout=10)
         assert r.returncode == 0
         for cmd in ["evaluate", "top", "best", "portfolio", "build-strategies", "generate-strategies", "health"]:
             assert cmd in r.stdout.lower(), f"Missing command: {cmd}"

@@ -4,11 +4,11 @@
 # Restarts automatically on crash, generates strategies continuously.
 # ============================================================================
 
-SCRIPT_DIR="/home/nico/Predix"
-GENERATOR="python ${SCRIPT_DIR}/predix_smart_strategy_gen.py"
+SCRIPT_DIR="/home/nico/NexQuant"
+GENERATOR="python ${SCRIPT_DIR}/nexquant_smart_strategy_gen.py"
 TARGET_COUNT=3
 LOGFILE="${SCRIPT_DIR}/results/logs/generator_loop.log"
-PIDFILE="/tmp/predix_loop.pid"
+PIDFILE="/tmp/nexquant_loop.pid"
 
 echo $$ > "$PIDFILE"
 mkdir -p "${SCRIPT_DIR}/results/logs"
@@ -19,7 +19,7 @@ log() {
 
 cleanup() {
     log "Received termination signal. Cleaning up..."
-    pkill -f "predix_smart_strategy_gen.py" 2>/dev/null
+    pkill -f "nexquant_smart_strategy_gen.py" 2>/dev/null
     rm -f "$PIDFILE"
     log "Cleanup complete. Exiting."
     exit 0
@@ -53,7 +53,7 @@ while true; do
     log "📁 Existing strategies: ${STRAT_COUNT}"
     
     # Kill any stale processes
-    pkill -9 -f "predix_smart_strategy_gen.py" 2>/dev/null
+    pkill -9 -f "nexquant_smart_strategy_gen.py" 2>/dev/null
     sleep 2
     
     # Start generator

@@ -18,8 +18,8 @@ class TestContinuousGenerator:
     def test_module_imports(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location(
-            "predix_autopilot",
-            PROJECT_ROOT / "scripts/predix_autopilot.py",
+            "nexquant_autopilot",
+            PROJECT_ROOT / "scripts/nexquant_autopilot.py",
         )
         assert spec is not None
 
@@ -107,6 +107,6 @@ class TestAutopilotIntegration:
 
     def test_autopilot_pid_running(self):
         import os
-        result = os.system("pgrep -f predix_autopilot > /dev/null 2>&1")
+        result = os.system("pgrep -f nexquant_autopilot > /dev/null 2>&1")
         # 0 = running, 1 = not running — both are valid states
         assert result in (0, 1)

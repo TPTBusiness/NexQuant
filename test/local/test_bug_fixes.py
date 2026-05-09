@@ -15,8 +15,8 @@ Verifies:
 - strategy_orchestrator.py exec() exception logged at ERROR level
 - strategy_orchestrator.py template validation warns on unreplaced {{...}}
 - factor_runner.py IC_max guard against scalar (AttributeError)
-- predix_parallel.py handle leak on Popen failure
-- predix_rebacktest_strategies.py bare except replaced with except Exception
+- nexquant_parallel.py handle leak on Popen failure
+- nexquant_rebacktest_strategies.py bare except replaced with except Exception
 """
 
 import ast
@@ -228,32 +228,32 @@ class TestFactorRunnerICMaxGuard:
         )
 
 
-# ── Fix 13: predix_parallel.py handle leak ───────────────────────────────
+# ── Fix 13: nexquant_parallel.py handle leak ───────────────────────────────
 
 
 class TestParallelRunnerHandleLeak:
     def test_log_f_close_on_popen_failure(self):
         """Bug: open() file handle leaked if Popen failed."""
-        source = (REPO_ROOT / "scripts/predix_parallel.py").read_text()
+        source = (REPO_ROOT / "scripts/nexquant_parallel.py").read_text()
 
         # After fix, log_f.close() is called before re-raise
         assert "log_f.close()" in source, (
-            "predix_parallel.py should close log file handle on Popen failure"
+            "nexquant_parallel.py should close log file handle on Popen failure"
         )
 
 
-# ── Fix 14: predix_rebacktest_strategies.py bare except ──────────────────
+# ── Fix 14: nexquant_rebacktest_strategies.py bare except ──────────────────
 
 
 class TestRebacktestBareExcept:
     def test_not_bare_except(self):
         """Bug: bare except: pass swallowed all errors including SystemExit."""
-        source = (REPO_ROOT / "scripts/predix_rebacktest_strategies.py").read_text()
+        source = (REPO_ROOT / "scripts/nexquant_rebacktest_strategies.py").read_text()
 
         # After fix, should use except Exception, not bare except
         assert "except Exception:" in source
         assert "except:" not in source, (
-            "predix_rebacktest_strategies.py should not use bare except:"
+            "nexquant_rebacktest_strategies.py should not use bare except:"
         )
 
 

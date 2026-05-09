@@ -56,7 +56,7 @@ Current Date: {current_date}
 Live Macro Data:
 {macro_data}
 
-Factor Report from Predix RD-Agent:
+Factor Report from NexQuant RD-Agent:
 {factor_report}
 
 Analyze the macro environment and its impact on the proposed factor:

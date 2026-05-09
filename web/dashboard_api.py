@@ -1,5 +1,5 @@
 """
-Predix Dashboard API
+NexQuant Dashboard API
 
 Flask-Backend für das Web-Dashboard.
 Zeigt COMPLETE Progress von EURUSD Trading-Agent.
@@ -290,7 +290,7 @@ def get_full_dashboard():
 def index():
     """Root Endpoint - zeigt API-Info."""
     return jsonify({
-        "name": "Predix Dashboard API",
+        "name": "NexQuant Dashboard API",
         "version": "1.0.0",
         "description": "COMPLETE Progress Visualisierung für EURUSD Trading-Agent",
         "endpoints": {
@@ -307,7 +307,7 @@ def index():
 
 if __name__ == '__main__':
     print("="*60)
-    print("Predix Dashboard API")
+    print("NexQuant Dashboard API")
     print("="*60)
     print(f"Modules available: {MODULES_AVAILABLE}")
     print(f"Starting server on http://localhost:5000")

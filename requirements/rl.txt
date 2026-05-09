@@ -3,7 +3,7 @@
 # Install with: pip install -r requirements/rl.txt
 #
 # These dependencies are OPTIONAL.
-# The Predix RL trading system works without them using a simple momentum fallback.
+# The NexQuant RL trading system works without them using a simple momentum fallback.
 #
 # Only install if you want to use full PPO/A2C/SAC training.
 

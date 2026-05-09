@@ -26,7 +26,7 @@ Die Pakete sind in `requirements.txt` enthalten.
 ### Alle Tests ausführen
 
 ```bash
-cd /home/nico/Predix
+cd /home/nico/NexQuant
 pytest test/backtesting/
 ```
 
@@ -226,8 +226,8 @@ Für GitHub Actions oder andere CI/CD-Systeme:
 
 ```bash
 # Stelle sicher dass du im Projekt-Verzeichnis bist
-cd /home/nico/Predix
-export PYTHONPATH=/home/nico/Predix:$PYTHONPATH
+cd /home/nico/NexQuant
+export PYTHONPATH=/home/nico/NexQuant:$PYTHONPATH
 pytest test/backtesting/
 ```
 
