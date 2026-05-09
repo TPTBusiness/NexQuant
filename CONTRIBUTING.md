@@ -1,6 +1,6 @@
-# Contributing to Predix
+# Contributing to NexQuant
 
-We welcome contributions and suggestions to improve Predix. Whether it's solving an issue, addressing a bug, enhancing documentation, or even correcting a typo, every contribution is valuable and helps improve the project.
+We welcome contributions and suggestions to improve NexQuant. Whether it's solving an issue, addressing a bug, enhancing documentation, or even correcting a typo, every contribution is valuable and helps improve the project.
 
 ## Getting Started
 
@@ -15,11 +15,11 @@ grep -r "TODO:"
 
 ```bash
 # Fork the repository on GitHub, then clone your fork
-git clone https://github.com/YOUR-USERNAME/Predix.git
-cd Predix
+git clone https://github.com/YOUR-USERNAME/NexQuant.git
+cd NexQuant
 
 # Add upstream remote
-git remote add upstream https://github.com/TPTBusiness/Predix.git
+git remote add upstream https://github.com/TPTBusiness/NexQuant.git
 ```
 
 ### 2. Create a Branch
@@ -141,7 +141,7 @@ All PRs are reviewed by maintainers. Expect:
 ## Project Structure
 
 ```
-Predix/
+NexQuant/
 ├── rdagent/                 # Core framework (open source)
 │   ├── app/                 # CLI and scenario apps
 │   ├── components/          # Reusable agent components
@@ -157,8 +157,8 @@ Predix/
 
 ## Need Help?
 
-- **Issues**: [GitHub Issues](https://github.com/TPTBusiness/Predix/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/TPTBusiness/Predix/discussions)
+- **Issues**: [GitHub Issues](https://github.com/TPTBusiness/NexQuant/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/TPTBusiness/NexQuant/discussions)
 - **Documentation**: See `docs/` folder
 
 ## License

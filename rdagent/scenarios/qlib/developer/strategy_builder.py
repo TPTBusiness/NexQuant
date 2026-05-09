@@ -1,5 +1,5 @@
 """
-Predix Strategy Builder - Systematically combine factors into trading strategies.
+NexQuant Strategy Builder - Systematically combine factors into trading strategies.
 
 This module:
 1. Loads evaluated factors with time-series values
@@ -8,9 +8,9 @@ This module:
 4. Ranks and saves best strategies
 
 Usage:
-    predix build-strategies              # Build strategies from top factors
-    predix build-strategies --top 50     # Use top 50 factors
-    predix build-strategies --max-combo 3  # Allow up to 3-factor combinations
+    nexquant build-strategies              # Build strategies from top factors
+    nexquant build-strategies --top 50     # Use top 50 factors
+    nexquant build-strategies --max-combo 3  # Allow up to 3-factor combinations
 """
 
 import json

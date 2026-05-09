@@ -1,1 +1,1 @@
-"""Predix Backtesting Test Package"""
+"""NexQuant Backtesting Test Package"""

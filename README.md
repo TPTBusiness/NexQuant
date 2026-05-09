@@ -1,4 +1,4 @@
-# Predix
+# NexQuant
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%20|%203.11-blue?style=for-the-badge&logo=python" alt="Python">
@@ -27,17 +27,17 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/TPTBusiness/Predix/actions/workflows/ci.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/TPTBusiness/Predix/ci.yml?branch=master&label=CI&logo=github&style=flat-square" alt="CI Status">
+  <a href="https://github.com/TPTBusiness/NexQuant/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/TPTBusiness/NexQuant/ci.yml?branch=master&label=CI&logo=github&style=flat-square" alt="CI Status">
   </a>
-  <a href="https://github.com/TPTBusiness/Predix/actions/workflows/codacy.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/TPTBusiness/Predix/codacy.yml?branch=master&label=Security&logo=shield&style=flat-square" alt="Security Scan">
+  <a href="https://github.com/TPTBusiness/NexQuant/actions/workflows/codacy.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/TPTBusiness/NexQuant/codacy.yml?branch=master&label=Security&logo=shield&style=flat-square" alt="Security Scan">
   </a>
-  <a href="https://codecov.io/gh/TPTBusiness/Predix">
-    <img src="https://img.shields.io/codecov/c/github/TPTBusiness/Predix?style=flat-square&logo=codecov" alt="Coverage">
+  <a href="https://codecov.io/gh/TPTBusiness/NexQuant">
+    <img src="https://img.shields.io/codecov/c/github/TPTBusiness/NexQuant?style=flat-square&logo=codecov" alt="Coverage">
   </a>
-  <a href="https://github.com/TPTBusiness/Predix/blob/master/LICENSE">
-    <img src="https://img.shields.io/github/license/TPTBusiness/Predix?style=flat-square" alt="License">
+  <a href="https://github.com/TPTBusiness/NexQuant/blob/master/LICENSE">
+    <img src="https://img.shields.io/github/license/TPTBusiness/NexQuant?style=flat-square" alt="License">
   </a>
   <a href="https://www.conventionalcommits.org/">
     <img src="https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow?style=flat-square" alt="Conventional Commits">
@@ -45,17 +45,17 @@
   <a href="https://github.com/astral-sh/ruff">
     <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=flat-square" alt="Ruff">
   </a>
-  <a href="https://github.com/TPTBusiness/Predix/stargazers">
-    <img src="https://img.shields.io/github/stars/TPTBusiness/Predix?style=flat-square" alt="Stars">
+  <a href="https://github.com/TPTBusiness/NexQuant/stargazers">
+    <img src="https://img.shields.io/github/stars/TPTBusiness/NexQuant?style=flat-square" alt="Stars">
   </a>
-  <a href="https://github.com/TPTBusiness/Predix/forks">
-    <img src="https://img.shields.io/github/forks/TPTBusiness/Predix?style=flat-square" alt="Forks">
+  <a href="https://github.com/TPTBusiness/NexQuant/forks">
+    <img src="https://img.shields.io/github/forks/TPTBusiness/NexQuant?style=flat-square" alt="Forks">
   </a>
-  <a href="https://github.com/TPTBusiness/Predix/issues">
-    <img src="https://img.shields.io/github/issues/TPTBusiness/Predix?style=flat-square" alt="Issues">
+  <a href="https://github.com/TPTBusiness/NexQuant/issues">
+    <img src="https://img.shields.io/github/issues/TPTBusiness/NexQuant?style=flat-square" alt="Issues">
   </a>
-  <a href="https://github.com/TPTBusiness/Predix/commits/master">
-    <img src="https://img.shields.io/github/last-commit/TPTBusiness/Predix?style=flat-square" alt="Last Commit">
+  <a href="https://github.com/TPTBusiness/NexQuant/commits/master">
+    <img src="https://img.shields.io/github/last-commit/TPTBusiness/NexQuant?style=flat-square" alt="Last Commit">
   </a>
 </p>
 
@@ -64,18 +64,18 @@
 ## 🖥️ CLI Dashboard
 
 ```bash
-rdagent predix
+rdagent nexquant
 ```
 
-![Predix CLI Welcome Screen](docs/cli-welcome-screen.png)
+![NexQuant CLI Welcome Screen](docs/cli-welcome-screen.png)
 
-*The Predix CLI shows system status, available commands, and quick start guide.*
+*The NexQuant CLI shows system status, available commands, and quick start guide.*
 
 ---
 
 ## Overview
 
-**Predix** is an autonomous AI agent for quantitative trading strategies in the EUR/USD forex market. Built on a multi-agent framework, Predix automates the full research and development cycle:
+**NexQuant** is an autonomous AI agent for quantitative trading strategies in the EUR/USD forex market. Built on a multi-agent framework, NexQuant automates the full research and development cycle:
 
 - 📊 **Factor Generation** — LLM proposes novel alpha factors; Kronos foundation model generates OHLCV-based predictions
 - 💡 **Strategy Discovery** — Autopilot generates + backtests trading strategies 24/7
@@ -83,7 +83,7 @@ rdagent predix
 - 📈 **Backtesting** — Unified engine with 10 runtime invariants on 1-min EUR/USD data (2020–2026)
 - 🔄 **Auto-Restart** — All services run as daemons with automatic crash recovery
 
-Predix is optimized for **1-minute EUR/USD FX data** (2020–2026) and supports both local LLMs (llama.cpp) and cloud backends (OpenRouter).
+NexQuant is optimized for **1-minute EUR/USD FX data** (2020–2026) and supports both local LLMs (llama.cpp) and cloud backends (OpenRouter).
 
 > **Backtest Verification**: Every backtest result is automatically verified at runtime against mathematical invariants (MaxDD ∈ [-1,0], WinRate ∈ [0,1], Sharpe finite, sign consistency, etc.). 1125 collected tests with deep property-based, fuzzing, and hypothesis tests ensure metric correctness. See [Backtest Integrity](#backtest-integrity).
 
@@ -99,7 +99,7 @@ Special thanks to:
 
 - **[ai-hedge-fund](https://github.com/virattt/ai-hedge-fund)** - Inspiration for macro analysis (Stanley Druckenmiller agent), risk management concepts, and market regime detection.
 
-All code in Predix is originally written and implemented independently. Predix extends these frameworks with EUR/USD forex-specific features, 1-minute backtesting capabilities, comprehensive risk management, and trading dashboards.
+All code in NexQuant is originally written and implemented independently. NexQuant extends these frameworks with EUR/USD forex-specific features, 1-minute backtesting capabilities, comprehensive risk management, and trading dashboards.
 
 ---
 
@@ -129,12 +129,12 @@ All code in Predix is originally written and implemented independently. Predix e
 
 ```bash
 # Clone repository
-git clone https://github.com/TPTBusiness/Predix
-cd Predix
+git clone https://github.com/TPTBusiness/NexQuant
+cd NexQuant
 
 # Create and activate conda environment
-conda create -n predix python=3.10 -y
-conda activate predix
+conda create -n nexquant python=3.10 -y
+conda activate nexquant
 
 # Install in editable mode
 pip install -e .
@@ -143,14 +143,14 @@ pip install -e .
 docker run --rm hello-world
 ```
 
-> **Important:** Predix requires a conda environment to manage dependencies properly.
+> **Important:** NexQuant requires a conda environment to manage dependencies properly.
 > Using plain Python or other environment managers may cause conflicts.
 
 ---
 
 ## Data Setup
 
-Predix requires **1-minute EUR/USD OHLCV data** in HDF5 format. This is a hard prerequisite — the system cannot run without it.
+NexQuant requires **1-minute EUR/USD OHLCV data** in HDF5 format. This is a hard prerequisite — the system cannot run without it.
 
 ### Step 1: Get the data
 
@@ -266,7 +266,7 @@ market_context:
 
 ## No GPU? Use OpenRouter
 
-If you don't have a CUDA-capable GPU, you can run Predix using [OpenRouter](https://openrouter.ai) for LLM inference — no local model download required.
+If you don't have a CUDA-capable GPU, you can run NexQuant using [OpenRouter](https://openrouter.ai) for LLM inference — no local model download required.
 
 **1. Set up `.env` for OpenRouter:**
 
@@ -293,7 +293,7 @@ rdagent fin_quant --model openrouter
 **4. Parallel runs** (uses API concurrency instead of GPU slots):
 
 ```bash
-python predix_parallel.py --runs 5 --api-keys 1 -m openrouter
+python nexquant_parallel.py --runs 5 --api-keys 1 -m openrouter
 ```
 
 > Ollama is still required for embeddings even in the OpenRouter path. Install from [ollama.com](https://ollama.com) and run `ollama pull nomic-embed-text` once.
@@ -318,7 +318,7 @@ curl http://localhost:8081/health
 ### 1. Run Trading Loop
 
 ```bash
-conda activate predix
+conda activate nexquant
 rdagent fin_quant
 # or with explicit options:
 rdagent fin_quant --loop-n 5 --step-n 2
@@ -332,7 +332,7 @@ rdagent server_ui --port 19899 --log-dir git_ignore_folder/RD-Agent_workspace/
 # then open http://127.0.0.1:19899
 
 # Best strategies so far
-python predix.py best
+python nexquant.py best
 ```
 
 ### 3. Run Continuously (Auto-Restart)
@@ -344,7 +344,7 @@ python predix.py best
 nohup bash -c 'while true; do rdagent fin_quant --loop-n 10 --model local >> /tmp/fin_quant_daemon.log 2>&1; sleep 10; done' &
 
 # Autopilot — 24/7 strategy generator (Kronos factors auto-selected)
-nohup python scripts/predix_autopilot.py >> /tmp/autopilot_daemon.log 2>&1 &
+nohup python scripts/nexquant_autopilot.py >> /tmp/autopilot_daemon.log 2>&1 &
 
 # Live Trader — FTMO FIX API (requires credentials)
 nohup python git_ignore_folder/live_trading/ftmo_live_trader.py >> ftmo_live_trader.log 2>&1 &
@@ -369,13 +369,13 @@ nohup python git_ignore_folder/live_trading/ftmo_live_trader.py >> ftmo_live_tra
 
 | Command | Description |
 |---------|-------------|
-| `python predix.py best` | Show top strategies by composite score |
-| `python predix.py best -n 20 -m sharpe` | Top 20 by Sharpe ratio |
-| `python predix.py best --show NAME` | Full metadata for one strategy |
-| `python predix_gen_strategies_real_bt.py 10` | Generate 10 strategies with LLM + real OHLCV backtest |
-| `python predix_gen_strategies_real_bt.py 20` | Generate 20 strategies (parallel workers) |
-| `python scripts/predix_autopilot.py` | 24/7 Auto-Pilot: endless strategy generation |
-| `python predix_continuous_strategies.py` | Continuous generation with ML training
+| `python nexquant.py best` | Show top strategies by composite score |
+| `python nexquant.py best -n 20 -m sharpe` | Top 20 by Sharpe ratio |
+| `python nexquant.py best --show NAME` | Full metadata for one strategy |
+| `python nexquant_gen_strategies_real_bt.py 10` | Generate 10 strategies with LLM + real OHLCV backtest |
+| `python nexquant_gen_strategies_real_bt.py 20` | Generate 20 strategies (parallel workers) |
+| `python scripts/nexquant_autopilot.py` | 24/7 Auto-Pilot: endless strategy generation |
+| `python nexquant_continuous_strategies.py` | Continuous generation with ML training
 
 ### Kronos Foundation Model
 
@@ -390,16 +390,16 @@ Kronos runs automatically — no separate command needed. Factors are regenerate
 
 | Command | Description |
 |---------|-------------|
-| `python predix.py evaluate --all` | Evaluate all generated factors |
-| `python predix.py top -n 20` | Show top 20 factors by IC |
-| `python predix.py portfolio-simple` | Simple portfolio optimization |
+| `python nexquant.py evaluate --all` | Evaluate all generated factors |
+| `python nexquant.py top -n 20` | Show top 20 factors by IC |
+| `python nexquant.py portfolio-simple` | Simple portfolio optimization |
 
 ### Parallel Execution
 
 | Command | Description |
 |---------|-------------|
-| `python predix_parallel.py --runs 5 --api-keys 1 -m openrouter` | Run 5 parallel factor evolutions |
-| `python predix_parallel.py --runs 20 --api-keys 2 -m openrouter` | Run 20 runs with 2 API keys |
+| `python nexquant_parallel.py --runs 5 --api-keys 1 -m openrouter` | Run 5 parallel factor evolutions |
+| `python nexquant_parallel.py --runs 20 --api-keys 2 -m openrouter` | Run 20 runs with 2 API keys |
 
 ### Monitoring & Debug
 
@@ -407,8 +407,8 @@ Kronos runs automatically — no separate command needed. Factors are regenerate
 |---------|-------------|
 | `rdagent server_ui --port 19899 --log-dir <path>` | Start web dashboard |
 | `rdagent health_check` | Validate environment setup |
-| `python predix_batch_backtest.py` | Batch backtest multiple factors |
-| `python predix_rebacktest_strategies.py` | Re-backtest existing strategies |
+| `python nexquant_batch_backtest.py` | Batch backtest multiple factors |
+| `python nexquant_rebacktest_strategies.py` | Re-backtest existing strategies |
 
 ---
 
@@ -416,7 +416,7 @@ Kronos runs automatically — no separate command needed. Factors are regenerate
 
 ### 🔄 Iterative Factor Evolution
 
-Predix continuously proposes, implements, and validates new alpha factors:
+NexQuant continuously proposes, implements, and validates new alpha factors:
 
 - Learns from backtest feedback
 - Avoids overfitting through walk-forward validation
@@ -458,7 +458,7 @@ Real-time dashboard for monitoring:
 
 ### 🤖 Kronos Foundation Model Integration
 
-Predix integrates Kronos — an OHLCV foundation model from the NeoQuasar team (AAAI 2026, **MIT License**) — for alpha factor generation:
+NexQuant integrates Kronos — an OHLCV foundation model from the NeoQuasar team (AAAI 2026, **MIT License**) — for alpha factor generation:
 
 | Model | Params | p24 IC | Best For |
 |-------|--------|--------|----------|
@@ -496,7 +496,7 @@ Automated quality assurance:
 ## Project Structure
 
 ```
-predix/
+nexquant/
 ├── rdagent/                 # Core agent framework
 │   ├── app/                 # CLI and scenario apps
 │   │   └── qlib_rd_loop/    # Quant R&D loop (factor + model generation)
@@ -518,12 +518,12 @@ predix/
 │   ├── scenarios/           # Domain-specific scenarios (qlib, kaggle, rl)
 │   └── utils/               # Utilities
 ├── scripts/                 # Daily operation scripts
-│   ├── predix_autopilot.py          # 24/7 auto strategy generator
-│   ├── predix_gen_strategies_real_bt.py  # Parallel strategy generation
-│   ├── predix_parallel.py           # Multi-instance parallel R&D
-│   ├── predix_continuous_strategies.py  # Continuous strategy generation
-│   ├── predix_fast_rebacktest.py    # Fast strategy re-evaluation
-│   └── predix_rebacktest_parent.py  # Parallel rebacktest orchestrator
+│   ├── nexquant_autopilot.py          # 24/7 auto strategy generator
+│   ├── nexquant_gen_strategies_real_bt.py  # Parallel strategy generation
+│   ├── nexquant_parallel.py           # Multi-instance parallel R&D
+│   ├── nexquant_continuous_strategies.py  # Continuous strategy generation
+│   ├── nexquant_fast_rebacktest.py    # Fast strategy re-evaluation
+│   └── nexquant_rebacktest_parent.py  # Parallel rebacktest orchestrator
 ├── test/                    # Test suite (1,125+ collected)
 │   ├── backtesting/         # Backtest engine deep tests
 │   ├── qlib/                # Quant loop, factor, model tests
@@ -581,7 +581,7 @@ For major changes, please open an issue first to discuss your approach.
 
 ## Citation
 
-If you use Predix in your research, please cite the underlying framework:
+If you use NexQuant in your research, please cite the underlying framework:
 
 ```bibtex
 @misc{yang2025rdagentllmagentframeworkautonomous,
@@ -598,7 +598,7 @@ If you use Predix in your research, please cite the underlying framework:
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/TPTBusiness/Predix/issues)
+- **Issues**: [GitHub Issues](https://github.com/TPTBusiness/NexQuant/issues)
 
 ---
 
@@ -630,7 +630,7 @@ pytest test/backtesting/ -q # backtest engine deep tests
 
 ## Disclaimer
 
-Predix is provided "as is" for **research and educational purposes only**. It is **not** intended for:
+NexQuant is provided "as is" for **research and educational purposes only**. It is **not** intended for:
 
 - Live trading or financial advice
 - Production use without thorough testing

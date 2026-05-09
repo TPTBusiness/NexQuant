@@ -1,5 +1,5 @@
 """
-Integration Tests for Full Predix Pipeline (P6-P9)
+Integration Tests for Full NexQuant Pipeline (P6-P9)
 
 Tests the complete end-to-end pipeline including:
 - Feedback Loop Integration (P6)

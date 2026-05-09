@@ -10,9 +10,9 @@ import subprocess
 
 latest_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"], text=True).strip()
 
-project = "Predix"
-copyright = "2025, Predix Team"
-author = "Predix Team"
+project = "NexQuant"
+copyright = "2025, NexQuant Team"
+author = "NexQuant Team"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -66,7 +66,7 @@ html_static_path = ["_static"]
 html_favicon = "_static/favicon.ico"
 
 html_theme_options = {
-    "source_repository": "https://github.com/PredixAI/predix",
+    "source_repository": "https://github.com/NexQuantAI/nexquant",
     "source_branch": "main",
     "source_directory": "docs/",
 }

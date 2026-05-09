@@ -1,5 +1,5 @@
 """
-Predix CLI Welcome Screen - Beautiful dashboard for GitHub README screenshot.
+NexQuant CLI Welcome Screen - Beautiful dashboard for GitHub README screenshot.
 """
 
 import os
@@ -16,7 +16,7 @@ from datetime import datetime
 console = Console()
 
 def show_welcome():
-    """Show beautiful Predix welcome screen."""
+    """Show beautiful NexQuant welcome screen."""
     
     # Header
     console.print()
@@ -89,7 +89,7 @@ def show_welcome():
     console.print()
     
     # Footer
-    footer = Text("📄 github.com/TPTBusiness/Predix  •  🔒 MIT License  •  📖 docs/", style="dim white")
+    footer = Text("📄 github.com/TPTBusiness/NexQuant  •  🔒 MIT License  •  📖 docs/", style="dim white")
     console.print(Align.center(footer))
     console.print()
 
@@ -98,5 +98,5 @@ if __name__ == "__main__":
 
 
 def main():
-    """Entry point for 'predix' CLI command."""
+    """Entry point for 'nexquant' CLI command."""
     show_welcome()

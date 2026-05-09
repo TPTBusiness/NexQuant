@@ -1,5 +1,5 @@
 """
-Trading Protection System for Predix.
+Trading Protection System for NexQuant.
 
 Prevents excessive losses by automatically pausing trading
 when risk thresholds are exceeded.

@@ -5,7 +5,7 @@ Gym-compatible environment for training RL trading agents.
 Supports single-asset (EUR/USD) trading with technical indicators
 and portfolio state as observations.
 
-Inspired by common RL trading environment patterns, implemented from scratch for Predix.
+Inspired by common RL trading environment patterns, implemented from scratch for NexQuant.
 """
 
 import gymnasium as gym

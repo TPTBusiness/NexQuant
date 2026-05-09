@@ -127,8 +127,8 @@ jupyter notebook examples/notebooks/quickstart.ipynb
 
 - **Dokumentation:** `docs/` oder [README.md](../README.md)
 - **CLI Hilfe:** `rdagent COMMAND --help`
-- **Issues:** [GitHub Issues](https://github.com/nico/Predix/issues)
-- **Community:** [Discussions](https://github.com/nico/Predix/discussions)
+- **Issues:** [GitHub Issues](https://github.com/nico/NexQuant/issues)
+- **Community:** [Discussions](https://github.com/nico/NexQuant/discussions)
 
 ## ⚠️ Wichtige Hinweise
 

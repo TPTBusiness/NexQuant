@@ -294,7 +294,7 @@ def fin_quant_cli(
     # Start CLI Dashboard wenn gewünscht
     if with_cli_dashboard:
         def start_cli_dash():
-            from rdagent.log.ui.predix_dashboard import run_dashboard
+            from rdagent.log.ui.nexquant_dashboard import run_dashboard
             run_dashboard(log_path="fin_quant.log", refresh_interval=3)
 
         cli_thread = threading.Thread(target=start_cli_dash, daemon=True)
@@ -1262,9 +1262,9 @@ def start_loop_cli(
     from datetime import datetime
 
     script_dir = str(Path(__file__).parent.parent.parent)
-    generator = [sys.executable, f"{script_dir}/scripts/predix_smart_strategy_gen.py"]
+    generator = [sys.executable, f"{script_dir}/scripts/nexquant_smart_strategy_gen.py"]
     logfile = f"{script_dir}/results/logs/generator_loop.log"
-    pidfile = "/tmp/predix_loop.pid"  # nosec B108 — administrative PID file, single-process daemon
+    pidfile = "/tmp/nexquant_loop.pid"  # nosec B108 — administrative PID file, single-process daemon
 
     os.makedirs(f"{script_dir}/results/logs", exist_ok=True)
 
@@ -1418,7 +1418,7 @@ def parallel_cli(
     from rdagent.log import daily_log as _dlog
 
     project_root = Path(__file__).parent.parent.parent
-    script = project_root / "scripts" / "predix_parallel.py"
+    script = project_root / "scripts" / "nexquant_parallel.py"
 
     if not script.exists():
         typer.echo(f"❌ Script not found: {script}")
@@ -1469,7 +1469,7 @@ def eval_all_cli(
     from rdagent.log import daily_log as _dlog
 
     project_root = Path(__file__).parent.parent.parent
-    script = project_root / "scripts" / "predix_full_eval.py"
+    script = project_root / "scripts" / "nexquant_full_eval.py"
 
     if not script.exists():
         typer.echo(f"❌ Script not found: {script}")
@@ -1522,7 +1522,7 @@ def batch_backtest_cli(
     from pathlib import Path
 
     project_root = Path(__file__).parent.parent.parent
-    script = project_root / "scripts" / "predix_batch_backtest.py"
+    script = project_root / "scripts" / "nexquant_batch_backtest.py"
 
     if not script.exists():
         typer.echo(f"❌ Script not found: {script}")
@@ -1574,7 +1574,7 @@ def simple_eval_cli(
     from pathlib import Path
 
     project_root = Path(__file__).parent.parent.parent
-    script = project_root / "scripts" / "predix_simple_eval.py"
+    script = project_root / "scripts" / "nexquant_simple_eval.py"
 
     if not script.exists():
         typer.echo(f"❌ Script not found: {script}")
@@ -1620,7 +1620,7 @@ def rebacktest_cli(
     from pathlib import Path
 
     project_root = Path(__file__).parent.parent.parent
-    script = project_root / "scripts" / "predix_rebacktest_strategies.py"
+    script = project_root / "scripts" / "nexquant_rebacktest_strategies.py"
 
     if not script.exists():
         typer.echo(f"❌ Script not found: {script}")
@@ -1673,7 +1673,7 @@ def report_cli(
     from pathlib import Path
 
     project_root = Path(__file__).parent.parent.parent
-    script = project_root / "scripts" / "predix_strategy_report.py"
+    script = project_root / "scripts" / "nexquant_strategy_report.py"
 
     if not script.exists():
         typer.echo(f"❌ Script not found: {script}")
@@ -1697,10 +1697,10 @@ def report_cli(
 
 
 
-@app.command(name="predix")
-def predix_welcome():
+@app.command(name="nexquant")
+def nexquant_welcome():
     """
-    Show Predix welcome screen with system overview.
+    Show NexQuant welcome screen with system overview.
     
     This command displays a beautiful dashboard showing:
     - System status (factors, strategies, security)
@@ -1710,7 +1710,7 @@ def predix_welcome():
     Perfect for GitHub README screenshots!
     
     Examples:
-      rdagent predix
+      rdagent nexquant
     """
     from rdagent.app.cli_welcome import show_welcome
     show_welcome()

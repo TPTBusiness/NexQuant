@@ -14,7 +14,7 @@ FTMO 100k rules enforced:
 Out-of-sample window: 2024-01-01 onwards (never seen during factor research).
 
 Usage:
-    conda activate predix
+    conda activate nexquant
     python scripts/realistic_backtest_all.py
     python scripts/realistic_backtest_all.py --target-monthly 4.0 --min-trades 50
     python scripts/realistic_backtest_all.py --workers 8

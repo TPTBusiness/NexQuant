@@ -1,5 +1,5 @@
 """
-Predix Backtesting Test Fixtures
+NexQuant Backtesting Test Fixtures
 Wiederverwendbare Test-Daten und Fixtures für alle Backtesting-Tests
 """
 import pytest

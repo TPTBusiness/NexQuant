@@ -1,6 +1,6 @@
-# Predix Prompts Index
+# NexQuant Prompts Index
 
-Centralized location for all LLM prompts used in the Predix trading system.
+Centralized location for all LLM prompts used in the NexQuant trading system.
 
 ## Structure
 

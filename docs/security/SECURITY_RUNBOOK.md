@@ -1,4 +1,4 @@
-# Security Runbook für Predix
+# Security Runbook für NexQuant
 
 ## Bandit Security Scanner
 

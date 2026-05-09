@@ -1,5 +1,5 @@
 """
-Shared fixtures for Predix integration tests.
+Shared fixtures for NexQuant integration tests.
 Provides common test data, mock objects, and utilities.
 """
 import pytest

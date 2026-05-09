@@ -643,14 +643,14 @@ class TestStrategySaver:
                 'passed': True,
                 'checks': {},
             },
-            metadata={'version': '1.0', 'author': 'Predix'},
+            metadata={'version': '1.0', 'author': 'NexQuant'},
         )
 
         with open(filepath) as f:
             data = json.load(f)
 
         assert data['metadata']['version'] == '1.0'
-        assert data['metadata']['author'] == 'Predix'
+        assert data['metadata']['author'] == 'NexQuant'
 
     def test_save_strategy_with_llm_response(self, strategy_saver):
         """Test saving strategy with LLM response preview."""
