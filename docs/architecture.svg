@@ -1,5 +1,5 @@
 <svg width="100%" viewBox="0 0 680 920" xmlns="http://www.w3.org/2000/svg" role="img">
-<title>Predix data flow architecture</title>
+<title>NexQuant data flow architecture</title>
 <desc>Full pipeline from Qlib data source through R&D loop, factor and model tracks, strategy generation, portfolio optimization, to live trading.</desc>
 
 <defs>

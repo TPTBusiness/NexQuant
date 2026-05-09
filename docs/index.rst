@@ -1,13 +1,13 @@
-.. Predix documentation master file, created by
+.. NexQuant documentation master file, created by
    sphinx-quickstart on Mon Jul 15 04:27:50 2024.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to Predix's documentation!
+Welcome to NexQuant's documentation!
 ===================================
 
 .. image:: _static/logo.png
-   :alt: Predix Logo
+   :alt: NexQuant Logo
 
 .. toctree::
    :maxdepth: 3
@@ -23,7 +23,7 @@ Welcome to Predix's documentation!
    api_reference
    policy
 
-   GitHub <https://github.com/PredixAI/predix>
+   GitHub <https://github.com/NexQuantAI/nexquant>
 
 
 Indices and tables
