@@ -293,7 +293,7 @@ rdagent fin_quant --model openrouter
 **4. Parallel runs** (uses API concurrency instead of GPU slots):
 
 ```bash
-python nexquant_parallel.py --runs 5 --api-keys 1 -m openrouter
+python scripts/nexquant_parallel.py --runs 5 --api-keys 1 -m openrouter
 ```
 
 > Ollama is still required for embeddings even in the OpenRouter path. Install from [ollama.com](https://ollama.com) and run `ollama pull nomic-embed-text` once.
@@ -372,10 +372,10 @@ nohup python git_ignore_folder/live_trading/ftmo_live_trader.py >> ftmo_live_tra
 | `python nexquant.py best` | Show top strategies by composite score |
 | `python nexquant.py best -n 20 -m sharpe` | Top 20 by Sharpe ratio |
 | `python nexquant.py best --show NAME` | Full metadata for one strategy |
-| `python nexquant_gen_strategies_real_bt.py 10` | Generate 10 strategies with LLM + real OHLCV backtest |
-| `python nexquant_gen_strategies_real_bt.py 20` | Generate 20 strategies (parallel workers) |
+| `python scripts/nexquant_gen_strategies_real_bt.py 10` | Generate 10 strategies with LLM + real OHLCV backtest |
+| `python scripts/nexquant_gen_strategies_real_bt.py 20` | Generate 20 strategies (parallel workers) |
 | `python scripts/nexquant_autopilot.py` | 24/7 Auto-Pilot: endless strategy generation |
-| `python nexquant_continuous_strategies.py` | Continuous generation with ML training
+| `python scripts/nexquant_continuous_strategies.py` | Continuous generation with ML training
 
 ### Kronos Foundation Model
 
@@ -398,8 +398,8 @@ Kronos runs automatically — no separate command needed. Factors are regenerate
 
 | Command | Description |
 |---------|-------------|
-| `python nexquant_parallel.py --runs 5 --api-keys 1 -m openrouter` | Run 5 parallel factor evolutions |
-| `python nexquant_parallel.py --runs 20 --api-keys 2 -m openrouter` | Run 20 runs with 2 API keys |
+| `python scripts/nexquant_parallel.py --runs 5 --api-keys 1 -m openrouter` | Run 5 parallel factor evolutions |
+| `python scripts/nexquant_parallel.py --runs 20 --api-keys 2 -m openrouter` | Run 20 runs with 2 API keys |
 
 ### Monitoring & Debug
 
@@ -407,8 +407,8 @@ Kronos runs automatically — no separate command needed. Factors are regenerate
 |---------|-------------|
 | `rdagent server_ui --port 19899 --log-dir <path>` | Start web dashboard |
 | `rdagent health_check` | Validate environment setup |
-| `python nexquant_batch_backtest.py` | Batch backtest multiple factors |
-| `python nexquant_rebacktest_strategies.py` | Re-backtest existing strategies |
+| `python scripts/nexquant_batch_backtest.py` | Batch backtest multiple factors |
+| `python scripts/nexquant_rebacktest_strategies.py` | Re-backtest existing strategies |
 
 ---
 
