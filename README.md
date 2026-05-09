@@ -77,14 +77,15 @@ rdagent predix
 
 **Predix** is an autonomous AI agent for quantitative trading strategies in the EUR/USD forex market. Built on a multi-agent framework, Predix automates the full research and development cycle:
 
-- 📊 **Data Analysis** – Automatically analyzes market patterns and microstructure
-- 💡 **Strategy Discovery** – Proposes novel trading factors and signals
-- 🧠 **Model Evolution** – Iteratively improves predictive models
-- 📈 **Backtesting** – Validates strategies on historical 1-minute data
+- 📊 **Factor Generation** — LLM proposes novel alpha factors; Kronos foundation model generates OHLCV-based predictions
+- 💡 **Strategy Discovery** — Autopilot generates + backtests trading strategies 24/7
+- 🧠 **Model Evolution** — CoSTEER iteratively improves predictive models through code evolution
+- 📈 **Backtesting** — Unified engine with 10 runtime invariants on 1-min EUR/USD data (2020–2026)
+- 🔄 **Auto-Restart** — All services run as daemons with automatic crash recovery
 
-Predix is optimized for **1-minute EUR/USD FX data** (2020–2026) and uses Qlib as the underlying backtesting engine.
+Predix is optimized for **1-minute EUR/USD FX data** (2020–2026) and supports both local LLMs (llama.cpp) and cloud backends (OpenRouter).
 
-> **Backtest Verification**: Every backtest result is automatically verified at runtime against mathematical invariants (MaxDD ∈ [-1,0], WinRate ∈ [0,1], Sharpe finite, sign consistency, etc.). 479 unit tests + 10 ground-truth validation tests ensure ~99% metric correctness. See [Backtest Integrity](#backtest-integrity).
+> **Backtest Verification**: Every backtest result is automatically verified at runtime against mathematical invariants (MaxDD ∈ [-1,0], WinRate ∈ [0,1], Sharpe finite, sign consistency, etc.). 1125 collected tests with deep property-based, fuzzing, and hypothesis tests ensure metric correctness. See [Backtest Integrity](#backtest-integrity).
 
 ## Acknowledgments
 
@@ -222,10 +223,10 @@ QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
 ```bash
 ~/llama.cpp/build/bin/llama-server \
   --model ~/models/qwen3.6/Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf \
-  --n-gpu-layers 24 \
+  --n-gpu-layers 18 \
   --no-mmap \
   --port 8081 \
-  --ctx-size 240000 \
+  --ctx-size 260000 \
   --parallel 2 \
   --batch-size 512 --ubatch-size 512 \
   --host 0.0.0.0 \
@@ -234,10 +235,10 @@ QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
 ```
 
 > **Important flags:**
-> - `--ctx-size 240000 --parallel 2` — allocates **2 slots × 120,000 tokens each**. `fin_quant` prompts can reach 80k+ tokens with full factor history; a smaller slot causes silent overflow and empty responses.
+> - `--ctx-size 260000 --parallel 2` — allocates **2 slots × 130,000 tokens each**.
 > - `--reasoning off` — **critical**: completely disables Qwen3 chain-of-thought. `--reasoning-budget 0` is not sufficient and produces empty JSON responses.
-> - `--n-gpu-layers 24` — 4 fewer than maximum on RTX 5060 Ti (16 GB), freeing ~500 MB VRAM for the larger KV cache.
-> - `-ctk q4_0 -ctv q4_0` — quantises the KV cache to 4-bit, reducing VRAM from ~5 GB to ~1.3 GB at 240k context.
+> - `--n-gpu-layers 18` — reduced from max (33) to free ~7 GB VRAM for Kronos-small GPU inference alongside llama-server.
+> - `-ctk q4_0 -ctv q4_0` — quantises the KV cache to 4-bit, reducing VRAM usage.
 
 ### Data Configuration
 
@@ -334,13 +335,19 @@ rdagent server_ui --port 19899 --log-dir git_ignore_folder/RD-Agent_workspace/
 python predix.py best
 ```
 
-### 3. Run Continuously
+### 3. Run Continuously (Auto-Restart)
 
 ```bash
-while true; do
-    rdagent fin_quant
-    sleep 5
-done
+# Start all services with auto-restart daemons:
+
+# fin_quant — factor R&D loop
+nohup bash -c 'while true; do rdagent fin_quant --loop-n 10 --model local >> /tmp/fin_quant_daemon.log 2>&1; sleep 10; done' &
+
+# Autopilot — 24/7 strategy generator (Kronos factors auto-selected)
+nohup python scripts/predix_autopilot.py >> /tmp/autopilot_daemon.log 2>&1 &
+
+# Live Trader — FTMO FIX API (requires credentials)
+nohup python git_ignore_folder/live_trading/ftmo_live_trader.py >> ftmo_live_trader.log 2>&1 &
 ```
 
 ---
@@ -365,18 +372,19 @@ done
 | `python predix.py best` | Show top strategies by composite score |
 | `python predix.py best -n 20 -m sharpe` | Top 20 by Sharpe ratio |
 | `python predix.py best --show NAME` | Full metadata for one strategy |
-| `python predix_gen_strategies_real_bt.py` | Generate 10 strategies with LLM + real backtest |
-| `python predix_gen_strategies_real_bt.py 20` | Generate 20 strategies |
+| `python predix_gen_strategies_real_bt.py 10` | Generate 10 strategies with LLM + real OHLCV backtest |
+| `python predix_gen_strategies_real_bt.py 20` | Generate 20 strategies (parallel workers) |
+| `python scripts/predix_autopilot.py` | 24/7 Auto-Pilot: endless strategy generation |
+| `python predix_continuous_strategies.py` | Continuous generation with ML training
 
 ### Kronos Foundation Model
 
 | Command | Description |
 |---------|-------------|
-| `python predix.py kronos-factor` | Generate Kronos predicted-return factor (daily stride, ~15 min GPU) |
-| `python predix.py kronos-factor --pred 30` | 30-bar prediction horizon |
-| `python predix.py kronos-factor --device cpu` | CPU inference (slower) |
-| `python predix.py kronos-eval` | Evaluate Kronos IC / hit rate vs LightGBM baseline |
-| `python predix.py kronos-eval --pred 96` | Daily horizon evaluation |
+| `rdagent fin_quant` | Kronos factors auto-generated on startup (3 horizons) |
+| Model size: `KRONOS_MODEL_SIZE=small\|mini\|base` | Configurable via env (default: small) |
+
+Kronos runs automatically — no separate command needed. Factors are regenerated if missing from `results/factors/`.
 
 ### Factor Evaluation
 
@@ -450,30 +458,38 @@ Real-time dashboard for monitoring:
 
 ### 🤖 Kronos Foundation Model Integration
 
-Predix integrates [Kronos-mini](https://github.com/shiyu-coder/Kronos) — a 4.1M parameter OHLCV foundation model pretrained on 12+ billion K-lines from 45 global exchanges (AAAI 2026, MIT):
+Predix integrates Kronos — an OHLCV foundation model from the NeoQuasar team (AAAI 2026, **MIT License**) — for alpha factor generation:
 
-- **Option A — Alpha Factor**: Rolling daily inference generates a `KronosPredReturn` factor. Every 96 bars (one trading day), Kronos predicts the next day's return from the previous 512 bars of EUR/USD OHLCV data. The factor is forward-filled to 1-min frequency and plugs directly into Predix's factor evaluation pipeline.
+| Model | Params | p24 IC | Best For |
+|-------|--------|--------|----------|
+| **Kronos-small** (default) | 25M | \|IC\| ≈ 0.09 | 1-min EUR/USD |
+| Kronos-mini | 4.1M | \|IC\| ≈ 0.07 | Low-resource |
+| Kronos-base | 102M | \|IC\| ≈ 0.002 | Daily/weekly data only |
 
-- **Option B — Model Evaluation**: Kronos runs alongside LightGBM as a standalone predictor. IC (Information Coefficient), IC IR, and directional hit rate are computed over the full dataset for direct comparison with LightGBM-generated models.
+Kronos generates 3 prediction-horizon factors automatically on `fin_quant` startup:
+- `KronosPredReturn_p24` — 24-minute horizon
+- `KronosPredReturn_p48` — 48-minute horizon  
+- `KronosPredReturn_p96` — 96-minute horizon (best performer)
+
+The model runs on GPU (CUDA) alongside the llama-server, using CPU as fallback.
+Factors are persisted in `results/factors/` for use by the strategy orchestrator.
 
 ```bash
-# One-time setup
-git clone https://github.com/shiyu-coder/Kronos ~/Kronos
+# Kronos runs automatically with fin_quant (no separate command needed)
+rdagent fin_quant --loop-n 10 --model local
 
-# Generate factor (Option A) — saves to results/factors/
-python predix.py kronos-factor
-
-# Evaluate as model (Option B) — prints IC vs LightGBM reference
-python predix.py kronos-eval
+# Model size is auto-detected and configurable via env
+# Set KRONOS_MODEL_SIZE=base to use the 102M-param model
 ```
 
 ### 🔒 Security & Quality
 
 Automated quality assurance:
 
-- **134+ Tests** — all features tested automatically on every commit
+- **1,125+ collected tests** — deep property-based, fuzzing, and hypothesis tests on every commit
 - **Bandit Security Scanner** — pre-commit security checks
 - **Weekly Dependency Audit** — automated vulnerability scan via GitHub Actions
+- **Closed-source detection** — CI verifies no local/ files are accidentally committed
 
 ---
 
@@ -483,22 +499,42 @@ Automated quality assurance:
 predix/
 ├── rdagent/                 # Core agent framework
 │   ├── app/                 # CLI and scenario apps
+│   │   └── qlib_rd_loop/    # Quant R&D loop (factor + model generation)
 │   ├── components/          # Reusable agent components
 │   │   ├── backtesting/     # Backtest engine & protections
-│   │   │   ├── backtest_engine.py
-│   │   │   ├── vbt_backtest.py  # Unified backtest engine
+│   │   │   ├── vbt_backtest.py  # Unified backtest engine (1-min bars)
+│   │   │   ├── verify.py        # Runtime backtest invariant checker
 │   │   │   ├── results_db.py
-│   │   │   └── protections/ # Trading protection system
-│   │   └── coder/           # Factor & model coding (CoSTEER + Optuna)
+│   │   │   └── protections/     # Trading protection system
+│   │   ├── coder/           # Factor & model coding
+│   │   │   ├── CoSTEER/     # LLM-based code evolution engine
+│   │   │   ├── factor_coder/  # Factor-specific coders
+│   │   │   ├── model_coder/   # Model-specific coders
+│   │   │   └── kronos_adapter.py  # Kronos foundation model adapter
+│   │   └── workflow/        # R&D loop workflow
 │   ├── core/                # Core abstractions
-│   ├── scenarios/           # Domain-specific scenarios
+│   ├── oai/                 # LLM backend (LiteLLM, streaming, retry)
+│   ├── log/                 # Logging infrastructure
+│   ├── scenarios/           # Domain-specific scenarios (qlib, kaggle, rl)
 │   └── utils/               # Utilities
-├── test/                    # Test suite (134 tests)
-│   └── backtesting/         # Backtest unit tests
-├── web/                     # Web UI frontend
+├── scripts/                 # Daily operation scripts
+│   ├── predix_autopilot.py          # 24/7 auto strategy generator
+│   ├── predix_gen_strategies_real_bt.py  # Parallel strategy generation
+│   ├── predix_parallel.py           # Multi-instance parallel R&D
+│   ├── predix_continuous_strategies.py  # Continuous strategy generation
+│   ├── predix_fast_rebacktest.py    # Fast strategy re-evaluation
+│   └── predix_rebacktest_parent.py  # Parallel rebacktest orchestrator
+├── test/                    # Test suite (1,125+ collected)
+│   ├── backtesting/         # Backtest engine deep tests
+│   ├── qlib/                # Quant loop, factor, model tests
+│   ├── oai/                 # LLM backend tests
+│   ├── log/                 # Logger tests
+│   ├── local/               # Closed-source tests (autopilot, ML, strategies)
+│   └── integration/         # End-to-end pipeline tests
 ├── data_config.yaml         # Walk-forward split configuration
 ├── pyproject.toml           # Project metadata
-└── requirements.txt         # Dependencies
+├── requirements.txt         # Dependencies
+└── AGENTS.md               # Agent configuration & workflow guide
 ```
 
 ---
@@ -584,11 +620,11 @@ The verifier runs in **<1ms** and catches corrupted/missing/flipped metrics befo
 
 ### Test suite (CI + pre-commit)
 ```bash
-pytest test/qlib/ -q        # 479 tests, 0 failures
-pytest test/backtesting/ -q # backtest engine tests
+pytest test/ -q        # 1,125+ collected, property-based + fuzzing
+pytest test/backtesting/ -q # backtest engine deep tests
 ```
 
-**Coverage**: IC linear invariance, forward-return alignment, cross-implementation validation, ground-truth hand-computed scenarios, look-ahead bias detection, edge cases (all-NaN, constant, zero-variance), Monte Carlo p-value, walk-forward rolling, buy-and-hold equality.
+**Coverage**: IC linear invariance, forward-return alignment, cross-implementation validation, ground-truth hand-computed scenarios, look-ahead bias detection, edge cases (all-NaN, constant, zero-variance, 1-bar, empty series), Monte Carlo p-value, walk-forward rolling, buy-and-hold equality, property-based testing (hypothesis: cost monotonicity, signal inversion, max-DD invariants), fuzzing (1,000 random backtest results), autopilot failure recovery, threshold rescaling, API key distribution, ML model acceptance criteria.
 
 ---
 
