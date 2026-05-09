@@ -1,6 +1,6 @@
-# Predix Prompts
+# NexQuant Prompts
 
-This directory contains all LLM prompts for the Predix trading agent.
+This directory contains all LLM prompts for the NexQuant trading agent.
 
 ---
 
@@ -174,13 +174,13 @@ prompt_v2 = load_yaml_file("prompts/local/factor_discovery_v2.yaml")
 
 ```bash
 # Backup to private repo
-cd ~/Predix
+cd ~/NexQuant
 git archive --format=tar prompts/local/ | gzip > ~/backups/prompts_local_$(date +%Y%m%d).tar.gz
 
 # Or sync to private GitHub repo
-git clone git@github.com:TPTBusiness/predix-prompts-private.git
-cp -r prompts/local/* predix-prompts-private/
-cd predix-prompts-private && git push
+git clone git@github.com:TPTBusiness/nexquant-prompts-private.git
+cp -r prompts/local/* nexquant-prompts-private/
+cd nexquant-prompts-private && git push
 ```
 
 ---

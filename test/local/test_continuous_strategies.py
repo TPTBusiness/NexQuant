@@ -1,4 +1,4 @@
-"""Deep tests for predix_continuous_strategies.py — ML model building, style cycling.
+"""Deep tests for nexquant_continuous_strategies.py — ML model building, style cycling.
 
 Tests the build_ml_model function and the round/style alternation logic
 without requiring real StrategyOrchestrator connections.
@@ -45,7 +45,7 @@ def close_data():
 class TestBuildMLModel:
     def test_insufficient_data_returns_none(self, factor_data, close_data):
         """<5000 rows should return None."""
-        from scripts.predix_continuous_strategies import build_ml_model
+        from scripts.nexquant_continuous_strategies import build_ml_model
         result = build_ml_model(factor_data.iloc[:100], close_data.iloc[:100], "swing")
         assert result is None
 
@@ -55,7 +55,7 @@ class TestBuildMLModel:
             "sharpe": 1.5, "max_drawdown": -0.1, "win_rate": 0.55,
             "n_trades": 200, "wf_oos_sharpe_mean": 0.8,
         }
-        from scripts.predix_continuous_strategies import build_ml_model
+        from scripts.nexquant_continuous_strategies import build_ml_model
         result = build_ml_model(factor_data, close_data, "daytrading")
         assert result is not None
         assert "strategy_name" in result
@@ -69,7 +69,7 @@ class TestBuildMLModel:
             "sharpe": 1.5, "max_drawdown": -0.1, "win_rate": 0.55,
             "n_trades": 200, "wf_oos_sharpe_mean": -0.3,
         }
-        from scripts.predix_continuous_strategies import build_ml_model
+        from scripts.nexquant_continuous_strategies import build_ml_model
         result = build_ml_model(factor_data, close_data, "swing")
         assert result is None
 
@@ -90,7 +90,7 @@ class TestBuildMLModel:
         }, index=factor_data.index[:n])
         c = pd.Series(1.10 + rng.normal(0, 0.001, n).cumsum(), index=f.index)
         try:
-            from scripts.predix_continuous_strategies import build_ml_model
+            from scripts.nexquant_continuous_strategies import build_ml_model
             result = build_ml_model(f, c, "swing")
             assert result is None or isinstance(result, dict)
         except Exception as e:
@@ -102,12 +102,12 @@ class TestBuildMLModel:
 
 class TestConfig:
     def test_batch_size_is_positive(self):
-        from scripts import predix_continuous_strategies
-        assert predix_continuous_strategies.BATCH_SIZE > 0
+        from scripts import nexquant_continuous_strategies
+        assert nexquant_continuous_strategies.BATCH_SIZE > 0
 
     def test_cooldown_is_positive(self):
-        from scripts import predix_continuous_strategies
-        assert predix_continuous_strategies.COOLDOWN_SECONDS > 0
+        from scripts import nexquant_continuous_strategies
+        assert nexquant_continuous_strategies.COOLDOWN_SECONDS > 0
 
 
 class TestStyleCycling:

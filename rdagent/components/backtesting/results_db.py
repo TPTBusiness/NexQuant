@@ -1,5 +1,5 @@
 """
-Predix Results Database - SQLite für Backtest-Ergebnisse
+NexQuant Results Database - SQLite für Backtest-Ergebnisse
 
 Stores backtest metrics from Qlib/MLflow runs for querying and dashboard display.
 """
@@ -409,7 +409,7 @@ class ResultsDatabase:
         worst_dd_str = self._fmt_float(best['worst_drawdown'], ".4f")
 
         md_lines = [
-            "# Predix Results Summary",
+            "# NexQuant Results Summary",
             "",
             f"**Generated:** {summary['generated_at']}",
             f"**Database:** `{summary['database_path']}`",

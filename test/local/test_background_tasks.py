@@ -2,9 +2,9 @@
 Tests for background task infrastructure (parallel runner, CLI paths, env loading).
 
 Verifies bugs that were previously present:
-- predix_parallel.py: project_root pointing to scripts/ instead of repo root
-- predix_parallel.py: .env loaded from scripts/ instead of repo root
-- predix_parallel.py: API key round-robin overwritten by comma-separated list
+- nexquant_parallel.py: project_root pointing to scripts/ instead of repo root
+- nexquant_parallel.py: .env loaded from scripts/ instead of repo root
+- nexquant_parallel.py: API key round-robin overwritten by comma-separated list
 - cli.py: project_root depth wrong (4 .parent hops instead of 3)
 - cli.py start_loop: hardcoded "python" instead of sys.executable
 - cli.py parallel: hardcoded model=local
@@ -18,7 +18,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 
-# ── predix_parallel.py ──────────────────────────────────────────────────
+# ── nexquant_parallel.py ──────────────────────────────────────────────────
 
 
 class TestParallelRunnerProjectRoot:
@@ -26,36 +26,36 @@ class TestParallelRunnerProjectRoot:
 
     def test_project_root_is_repo_root(self):
         """Bug: project_root was Path(__file__).parent (= scripts/)."""
-        from scripts.predix_parallel import ParallelRunner
+        from scripts.nexquant_parallel import ParallelRunner
 
         runner = ParallelRunner(num_runs=1, num_api_keys=1, model="local")
         root = runner.project_root
 
-        # Must contain predix.py (repo root), NOT be the scripts/ dir
-        assert (root / "predix.py").exists(), (
-            f"project_root={root} does not contain predix.py — "
+        # Must contain nexquant.py (repo root), NOT be the scripts/ dir
+        assert (root / "nexquant.py").exists(), (
+            f"project_root={root} does not contain nexquant.py — "
             f"likely still pointing to scripts/ instead of repo root"
         )
         assert root.name != "scripts", (
             f"project_root={root} ends with 'scripts/' — should be repo root"
         )
 
-    def test_build_command_points_to_predix_py(self):
-        """Bug: command pointed to scripts/predix.py which doesn't exist."""
-        from scripts.predix_parallel import ParallelRunner, RunState
+    def test_build_command_points_to_nexquant_py(self):
+        """Bug: command pointed to scripts/nexquant.py which doesn't exist."""
+        from scripts.nexquant_parallel import ParallelRunner, RunState
 
         runner = ParallelRunner(num_runs=1, num_api_keys=1, model="local")
         run = RunState(run_id=1, api_key_idx=0, model="local")
         cmd = runner._build_command(run)
 
-        predix_path = Path(cmd[1])
-        assert predix_path.exists(), (
-            f"Command references {predix_path} which does not exist — "
+        nexquant_path = Path(cmd[1])
+        assert nexquant_path.exists(), (
+            f"Command references {nexquant_path} which does not exist — "
             f"project_root likely still wrong"
         )
-        assert predix_path.name == "predix.py"
-        assert predix_path.parent.name != "scripts", (
-            "predix.py should be in repo root, not scripts/"
+        assert nexquant_path.name == "nexquant.py"
+        assert nexquant_path.parent.name != "scripts", (
+            "nexquant.py should be in repo root, not scripts/"
         )
 
     def test_env_loading_from_repo_root(self):
@@ -75,7 +75,7 @@ class TestParallelRunnerAPIKeys:
 
     def test_single_api_key_no_overwrite(self):
         """Bug: with num_api_keys=1, individual key was set then overwritten."""
-        from scripts.predix_parallel import ParallelRunner, RunState
+        from scripts.nexquant_parallel import ParallelRunner, RunState
 
         with patch.dict(os.environ, {}, clear=True):
             os.environ["OPENROUTER_API_KEY"] = "sk-test-key-1"
@@ -95,7 +95,7 @@ class TestParallelRunnerAPIKeys:
 
     def test_multi_api_key_comma_separated(self):
         """With 2+ keys, all runs get comma-separated list for load balancing."""
-        from scripts.predix_parallel import ParallelRunner, RunState
+        from scripts.nexquant_parallel import ParallelRunner, RunState
 
         with patch.dict(os.environ, {}, clear=True):
             os.environ["OPENROUTER_API_KEY"] = "sk-key-a"
@@ -111,7 +111,7 @@ class TestParallelRunnerAPIKeys:
 
     def test_round_robin_api_key_index(self):
         """Verify round-robin API key index assignment is computed correctly."""
-        from scripts.predix_parallel import ParallelRunner
+        from scripts.nexquant_parallel import ParallelRunner
 
         with patch.dict(os.environ, {}, clear=True):
             os.environ["OPENROUTER_API_KEY"] = "a"
@@ -129,7 +129,7 @@ class TestParallelRunnerLogFileHandling:
 
     def test_log_file_paths_in_repo_root(self):
         """Bug: logs went to scripts/fin_quant_runN.log."""
-        from scripts.predix_parallel import ParallelRunner
+        from scripts.nexquant_parallel import ParallelRunner
 
         runner = ParallelRunner(num_runs=2, num_api_keys=1, model="local")
 
@@ -170,7 +170,7 @@ class TestCLIProjectRoot:
             "4 .parent hops should NOT yield repo root "
             f"(got {buggy}, expected {self.REPO_ROOT.parent})"
         )
-        assert (buggy / "Predix").exists() or buggy == self.REPO_ROOT.parent, (
+        assert (buggy / "NexQuant").exists() or buggy == self.REPO_ROOT.parent, (
             f"4 .parent hops overshoots repo root: {buggy}"
         )
 
@@ -210,12 +210,12 @@ class TestCLIProjectRoot:
 
         # All these commands use Path(__file__).parent.parent.parent as project_root
         commands = {
-            "eval_all": "scripts/predix_full_eval.py",
-            "batch_backtest": "scripts/predix_batch_backtest.py",
-            "simple_eval": "scripts/predix_simple_eval.py",
-            "rebacktest": "scripts/predix_rebacktest_strategies.py",
-            "report": "scripts/predix_strategy_report.py",
-            "parallel": "scripts/predix_parallel.py",
+            "eval_all": "scripts/nexquant_full_eval.py",
+            "batch_backtest": "scripts/nexquant_batch_backtest.py",
+            "simple_eval": "scripts/nexquant_simple_eval.py",
+            "rebacktest": "scripts/nexquant_rebacktest_strategies.py",
+            "report": "scripts/nexquant_strategy_report.py",
+            "parallel": "scripts/nexquant_parallel.py",
         }
 
         for cmd_name, script_path in commands.items():
@@ -231,12 +231,12 @@ class TestCLIProjectRoot:
         import inspect
 
         source = inspect.getsource(start_loop_cli)
-        # The generator should reference scripts/predix_smart_strategy_gen.py
-        assert "predix_smart_strategy_gen.py" in source, (
-            "start_loop_cli should reference predix_smart_strategy_gen.py"
+        # The generator should reference scripts/nexquant_smart_strategy_gen.py
+        assert "nexquant_smart_strategy_gen.py" in source, (
+            "start_loop_cli should reference nexquant_smart_strategy_gen.py"
         )
 
-        script = self.REPO_ROOT / "scripts" / "predix_smart_strategy_gen.py"
+        script = self.REPO_ROOT / "scripts" / "nexquant_smart_strategy_gen.py"
         assert script.exists(), (
             f"Generator script not found at {script}"
         )
@@ -266,7 +266,7 @@ class TestImportsDontCrash:
 
     def test_import_parallel_runner(self):
         """ParallelRunner should import without errors."""
-        from scripts.predix_parallel import ParallelRunner, RunState
+        from scripts.nexquant_parallel import ParallelRunner, RunState
         runner = ParallelRunner(num_runs=1, num_api_keys=1, model="local")
         assert runner.num_runs == 1
         assert len(runner.runs) == 1

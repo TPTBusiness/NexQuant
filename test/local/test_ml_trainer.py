@@ -1,5 +1,5 @@
 """
-Tests for MLTrainer - ML Training Pipeline for Predix quant trading system.
+Tests for MLTrainer - ML Training Pipeline for NexQuant quant trading system.
 
 Tests cover:
 - Feature matrix building

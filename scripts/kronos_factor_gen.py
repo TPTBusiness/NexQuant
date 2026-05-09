@@ -3,10 +3,10 @@
 Option A: Generate Kronos predicted-return factor from EUR/USD 1-min data.
 
 Runs Kronos-mini inference in daily strides (96 bars/day) over all available
-OHLCV data and saves the resulting factor for use in Predix's factor pipeline.
+OHLCV data and saves the resulting factor for use in NexQuant's factor pipeline.
 
 Usage:
-    conda activate predix
+    conda activate nexquant
     python scripts/kronos_factor_gen.py
     python scripts/kronos_factor_gen.py --context 512 --pred 96 --device cuda
     python scripts/kronos_factor_gen.py --device cpu  # slower but no GPU needed
@@ -71,7 +71,7 @@ def main():
     print(f"\nSample (first 5):")
     print(factor_df.head())
 
-    # Save metadata for predix.py top / best integration
+    # Save metadata for nexquant.py top / best integration
     meta = {
         "factor_name": f"KronosPredReturn_p{args.pred}",
         "description": f"Kronos-mini predicted return, {args.pred}-bar horizon",
