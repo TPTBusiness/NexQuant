@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.6.0](https://github.com/TPTBusiness/NexQuant/compare/v1.5.0...v1.6.0) (2026-05-09)
+
+
+### Features
+
+* auto-post releases to Mastodon and X/Twitter via GitHub Actions ([9e896e5](https://github.com/TPTBusiness/NexQuant/commit/9e896e58550a5bb58756357804028f6b657f5098))
+* integrate Kronos foundation model into fin_quant R&D loop ([ff1a9d6](https://github.com/TPTBusiness/NexQuant/commit/ff1a9d68484d3ef741fb66ba7b6f020a79c2fbd0))
+* prioritize Kronos foundation model factors in strategy selection ([0c5e046](https://github.com/TPTBusiness/NexQuant/commit/0c5e046a40bd319ee56b3f5a313f1766d7d98df8))
+* run Kronos on CPU to avoid GPU conflict with llama-server ([9cab556](https://github.com/TPTBusiness/NexQuant/commit/9cab556bb287287cff022efacd30ec1aa81054cd))
+* support Kronos-small and Kronos-base models, auto-select GPU/CPU ([9eca3d4](https://github.com/TPTBusiness/NexQuant/commit/9eca3d468063ea7c63f688c487c7ccfbaa6909b8))
+
+
+### Bug Fixes
+
+* add hypothesis to test deps and fix missing imports in deep tests ([485e2de](https://github.com/TPTBusiness/NexQuant/commit/485e2de13a68644da75c01b02ce631246a8208c4))
+* add missing debug() method to RDAgentLog ([1ce53f2](https://github.com/TPTBusiness/NexQuant/commit/1ce53f22232391ba2c6f268fd94a536ce7c4a3e9))
+* prevent LLM retry loop from consecutive assistant message corruption ([c1e278d](https://github.com/TPTBusiness/NexQuant/commit/c1e278df6a7a03a40945bfce5ea6011d9258c625))
+* restore KronosPredictor instantiation deleted during refactor ([4fee668](https://github.com/TPTBusiness/NexQuant/commit/4fee668dcb9b275959461eaf4adfe103cc84af04))
+
+
+### Reverts
+
+* remove automated release social workflow ([67ad8a4](https://github.com/TPTBusiness/NexQuant/commit/67ad8a471996055c78e6ce9e2dda6ff505faf0e2))
+
+
+### Documentation
+
+* add precise release trigger rules (5+ feats, 10+ fixes, 30+ commits, major feature, security) ([2221f87](https://github.com/TPTBusiness/NexQuant/commit/2221f875da3123ef1785ade80fdd48ada31c10f4))
+* fix script paths in README after rename ([5206341](https://github.com/TPTBusiness/NexQuant/commit/5206341f11b31b41c759bb7f9a1e990775cb5d1a))
+* update README — Kronos-small, test depth, daemon setup, project structure ([d67b904](https://github.com/TPTBusiness/NexQuant/commit/d67b904d57b2f7361194d3654fed7743b973d43d))
+
 ## [0.8.0](https://github.com/TPTBusiness/NexQuant/compare/v1.4.2...v0.8.0) (2026-05-04)
 
 
