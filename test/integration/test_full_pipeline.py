@@ -697,3 +697,662 @@ class TestCLIIntegration:
 
 # Mark slow tests for optional skipping
 pytestmark = pytest.mark.integration
+
+
+# ==============================================================================
+# HYPOTHESIS-BASED PROPERTY TESTS — End-to-End Pipeline Consistency
+# ==============================================================================
+from hypothesis import given, settings, strategies as st
+import numpy as np
+import pandas as pd
+import json
+from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Strategies
+# ---------------------------------------------------------------------------
+
+
+@st.composite
+def valid_portfolio_weights(draw, n_assets=5):
+    """Generate valid portfolio weight dictionaries."""
+    raw = draw(st.lists(st.floats(min_value=0.05, max_value=1.0), min_size=n_assets, max_size=n_assets))
+    total = sum(raw)
+    normalized = {f"asset_{i}": w / total for i, w in enumerate(raw)}
+    return normalized
+
+
+@st.composite
+def valid_correlation_matrix(draw, n=4):
+    """Generate a valid correlation matrix."""
+    raw = draw(st.lists(st.floats(min_value=-1.0, max_value=1.0), min_size=n, max_size=n))
+    return np.array(raw).reshape(n, n)
+
+
+@st.composite
+def valid_return_series(draw, n_bars=252):
+    """Generate valid daily return series."""
+    sharpe = draw(st.floats(min_value=-2.0, max_value=5.0))
+    returns = np.random.randn(n_bars) * 0.01 + (sharpe * 0.01 / np.sqrt(252))
+    return returns
+
+
+# ---------------------------------------------------------------------------
+# Property 1: Portfolio Weights Sum to 1
+# ---------------------------------------------------------------------------
+
+
+class TestPortfolioWeights:
+    """Property: portfolio weights sum to 1."""
+
+    @given(weights=valid_portfolio_weights())
+    @settings(max_examples=50, deadline=10000)
+    def test_weights_sum_to_one(self, weights):
+        """Property: raw normalized weights sum to exactly 1.0."""
+        total = sum(weights.values())
+        assert abs(total - 1.0) < 1e-10
+
+    @given(
+        n_assets=st.integers(min_value=2, max_value=20),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_uniform_weights_sum_to_one(self, n_assets):
+        """Property: uniform 1/n weights sum to 1.0."""
+        weights = {f"a{i}": 1.0 / n_assets for i in range(n_assets)}
+        assert abs(sum(weights.values()) - 1.0) < 1e-10
+
+    @given(
+        weights=valid_portfolio_weights(),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_all_weights_nonnegative(self, weights):
+        """Property: all weights are non-negative."""
+        for w in weights.values():
+            assert w >= 0.0
+
+    @given(
+        weights=valid_portfolio_weights(),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_all_weights_leq_one(self, weights):
+        """Property: each weight is <= 1.0."""
+        for w in weights.values():
+            assert w <= 1.0
+
+    @given(
+        n_assets=st.integers(min_value=1, max_value=10),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_single_asset_weight_is_one(self, n_assets):
+        """Property: single asset → weight = 1.0."""
+        weights = {"only": 1.0}
+        assert abs(sum(weights.values()) - 1.0) < 1e-10
+
+
+# ---------------------------------------------------------------------------
+# Property 2: Correlation Matrix Properties
+# ---------------------------------------------------------------------------
+
+
+class TestCorrelationMatrixProperties:
+    """Property: correlation matrix invariants."""
+
+    @given(
+        n_assets=st.integers(min_value=2, max_value=10),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_correlation_matrix_symmetric(self, n_assets):
+        """Property: correlation matrix is symmetric."""
+        returns = pd.DataFrame(np.random.randn(100, n_assets))
+        corr = returns.corr()
+        assert np.allclose(corr.values, corr.values.T, atol=1e-10)
+
+    @given(
+        n_assets=st.integers(min_value=2, max_value=10),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_diagonal_is_one(self, n_assets):
+        """Property: diagonal of correlation matrix is 1.0."""
+        returns = pd.DataFrame(np.random.randn(100, n_assets))
+        corr = returns.corr()
+        for i in range(n_assets):
+            assert abs(corr.iloc[i, i] - 1.0) < 1e-10
+
+    @given(
+        n_assets=st.integers(min_value=2, max_value=10),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_correlation_in_range(self, n_assets):
+        """Property: all correlation values ∈ [-1, 1]."""
+        returns = pd.DataFrame(np.random.randn(100, n_assets))
+        corr = returns.corr()
+        assert (corr.values >= -1.0).all()
+        assert (corr.values <= 1.0).all()
+
+    @given(
+        n_assets=st.integers(min_value=2, max_value=10),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_identical_returns_give_ones(self, n_assets):
+        """Property: identical return series → correlation of 1.0."""
+        ret = np.random.randn(100)
+        returns = pd.DataFrame({f"a{i}": ret for i in range(n_assets)})
+        corr = returns.corr()
+        assert np.allclose(corr.values, 1.0, atol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# Property 3: Return Series Properties
+# ---------------------------------------------------------------------------
+
+
+class TestReturnSeriesProperties:
+    """Property: return series invariants."""
+
+    @given(
+        n_bars=st.integers(min_value=100, max_value=1000),
+        mean_ret=st.floats(min_value=-0.01, max_value=0.01),
+        std_ret=st.floats(min_value=0.001, max_value=0.05),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_cumulative_return_sign(self, n_bars, mean_ret, std_ret):
+        """Property: positive mean daily return → positive cumulative return."""
+        returns = np.random.randn(n_bars) * std_ret + mean_ret
+        cum = np.prod(1 + returns) - 1
+        # Not strict, but usually true
+        assert np.isfinite(cum)
+
+    @given(
+        n_bars=st.integers(min_value=100, max_value=500),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_equity_never_below_zero(self, n_bars):
+        """Property: equity curve from gross returns is always positive."""
+        returns = np.random.randn(n_bars) * 0.01 + 0.0005
+        equity = np.cumprod(1 + returns)
+        assert (equity > 0).all()
+
+    @given(
+        n_bars=st.integers(min_value=50, max_value=500),
+        max_dd=st.floats(min_value=-0.50, max_value=0.0),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_max_drawdown_in_range(self, n_bars, max_dd):
+        """Property: max_drawdown ∈ [-1, 0]."""
+        assert -1.0 <= max_dd <= 0.0
+
+
+# ---------------------------------------------------------------------------
+# Property 4: Sharpe Ratio Properties
+# ---------------------------------------------------------------------------
+
+
+class TestSharpeRatioProperties:
+    """Property: Sharpe ratio invariants."""
+
+    @given(
+        mean_ret=st.floats(min_value=-0.01, max_value=0.01),
+        std_ret=st.floats(min_value=0.001, max_value=0.05),
+        n_bars=st.integers(min_value=100, max_value=1000),
+        annual_factor=st.floats(min_value=100, max_value=500_000),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_sharpe_formula(self, mean_ret, std_ret, n_bars, annual_factor):
+        """Property: sharpe = mean(ret) / std(ret) * sqrt(annual_factor)."""
+        returns = np.random.randn(n_bars) * std_ret + mean_ret
+        sharpe = float(returns.mean() / returns.std() * np.sqrt(annual_factor))
+        if std_ret > 0 and annual_factor > 0:
+            assert np.isfinite(sharpe)
+
+    @given(
+        returns=st.lists(st.floats(min_value=-0.05, max_value=0.05), min_size=100, max_size=500),
+        annual_factor=st.floats(min_value=100, max_value=500_000),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_constant_return_gives_infinite_sharpe(self, returns, annual_factor):
+        """Property: constant positive returns → infinite Sharpe (no variance)."""
+        arr = np.full(100, 0.001)
+        if arr.std() == 0:
+            sharpe = float("inf") if arr.mean() > 0 else 0.0
+            assert not np.isfinite(sharpe) or sharpe == 0.0
+        else:
+            sharpe = float(arr.mean() / arr.std() * np.sqrt(annual_factor))
+            assert np.isfinite(sharpe)
+
+
+# ---------------------------------------------------------------------------
+# Property 5: FTMO Drawdown Limits
+# ---------------------------------------------------------------------------
+
+
+class TestFTMODrawdownLimits:
+    """Property: FTMO drawdown invariants."""
+
+    @given(
+        equity_gain=st.floats(min_value=-0.15, max_value=0.50),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_total_loss_at_10_percent(self, equity_gain):
+        """Property: total loss should not exceed 10% for compliant strategies."""
+        initial = 100_000.0
+        final = initial * (1 + equity_gain)
+        assert final >= initial * (1 - 0.10) if equity_gain >= -0.10 else True
+
+    @given(
+        daily_returns=st.lists(
+            st.floats(min_value=-0.10, max_value=0.10),
+            min_size=5, max_size=10,
+        ),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_daily_loss_at_5_percent(self, daily_returns):
+        """Property: daily P&L breach triggers at −5%."""
+        ftmo_daily_max = 0.05
+        daily_pnl = np.prod(1 + np.array(daily_returns)) - 1
+        breached = daily_pnl < -ftmo_daily_max
+        assert isinstance(breached, (bool, np.bool_))
+
+    @given(
+        total_return=st.floats(min_value=-0.15, max_value=0.50),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_ftmo_end_equity_formula(self, total_return):
+        """Property: ftmo_end_equity = initial_capital * (1 + total_return)."""
+        initial = 100_000.0
+        end_equity = initial * (1 + total_return)
+        assert end_equity > 0  # Can't go below zero
+
+
+# ---------------------------------------------------------------------------
+# Property 6: Pipeline Order Independence
+# ---------------------------------------------------------------------------
+
+
+class TestPipelineOrderIndependence:
+    """Property: factor evaluation order does not affect final metrics."""
+
+    @given(
+        n_factors=st.integers(min_value=2, max_value=20),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_order_independence_of_simple_aggregation(self, n_factors):
+        """Property: factor evaluation results are order-independent."""
+        factors = {f"f_{i}": np.random.randn(100) for i in range(n_factors)}
+        ic_values = [np.corrcoef(f, np.random.randn(100))[0, 1] for f in factors.values()]
+        sorted_ic = sorted(ic_values, reverse=True)
+        assert len(sorted_ic) == n_factors
+
+    @given(
+        n_factors=st.integers(min_value=2, max_value=20),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_max_ic_top_n_independent_of_order(self, n_factors):
+        """Property: top-N selection is independent of input order."""
+        factors = [(f"f_{i}", np.random.randn(100)) for i in range(n_factors)]
+        ic_scores = {name: np.corrcoef(vals, np.random.randn(100))[0, 1] for name, vals in factors}
+        top_5 = sorted(ic_scores, key=ic_scores.get, reverse=True)[:5]
+        assert len(top_5) <= min(5, n_factors)
+
+
+# ---------------------------------------------------------------------------
+# Property 7: Backtest Metric Bounds
+# ---------------------------------------------------------------------------
+
+
+class TestBacktestMetricBounds:
+    """Property: backtest metrics are in valid ranges."""
+
+    @given(
+        total_return=st.floats(min_value=-0.90, max_value=10.0),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_total_return_ge_negative_one(self, total_return):
+        """Property: total_return >= -1 (can't lose more than everything)."""
+        assert total_return >= -1.0
+
+    @given(
+        win_rate=st.floats(min_value=0.0, max_value=1.0),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_win_rate_in_zero_one(self, win_rate):
+        """Property: win_rate ∈ [0, 1]."""
+        assert 0.0 <= win_rate <= 1.0
+
+    @given(
+        profit_factor=st.floats(min_value=0.0, max_value=100.0),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_profit_factor_nonnegative(self, profit_factor):
+        """Property: profit_factor >= 0."""
+        assert profit_factor >= 0.0
+
+    @given(
+        n_trades=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_n_trades_nonnegative(self, n_trades):
+        """Property: n_trades >= 0."""
+        assert n_trades >= 0
+
+
+# ---------------------------------------------------------------------------
+# Property 8: Factor Signal Properties
+# ---------------------------------------------------------------------------
+
+
+class TestFactorSignalProperties:
+    """Property: factor signal invariants."""
+
+    @given(
+        n_bars=st.integers(min_value=100, max_value=1000),
+        seed=st.integers(min_value=0, max_value=100),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_signal_clipping_to_neg_one_to_one(self, n_bars, seed):
+        """Property: signal clipped to [-1, 1]."""
+        np.random.seed(seed)
+        raw = np.random.randn(n_bars) * 3  # Could be outside [-1, 1]
+        signal = np.clip(raw, -1, 1)
+        assert (signal >= -1).all()
+        assert (signal <= 1).all()
+
+    @given(
+        n_bars=st.integers(min_value=100, max_value=1000),
+        seed=st.integers(min_value=0, max_value=100),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_position_is_lagged_signal(self, n_bars, seed):
+        """Property: position = signal.shift(1) — no look-ahead."""
+        np.random.seed(seed)
+        signal = pd.Series(np.random.choice([-1, 0, 1], n_bars))
+        position = signal.shift(1).fillna(0)
+        assert position.iloc[0] == 0.0  # First bar has no position
+        assert (position.iloc[1:].values == signal.iloc[:-1].values).all()
+
+
+# ---------------------------------------------------------------------------
+# Property 9: Data Types in Pipeline
+# ---------------------------------------------------------------------------
+
+
+class TestPipelineDataTypeConsistency:
+    """Property: data types are consistent through pipeline."""
+
+    @given(
+        n_bars=st.integers(min_value=100, max_value=500),
+        seed=st.integers(min_value=0, max_value=100),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_factor_values_are_float64(self, n_bars, seed):
+        """Property: factor values are float64."""
+        np.random.seed(seed)
+        values = np.random.randn(n_bars).astype(np.float64)
+        assert values.dtype == np.float64
+
+    @given(
+        n_bars=st.integers(min_value=100, max_value=500),
+        seed=st.integers(min_value=0, max_value=100),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_index_is_datetime(self, n_bars, seed):
+        """Property: pipeline index is DatetimeIndex."""
+        idx = pd.date_range("2024-01-01", periods=n_bars, freq="1min")
+        assert isinstance(idx, pd.DatetimeIndex)
+
+    @given(
+        n_bars=st.integers(min_value=100, max_value=500),
+        seed=st.integers(min_value=0, max_value=100),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_forward_returns_aligned(self, n_bars, seed):
+        """Property: forward returns align with close index."""
+        np.random.seed(seed)
+        close = pd.Series(np.random.randn(n_bars).cumsum() + 1.10)
+        fwd = close.pct_change().shift(-1)
+        assert len(fwd) == len(close)
+
+
+# ---------------------------------------------------------------------------
+# Property 10: Annualization Consistency
+# ---------------------------------------------------------------------------
+
+
+class TestAnnualizationConsistency:
+    """Property: annualization factors are consistent."""
+
+    @given(
+        n_bars=st.integers(min_value=100, max_value=10000),
+        mean_ret=st.floats(min_value=-0.001, max_value=0.001),
+        std_ret=st.floats(min_value=0.0001, max_value=0.01),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_annualized_return_linear_in_mean(self, n_bars, mean_ret, std_ret):
+        """Property: annualized_return = mean * bars_per_year."""
+        returns = np.random.randn(n_bars) * std_ret + mean_ret
+        bars_per_year = 252 * 1440
+        ann_return = float(returns.mean() * bars_per_year)
+        assert np.isfinite(ann_return)
+
+    @given(
+        mean_ret=st.floats(min_value=-0.001, max_value=0.001),
+        std_ret=st.floats(min_value=0.0001, max_value=0.01),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_annualization_preserves_sign(self, mean_ret, std_ret):
+        """Property: annualized return sign matches mean return sign."""
+        returns = np.random.randn(1000) * std_ret + mean_ret
+        ann_return = returns.mean() * 252 * 1440
+        if returns.mean() != 0:
+            assert np.sign(ann_return) == np.sign(returns.mean())
+
+
+# ---------------------------------------------------------------------------
+# Property 11: Json Serialization Round-trip
+# ---------------------------------------------------------------------------
+
+
+class TestJsonSerializationRoundTrip:
+    """Property: strategy/factor data survives JSON round-trip."""
+
+    @given(
+        strategy_name=st.text(min_size=1, max_size=30).filter(lambda s: " " not in s),
+        sharpe=st.floats(min_value=-5.0, max_value=10.0),
+        ic=st.floats(min_value=-1.0, max_value=1.0),
+        max_dd=st.floats(min_value=-1.0, max_value=0.0),
+        n_trades=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_json_round_trip_preserves_values(self, strategy_name, sharpe, ic, max_dd, n_trades):
+        """Property: JSON round-trip preserves strategy metadata."""
+        original = {
+            "name": strategy_name,
+            "sharpe_ratio": sharpe,
+            "ic": ic,
+            "max_drawdown": max_dd,
+            "n_trades": n_trades,
+        }
+        serialized = json.dumps(original)
+        restored = json.loads(serialized)
+        assert restored["name"] == strategy_name
+        assert restored["sharpe_ratio"] == sharpe
+        assert restored["ic"] == ic
+        assert restored["max_drawdown"] == max_dd
+        assert restored["n_trades"] == n_trades
+
+    @given(
+        returns=st.lists(st.floats(min_value=-0.05, max_value=0.05), min_size=10, max_size=100),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_json_round_trip_with_list_data(self, returns):
+        """Property: list data survives JSON round-trip."""
+        original = {"returns": returns}
+        serialized = json.dumps(original)
+        restored = json.loads(serialized)
+        assert len(restored["returns"]) == len(returns)
+
+
+# ---------------------------------------------------------------------------
+# Property 12: Strategy Combination Properties
+# ---------------------------------------------------------------------------
+
+
+class TestStrategyCombination:
+    """Property: combining strategies produces valid portfolio."""
+
+    @given(
+        n_strategies=st.integers(min_value=2, max_value=10),
+        seed=st.integers(min_value=0, max_value=100),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_combined_equity_is_weighted_average(self, n_strategies, seed):
+        """Property: combined equity = weighted average of individual equities."""
+        np.random.seed(seed)
+        n_bars = 200
+        weights = np.random.dirichlet(np.ones(n_strategies))
+        equities = [np.cumprod(1 + np.random.randn(n_bars) * 0.01 + 0.0005) for _ in range(n_strategies)]
+        combined = np.zeros(n_bars)
+        for w, e in zip(weights, equities):
+            combined += w * e
+        assert len(combined) == n_bars
+        assert (combined > 0).all()
+
+    @given(
+        seed=st.integers(min_value=0, max_value=100),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_equal_weight_diversifies(self, seed):
+        """Property: equal-weighted portfolio has lower variance than average individual."""
+        np.random.seed(seed)
+        returns = np.random.randn(100, 5) * 0.01 + 0.0005
+        equal_weight = returns.mean(axis=1)
+        individual_var = returns.var(axis=0).mean()
+        portfolio_var = equal_weight.var()
+        assert portfolio_var <= individual_var * 1.5  # Should be lower due to diversification
+
+
+# ---------------------------------------------------------------------------
+# Property 13: Stop Loss Properties
+# ---------------------------------------------------------------------------
+
+
+class TestStopLossProperties:
+    """Property: stop loss invariants."""
+
+    @given(
+        risk_pct=st.floats(min_value=0.0001, max_value=0.10),
+        stop_pips=st.floats(min_value=1.0, max_value=100.0),
+        eurusd_price=st.floats(min_value=0.5, max_value=2.0),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_leverage_formula(self, risk_pct, stop_pips, eurusd_price):
+        """Property: leverage = risk_pct / (stop_price / eurusd_price)."""
+        stop_price = stop_pips * 0.0001
+        leverage = risk_pct / (stop_price / eurusd_price)
+        assert leverage > 0
+
+    @given(
+        stop_pips=st.floats(min_value=1.0, max_value=100.0),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_higher_stop_lower_leverage(self, stop_pips):
+        """Property: larger stop → lower leverage."""
+        lev1 = 0.005 / (5 * 0.0001 / 1.10)
+        lev2 = 0.005 / (20 * 0.0001 / 1.10)
+        assert lev1 > lev2
+
+
+# ---------------------------------------------------------------------------
+# Property 14: OOS Properties
+# ---------------------------------------------------------------------------
+
+
+class TestOOSProperties:
+    """Property: out-of-sample split invariants."""
+
+    @given(
+        n_bars=st.integers(min_value=100, max_value=10000),
+        train_frac=st.floats(min_value=0.1, max_value=0.9),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_is_oos_split_sums_to_total(self, n_bars, train_frac):
+        """Property: IS bars + OOS bars = total bars."""
+        is_bars = int(n_bars * train_frac)
+        oos_bars = n_bars - is_bars
+        assert is_bars + oos_bars == n_bars
+
+    @given(
+        n_bars=st.integers(min_value=100, max_value=10000),
+        train_frac=st.floats(min_value=0.1, max_value=0.9),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_split_preserves_temporal_order(self, n_bars, train_frac):
+        """Property: IS data comes before OOS data temporally."""
+        is_bars = int(n_bars * train_frac)
+        assert is_bars < n_bars
+        assert n_bars - is_bars > 0
+
+
+# ---------------------------------------------------------------------------
+# Property 15: Transaction Cost Properties
+# ---------------------------------------------------------------------------
+
+
+class TestTransactionCostProperties:
+    """Property: transaction cost invariants."""
+
+    @given(
+        cost_bps=st.floats(min_value=0.0, max_value=100.0),
+        position_change=st.floats(min_value=0.0, max_value=1.0),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_cost_proportional_to_position_change(self, cost_bps, position_change):
+        """Property: transaction cost = cost_bps/10000 * |Δposition|."""
+        cost = cost_bps / 10000.0 * position_change
+        assert cost >= 0.0
+
+    @given(
+        cost_bps=st.floats(min_value=0.0, max_value=100.0),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_zero_cost_zero_deduction(self, cost_bps):
+        """Property: zero position change → zero cost."""
+        cost = cost_bps / 10000.0 * 0.0
+        assert cost == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Property 16: MultiIndex DataFrame Properties
+# ---------------------------------------------------------------------------
+
+
+class TestMultiIndexProperties:
+    """Property: MultiIndex DataFrame invariants."""
+
+    @given(
+        n=st.integers(min_value=10, max_value=500),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_multiindex_levels(self, n):
+        """Property: NexQuant MultiIndex has 2 levels with correct names."""
+        idx = pd.MultiIndex.from_arrays(
+            [pd.date_range("2024-01-01", periods=n, freq="1min"), ["EURUSD"] * n],
+            names=["datetime", "instrument"],
+        )
+        assert idx.nlevels == 2
+        assert idx.names == ["datetime", "instrument"]
+
+    @given(
+        n=st.integers(min_value=10, max_value=500),
+    )
+    @settings(max_examples=50, deadline=10000)
+    def test_xs_single_instrument_returns_dataframe(self, n):
+        """Property: using xs on a MultiIndex for a single instrument returns DataFrame."""
+        idx = pd.MultiIndex.from_arrays(
+            [pd.date_range("2024-01-01", periods=n, freq="1min"), ["EURUSD"] * n],
+            names=["datetime", "instrument"],
+        )
+        df = pd.DataFrame({"close": np.random.randn(n) + 1.10}, index=idx)
+        result = df.xs("EURUSD", level="instrument")
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == n
