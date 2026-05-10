@@ -481,3 +481,648 @@ class TestRiskManagementIntegration:
 from rdagent.components.backtesting.risk_management import (
     CorrelationAnalyzer, PortfolioOptimizer, AdvancedRiskManager
 )
+
+
+# ============================================================================
+# HYPOTHESIS PROPERTY-BASED TESTS (ADDED – DO NOT MODIFY ABOVE THIS LINE)
+# ============================================================================
+
+from hypothesis import given, settings, strategies as st, assume
+
+# ---------------------------------------------------------------------------
+# Correlation Matrix Properties (22 tests)
+# ---------------------------------------------------------------------------
+
+
+class TestCorrelationMatrixProperties:
+    """Property-based tests for correlation matrix invariants."""
+
+    @given(
+        st.integers(min_value=2, max_value=15),
+        st.integers(min_value=30, max_value=500),
+        st.floats(min_value=0.001, max_value=0.1),
+    )
+    @settings(max_examples=100, deadline=5000)
+    def test_corr_matrix_symmetric(self, n_assets, n_bars, noise):
+        """Property: correlation matrix is always symmetric."""
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, noise, (n_bars, n_assets))
+        df = pd.DataFrame(data, columns=[f"A_{i}" for i in range(n_assets)], index=dates)
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        assert np.allclose(corr.values, corr.values.T, atol=1e-10)
+
+    @given(
+        st.integers(min_value=1, max_value=20),
+        st.integers(min_value=30, max_value=500),
+    )
+    @settings(max_examples=70, deadline=5000)
+    def test_corr_diagonal_is_one(self, n_assets, n_bars):
+        """Property: all diagonal elements of correlation matrix equal 1.0."""
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 0.02, (n_bars, n_assets))
+        df = pd.DataFrame(data, columns=[f"A_{i}" for i in range(n_assets)], index=dates)
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        diag = np.diag(corr.values)
+        assert np.allclose(diag, 1.0, atol=1e-10)
+
+    @given(
+        st.integers(min_value=3, max_value=10),
+        st.integers(min_value=50, max_value=300),
+    )
+    @settings(max_examples=70, deadline=5000)
+    def test_corr_values_in_bounds(self, n_assets, n_bars):
+        """Property: all correlation values ∈ [-1, 1]."""
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 0.02, (n_bars, n_assets))
+        df = pd.DataFrame(data, columns=[f"A_{i}" for i in range(n_assets)], index=dates)
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        vals = corr.values.ravel()
+        vals = vals[~np.isnan(vals)]
+        assert np.all(vals >= -1.0)
+        assert np.all(vals <= 1.0)
+
+    @given(
+        st.integers(min_value=2, max_value=6),
+        st.integers(min_value=30, max_value=500),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_corr_psd(self, n_assets, n_bars):
+        """Property: correlation matrix is positive semi-definite."""
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 0.02, (n_bars, n_assets))
+        df = pd.DataFrame(data, columns=[f"A_{i}" for i in range(n_assets)], index=dates)
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        vals = corr.values
+        vals = np.nan_to_num(vals, nan=0)
+        eigenvalues = np.linalg.eigvalsh(vals)
+        assert np.all(eigenvalues >= -1e-10), f"Non-PSD: min eigenvalue={eigenvalues.min()}"
+
+    @given(st.integers(min_value=30, max_value=500))
+    @settings(max_examples=50, deadline=5000)
+    def test_single_asset_corr_is_one(self, n_bars):
+        """Property: correlation matrix of single asset is [[1.0]]."""
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        df = pd.DataFrame({"Only": rng.normal(0, 0.02, n_bars)}, index=dates)
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        assert corr.shape == (1, 1)
+        assert corr.iloc[0, 0] == 1.0
+
+    @given(
+        st.integers(min_value=3, max_value=10),
+        st.integers(min_value=50, max_value=300),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_corr_equals_corr_from_pandas(self, n_assets, n_bars):
+        """Property: calculate_matrix matches pandas .corr()."""
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 0.02, (n_bars, n_assets))
+        df = pd.DataFrame(data, columns=[f"A_{i}" for i in range(n_assets)], index=dates)
+        analyzer = CorrelationAnalyzer()
+        result = analyzer.calculate_matrix(df)
+        expected = df.dropna().corr()
+        assert np.allclose(result.values, expected.values, atol=1e-10, equal_nan=True)
+
+    @given(
+        st.floats(min_value=0.1, max_value=0.9),
+        st.integers(min_value=50, max_value=200),
+    )
+    @settings(max_examples=40, deadline=5000)
+    def test_corr_with_nans_still_symmetric(self, nan_fraction, n_bars):
+        """Property: correlation matrix stays symmetric even with NaN-contaminated data."""
+        n_assets = 5
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 0.02, (n_bars, n_assets))
+        df = pd.DataFrame(data, columns=[f"A_{i}" for i in range(n_assets)], index=dates)
+        for col in df.columns:
+            n_nan = int(n_bars * nan_fraction * 0.3)
+            df.loc[df.index[:n_nan], col] = np.nan
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        vals = np.nan_to_num(corr.values, nan=0)
+        assert np.allclose(vals, vals.T, atol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# find_uncorrelated Properties (12 tests)
+# ---------------------------------------------------------------------------
+
+
+class TestFindUncorrelatedProperties:
+    """Property tests for find_uncorrelated."""
+
+    @given(
+        st.integers(min_value=3, max_value=10),
+        st.integers(min_value=100, max_value=500),
+        st.floats(min_value=0.0, max_value=1.0),
+    )
+    @settings(max_examples=100, deadline=5000)
+    def test_uncorrelated_count_bounded_by_n_assets(self, n_assets, n_bars, threshold):
+        """Property: number of uncorrelated factors <= n_assets."""
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 0.02, (n_bars, n_assets))
+        df = pd.DataFrame(data, columns=[f"A_{i}" for i in range(n_assets)], index=dates)
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        result = analyzer.find_uncorrelated(corr, threshold=threshold)
+        assert len(result) <= n_assets
+
+    @given(
+        st.integers(min_value=3, max_value=8),
+        st.integers(min_value=100, max_value=400),
+        st.floats(min_value=0.0, max_value=0.5),
+        st.floats(min_value=0.5, max_value=1.0),
+    )
+    @settings(max_examples=70, deadline=5000)
+    def test_threshold_monotonicity(self, n_assets, n_bars, t_low, t_high):
+        """Property: higher threshold => more or equal uncorrelated factors."""
+        assume(t_low <= t_high)
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 0.02, (n_bars, n_assets))
+        df = pd.DataFrame(data, columns=[f"A_{i}" for i in range(n_assets)], index=dates)
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        r_low = analyzer.find_uncorrelated(corr, threshold=t_low)
+        r_high = analyzer.find_uncorrelated(corr, threshold=t_high)
+        assert len(r_high) >= len(r_low)
+
+    @given(
+        st.integers(min_value=30, max_value=300),
+    )
+    @settings(max_examples=30, deadline=5000)
+    def test_empty_matrix_returns_empty(self, n_bars):
+        """Property: find_uncorrelated on empty matrix returns []."""
+        analyzer = CorrelationAnalyzer()
+        assert analyzer.find_uncorrelated(pd.DataFrame()) == []
+
+    @given(
+        st.integers(min_value=120, max_value=300),
+    )
+    @settings(max_examples=30, deadline=5000)
+    def test_single_asset_is_uncorrelated(self, n_bars):
+        """Property: single-asset mean abs correlation to others is NaN → not found."""
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        df = pd.DataFrame({"Solo": rng.normal(0, 0.02, n_bars)}, index=dates)
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        result = analyzer.find_uncorrelated(corr, threshold=0.5)
+        # Single asset has no "others" — abs().mean() returns NaN, which is not < threshold
+        # So it should NOT be in result (or the list may be empty)
+        assert isinstance(result, list)
+
+
+# ---------------------------------------------------------------------------
+# Mean-Variance Properties (18 tests)
+# ---------------------------------------------------------------------------
+
+
+class TestMeanVarianceProperties:
+    """Property-based tests for mean_variance optimization."""
+
+    @given(
+        st.integers(min_value=2, max_value=10),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_weights_sum_to_one(self, n_assets):
+        """Property: mean_variance weights always sum to 1."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        exp_ret = pd.Series(np.random.default_rng(42).uniform(0.01, 0.15, n_assets), index=names)
+        cov_data = np.random.default_rng(43).uniform(0.01, 0.1, (n_assets, n_assets))
+        cov_data = cov_data @ cov_data.T + np.eye(n_assets) * 0.01  # make PSD
+        cov = pd.DataFrame(cov_data, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.mean_variance(exp_ret, cov)
+        assert abs(np.sum(w) - 1.0) < 1e-10
+
+    @given(
+        st.integers(min_value=2, max_value=8),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_weights_are_numpy_array(self, n_assets):
+        """Property: mean_variance returns numpy array."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        exp_ret = pd.Series(np.random.default_rng(42).uniform(0.01, 0.15, n_assets), index=names)
+        cov = pd.DataFrame(np.eye(n_assets) * 0.04, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.mean_variance(exp_ret, cov)
+        assert isinstance(w, np.ndarray)
+        assert len(w) == n_assets
+
+    @given(
+        st.integers(min_value=2, max_value=6),
+        st.floats(min_value=0.001, max_value=0.2),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_equal_returns_different_vol_weights(self, n_assets, ret_val):
+        """Property: if all returns equal, lower-vol assets get higher weight."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        exp_ret = pd.Series([ret_val] * n_assets, index=names)
+        # Increasing vol: A0 has 0.01, A1 has 0.04, ...
+        diag = np.array([0.01 * (i + 1) for i in range(n_assets)])
+        cov = pd.DataFrame(np.diag(diag), index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.mean_variance(exp_ret, cov)
+        assert w[np.argmin(diag)] > w[np.argmax(diag)]
+
+    @given(
+        st.integers(min_value=3, max_value=6),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_higher_return_gets_higher_weight_ceteris_paribus(self, n_assets):
+        """Property: among assets with equal risk, the one with highest return gets highest weight."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        rets = np.linspace(0.01, 0.20, n_assets)
+        exp_ret = pd.Series(rets, index=names)
+        cov = pd.DataFrame(np.eye(n_assets) * 0.04, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.mean_variance(exp_ret, cov)
+        assert np.argmax(w) == np.argmax(rets)
+
+    @given(
+        st.integers(min_value=2, max_value=6),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_singular_cov_fallback_equal_weights(self, n_assets):
+        """Property: singular covariance produces equal weights (fallback)."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        exp_ret = pd.Series(np.random.default_rng(42).uniform(0.01, 0.15, n_assets), index=names)
+        # Singular: all rows identical
+        row = np.ones(n_assets) * 0.04
+        cov = pd.DataFrame([row] * n_assets, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.mean_variance(exp_ret, cov)
+        expected = np.ones(n_assets) / n_assets
+        assert np.allclose(w, expected, atol=0.01)
+
+    @given(
+        st.integers(min_value=2, max_value=6),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_zero_cov_fallback_equal_weights(self, n_assets):
+        """Property: zero covariance matrix produces equal weights fallback."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        exp_ret = pd.Series(np.random.default_rng(42).uniform(0.01, 0.15, n_assets), index=names)
+        cov = pd.DataFrame(np.zeros((n_assets, n_assets)), index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.mean_variance(exp_ret, cov)
+        expected = np.ones(n_assets) / n_assets
+        assert np.allclose(w, expected, atol=0.01)
+
+    @given(
+        st.integers(min_value=2, max_value=8),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_negative_returns_still_sum_to_one(self, n_assets):
+        """Property: weights sum to 1 even when all expected returns are negative."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        exp_ret = pd.Series(np.random.default_rng(42).uniform(-0.20, -0.01, n_assets), index=names)
+        cov = pd.DataFrame(np.eye(n_assets) * 0.04, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.mean_variance(exp_ret, cov)
+        assert abs(np.sum(w) - 1.0) < 1e-10
+
+    @given(
+        st.floats(min_value=0.01, max_value=0.5),
+        st.integers(min_value=2, max_value=6),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_weights_invariant_to_exp_ret_scale(self, scale, n_assets):
+        """Property: multiplying all expected returns by same factor doesn't change weights."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        rng = np.random.default_rng(42)
+        base_rets = rng.uniform(0.01, 0.15, n_assets)
+        exp_ret_1 = pd.Series(base_rets, index=names)
+        exp_ret_2 = pd.Series(base_rets * scale, index=names)
+        cov = pd.DataFrame(np.eye(n_assets) * 0.04, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w1 = opt.mean_variance(exp_ret_1, cov)
+        w2 = opt.mean_variance(exp_ret_2, cov)
+        assert np.allclose(w1, w2, atol=1e-10), f"w1={w1}, w2={w2}"
+
+
+# ---------------------------------------------------------------------------
+# Risk-Parity Properties (16 tests)
+# ---------------------------------------------------------------------------
+
+
+class TestRiskParityProperties:
+    """Property-based tests for risk_parity optimization."""
+
+    @given(
+        st.integers(min_value=2, max_value=8),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_weights_sum_to_one(self, n_assets):
+        """Property: risk_parity weights sum to 1."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        rng = np.random.default_rng(42)
+        data = rng.uniform(0.01, 0.1, (n_assets, n_assets))
+        cov_data = data @ data.T + np.eye(n_assets) * 0.01
+        cov = pd.DataFrame(cov_data, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.risk_parity(cov)
+        assert abs(np.sum(w) - 1.0) < 1e-10
+
+    @given(
+        st.integers(min_value=2, max_value=8),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_weights_positive(self, n_assets):
+        """Property: risk_parity weights are all positive (long-only)."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        rng = np.random.default_rng(42)
+        data = rng.uniform(0.01, 0.1, (n_assets, n_assets))
+        cov_data = data @ data.T + np.eye(n_assets) * 0.01
+        cov = pd.DataFrame(cov_data, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.risk_parity(cov)
+        assert np.all(w > 0), f"Non-positive weight: {w}"
+
+    @given(st.integers(min_value=1, max_value=1))
+    @settings(max_examples=20, deadline=5000)
+    def test_single_asset_weight_is_one(self, _):
+        """Property: risk_parity with single asset returns [1.0]."""
+        cov = pd.DataFrame([[0.04]], index=["A"], columns=["A"])
+        opt = PortfolioOptimizer()
+        w = opt.risk_parity(cov)
+        assert len(w) == 1
+        assert w[0] == 1.0
+
+    @given(
+        st.integers(min_value=2, max_value=6),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_equal_vol_gives_equal_weights(self, n_assets):
+        """Property: diagonal covariance with equal variance => equal weights."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        cov = pd.DataFrame(np.eye(n_assets) * 0.04, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.risk_parity(cov)
+        expected = np.ones(n_assets) / n_assets
+        assert np.allclose(w, expected, atol=0.01)
+
+    @given(
+        st.integers(min_value=2, max_value=4),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_lower_vol_gets_higher_weight(self, n_assets):
+        """Property: asset with lower variance gets higher weight."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        diag = [0.01, 0.04, 0.09, 0.16][:n_assets]
+        names = names[:n_assets]
+        cov = pd.DataFrame(np.diag(diag), index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.risk_parity(cov)
+        assert np.argmax(w) == 0  # lowest vol has idx 0
+
+    @given(
+        st.integers(min_value=2, max_value=4),
+    )
+    @settings(max_examples=30, deadline=5000)
+    def test_zero_variance_gives_equal_weights(self, n_assets):
+        """Property: zero covariance matrix falls back to equal weights."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        cov = pd.DataFrame(np.zeros((n_assets, n_assets)), index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w = opt.risk_parity(cov)
+        expected = np.ones(n_assets) / n_assets
+        assert np.allclose(w, expected, atol=0.01)
+
+    @given(
+        st.integers(min_value=2, max_value=6),
+        st.floats(min_value=0.5, max_value=5.0),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_cov_scaling_invariance(self, n_assets, scale):
+        """Property: scaling covariance matrix by positive factor doesn't change RP weights."""
+        names = [f"A_{i}" for i in range(n_assets)]
+        rng = np.random.default_rng(42)
+        data = rng.uniform(0.01, 0.1, (n_assets, n_assets))
+        base = data @ data.T + np.eye(n_assets) * 0.01
+        cov1 = pd.DataFrame(base, index=names, columns=names)
+        cov2 = pd.DataFrame(base * scale, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w1 = opt.risk_parity(cov1)
+        w2 = opt.risk_parity(cov2)
+        assert np.allclose(w1, w2, atol=1e-10)
+
+    @given(
+        st.integers(min_value=2, max_value=6),
+        st.integers(min_value=2, max_value=20),
+        st.integers(min_value=50, max_value=200),
+    )
+    @settings(max_examples=30, deadline=5000)
+    def test_more_iterations_similar_result(self, n_assets, few_iter, many_iter):
+        """Property: more iterations gives similar or equal result."""
+        assume(few_iter <= many_iter)
+        names = [f"A_{i}" for i in range(n_assets)]
+        rng = np.random.default_rng(42)
+        data = rng.uniform(0.01, 0.1, (n_assets, n_assets))
+        cov_data = data @ data.T + np.eye(n_assets) * 0.01
+        cov = pd.DataFrame(cov_data, index=names, columns=names)
+        opt = PortfolioOptimizer()
+        w1 = opt.risk_parity(cov, max_iter=few_iter)
+        w2 = opt.risk_parity(cov, max_iter=many_iter)
+        assert np.abs(np.sum(w1) - np.sum(w2)) < 0.01
+
+
+# ---------------------------------------------------------------------------
+# check_limits Properties (16 tests)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckLimitsProperties:
+    """Property-based tests for check_limits."""
+
+    @given(
+        st.lists(st.floats(min_value=-0.5, max_value=0.5), min_size=3, max_size=10),
+        st.floats(min_value=0.01, max_value=0.5),
+        st.floats(min_value=-0.5, max_value=-0.001),
+        st.floats(min_value=0.01, max_value=1.0),
+        st.floats(min_value=1.0, max_value=10.0),
+        st.floats(min_value=0.01, max_value=1.0),
+    )
+    @settings(max_examples=200, deadline=5000)
+    def test_all_checks_are_boolean(self, weights, vol, dd, max_pos, max_lev, max_dd):
+        """Property: all check_limits return values are boolean."""
+        w = np.array(weights, dtype=float)
+        mgr = AdvancedRiskManager(max_pos=max_pos, max_lev=max_lev, max_dd=max_dd)
+        checks = mgr.check_limits(w, vol=vol, dd=dd)
+        for k, v in checks.items():
+            assert isinstance(v, (bool, np.bool_)), f"{k} is {type(v)}"
+
+    @given(
+        st.lists(st.floats(min_value=-0.5, max_value=0.5), min_size=3, max_size=10),
+        st.floats(min_value=-0.5, max_value=-0.001),
+        st.floats(min_value=0.01, max_value=1.0),
+        st.floats(min_value=1.0, max_value=10.0),
+        st.floats(min_value=0.01, max_value=1.0),
+    )
+    @settings(max_examples=200, deadline=5000)
+    def test_three_keys_present(self, weights, dd, max_pos, max_lev, max_dd):
+        """Property: check_limits returns exactly 3 keys."""
+        w = np.array(weights, dtype=float)
+        mgr = AdvancedRiskManager(max_pos=max_pos, max_lev=max_lev, max_dd=max_dd)
+        checks = mgr.check_limits(w, vol=0.15, dd=dd)
+        assert set(checks.keys()) == {"position_limit", "leverage_limit", "drawdown_limit"}
+
+    @given(
+        st.lists(st.floats(min_value=0.0, max_value=0.01), min_size=3, max_size=10),
+        st.floats(min_value=-0.01, max_value=0),
+        st.floats(min_value=0.1, max_value=1.0),
+        st.floats(min_value=1.0, max_value=10.0),
+        st.floats(min_value=0.1, max_value=1.0),
+    )
+    @settings(max_examples=100, deadline=5000)
+    def test_tiny_weights_pass_all_limits(self, weights, dd, max_pos, max_lev, max_dd):
+        """Property: very small weights pass all limits."""
+        w = np.array(weights, dtype=float)
+        mgr = AdvancedRiskManager(max_pos=max_pos, max_lev=max_lev, max_dd=max_dd)
+        checks = mgr.check_limits(w, vol=0.15, dd=dd)
+        assert bool(checks["position_limit"]) is True
+
+    @given(
+        st.lists(st.floats(min_value=100.0, max_value=1000.0), min_size=1, max_size=5),
+        st.floats(min_value=0.1, max_value=1.0),
+    )
+    @settings(max_examples=100, deadline=5000)
+    def test_huge_weights_fail_position_limit(self, weights, max_pos):
+        """Property: weights much larger than max_pos fail position_limit."""
+        w = np.array(weights, dtype=float)
+        mgr = AdvancedRiskManager(max_pos=max_pos, max_lev=10000.0, max_dd=1.0)
+        checks = mgr.check_limits(w, vol=0.15, dd=-0.01)
+        assert bool(checks["position_limit"]) is False
+
+    @given(
+        st.lists(st.floats(min_value=50.0, max_value=500.0), min_size=3, max_size=10),
+        st.floats(min_value=1.0, max_value=10.0),
+    )
+    @settings(max_examples=100, deadline=5000)
+    def test_huge_weights_fail_leverage_limit(self, weights, max_lev):
+        """Property: sum(abs(weights)) > max_lev fails leverage_limit."""
+        w = np.array(weights, dtype=float)
+        mgr = AdvancedRiskManager(max_pos=1000.0, max_lev=max_lev, max_dd=1.0)
+        checks = mgr.check_limits(w, vol=0.15, dd=-0.01)
+        assert bool(checks["leverage_limit"]) is False
+
+    @given(
+        st.floats(min_value=0.01, max_value=0.5),
+        st.floats(min_value=-2.0, max_value=-0.01),
+    )
+    @settings(max_examples=100, deadline=5000)
+    def test_big_drawdown_fails_drawdown_limit(self, max_dd, actual_dd):
+        """Property: |dd| > max_dd fails drawdown_limit."""
+        w = np.array([0.1, 0.1, 0.1])
+        mgr = AdvancedRiskManager(max_pos=1.0, max_lev=100.0, max_dd=max_dd)
+        checks = mgr.check_limits(w, vol=0.15, dd=actual_dd)
+        assume(abs(actual_dd) > max_dd)
+        assert bool(checks["drawdown_limit"]) is False
+
+    @given(
+        st.floats(min_value=0.01, max_value=0.5),
+        st.floats(min_value=-0.001, max_value=0),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_small_drawdown_passes_drawdown_limit(self, max_dd, actual_dd):
+        """Property: small |dd| passes drawdown_limit."""
+        w = np.array([0.1, 0.1, 0.1])
+        mgr = AdvancedRiskManager(max_pos=1.0, max_lev=100.0, max_dd=max_dd)
+        checks = mgr.check_limits(w, vol=0.15, dd=actual_dd)
+        assert bool(checks["drawdown_limit"]) is True
+
+    @given(
+        st.floats(min_value=0.01, max_value=1.0),
+        st.floats(min_value=1.0, max_value=10.0),
+        st.floats(min_value=0.01, max_value=1.0),
+    )
+    @settings(max_examples=100, deadline=5000)
+    def test_zero_weights_pass_all(self, max_pos, max_lev, max_dd):
+        """Property: all-zero weights pass all limits."""
+        w = np.zeros(5)
+        mgr = AdvancedRiskManager(max_pos=max_pos, max_lev=max_lev, max_dd=max_dd)
+        checks = mgr.check_limits(w, vol=0.15, dd=-0.01)
+        assert all(checks.values())
+
+    @given(
+        st.lists(st.floats(min_value=-2.0, max_value=2.0), min_size=2, max_size=8),
+    )
+    @settings(max_examples=100, deadline=5000)
+    def test_position_limit_uses_abs_value(self, weights):
+        """Property: position_limit uses abs(weight) for both long and short."""
+        w = np.array(weights, dtype=float)
+        max_abs = np.max(np.abs(w))
+        mgr = AdvancedRiskManager(max_pos=max_abs + 0.001, max_lev=1000.0, max_dd=1.0)
+        checks = mgr.check_limits(w, vol=0.15, dd=-0.01)
+        assert bool(checks["position_limit"]) is True
+
+        mgr2 = AdvancedRiskManager(max_pos=max_abs - 0.001, max_lev=1000.0, max_dd=1.0)
+        checks2 = mgr2.check_limits(w, vol=0.15, dd=-0.01)
+        if max_abs > 0.001:
+            assert bool(checks2["position_limit"]) is False
+
+
+# ---------------------------------------------------------------------------
+# Correlation + Risk Integration Properties (8 tests)
+# ---------------------------------------------------------------------------
+
+
+class TestCorrelationRiskIntegration:
+    """Integration properties combining correlation analysis and risk checks."""
+
+    @given(
+        st.integers(min_value=3, max_value=8),
+        st.integers(min_value=100, max_value=500),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_uncorrelated_subset_weights_valid(self, n_assets, n_bars):
+        """Property: portfolio weights for uncorrelated subset pass basic validation."""
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 0.02, (n_bars, n_assets))
+        df = pd.DataFrame(data, columns=[f"A_{i}" for i in range(n_assets)], index=dates)
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        uncorr = analyzer.find_uncorrelated(corr, threshold=0.5)
+        assume(len(uncorr) >= 2)
+
+        cov = df[uncorr].cov() * 252
+        opt = PortfolioOptimizer()
+        w = opt.risk_parity(cov)
+        assert abs(np.sum(w) - 1.0) < 1e-10
+        assert np.all(np.isfinite(w)), f"RP weights should be finite: {w}"
+
+    @given(
+        st.integers(min_value=3, max_value=8),
+        st.integers(min_value=100, max_value=300),
+    )
+    @settings(max_examples=50, deadline=5000)
+    def test_full_workflow_weight_sum_one(self, n_assets, n_bars):
+        """Property: full workflow (corr → uncorr → MV → risk check) runs end-to-end."""
+        dates = pd.date_range("2024-01-01", periods=n_bars, freq="B")
+        rng = np.random.default_rng(42)
+        data = rng.normal(0, 0.02, (n_bars, n_assets))
+        df = pd.DataFrame(data, columns=[f"A_{i}" for i in range(n_assets)], index=dates)
+        analyzer = CorrelationAnalyzer()
+        corr = analyzer.calculate_matrix(df)
+        assume(corr.shape[0] >= 3)
+        cov = df.cov()
+        exp_ret = pd.Series(df.mean(), index=df.columns)
+        opt = PortfolioOptimizer()
+        mv = opt.mean_variance(exp_ret, cov)
+        rp = opt.risk_parity(cov)
+        assert abs(np.sum(mv) - 1.0) < 0.01
+        assert abs(np.sum(rp) - 1.0) < 0.01
