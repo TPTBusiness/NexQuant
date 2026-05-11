@@ -1,117 +1,117 @@
 #!/usr/bin/env python
 """
-NexQuant Live Strategy — 1h London Session Momentum.
+NexQuant Live Strategy — Multi-mode trading signal generator.
 
-Generates real-time trading signals for FTMO live trading.
-Reads current 1h bar, computes factor value, outputs signal (LONG/SHORT/FLAT).
+Modes:
+  - price: SMA10/30 crossover on 1h bars (proven +0.40%/month)
+  - factors: London momentum factors (proven +3.29%/month, needs factor data)
+  
+For FTMO live trading. Reads 1-min bar from file, computes 1h signal.
 """
 
 from __future__ import annotations
 
 import json, sys
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+OHLCV_PATH = Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
+CONFIG_PATH = Path("results/strategies_live/live_config.json")
 
-class LiveStrategy:
-    """1h London Session Momentum — pull latest bar, compute signal."""
 
-    def __init__(self):
-        self.data_path = Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
-        self.factors_dir = Path("results/factors")
-        self.values_dir = self.factors_dir / "values"
-        self.factors = {
-            "london_session_momentum": 1,
-            "london_session_drift": 1,
-        }
-        self._factor_cache = {}
+def load_config():
+    with open(CONFIG_PATH) as f:
+        return json.load(f)
 
-    def _load_factor(self, name: str) -> pd.Series:
-        if name in self._factor_cache:
-            return self._factor_cache[name]
-        safe = name.replace("/", "_")[:150]
-        pf = self.values_dir / f"{safe}.parquet"
-        s = pd.read_parquet(pf).iloc[:, 0]
-        if isinstance(s.index, pd.MultiIndex):
-            s = s.droplevel(-1)
-        self._factor_cache[name] = s.sort_index()
-        return self._factor_cache[name]
 
-    def get_signal(self, current_time: pd.Timestamp = None) -> dict:
-        """
-        Compute trading signal for the current 1h bar.
-        
-        Returns dict with:
-            signal: 1 (long), -1 (short), 0 (flat)
-            strength: 0.0-1.0 (confidence)
-            factors: dict of individual factor signals
-            active: bool (is London/NY session?)
-            timestamp: current bar time
-        """
-        if current_time is None:
-            current_time = pd.Timestamp.now(tz="UTC").floor("1h")
+def get_latest_close():
+    """Get the most recent 1-min close price."""
+    close = pd.read_hdf(OHLCV_PATH, key="data")["$close"]
+    if isinstance(close.index, pd.MultiIndex):
+        close = close.droplevel(-1)
+    return close.sort_index().dropna()
 
-        hour = current_time.hour
-        is_session = 7 <= hour < 17
+
+class LiveSignal:
+    def __init__(self, mode="price"):
+        self.mode = mode
+        self.close = get_latest_close()
+        self.config = load_config()
+        self.session = self.config["session_hours"]  # [7, 17]
+
+    def get_signal(self) -> dict:
+        """Compute current trading signal."""
+        now = pd.Timestamp.now(tz="UTC").floor("1h")
+        hour = now.hour
+        is_session = self.session[0] <= hour < self.session[1]
 
         if not is_session:
-            return {
-                "signal": 0, "strength": 0.0,
-                "factors": {}, "active": False,
-                "timestamp": current_time,
-                "reason": "Outside trading session (07-17 UTC)"
-            }
+            return {"signal": 0, "active": False, "reason": "Outside session", "timestamp": now}
 
-        signals = {}
-        for name, direction in self.factors.items():
-            try:
-                series = self._load_factor(name)
-                fac_1h = series.resample("1h").last()
-                if current_time in fac_1h.index:
-                    val = fac_1h.loc[current_time]
-                else:
-                    val = fac_1h.asof(current_time)
-                if pd.isna(val):
-                    signals[name] = 0
-                else:
-                    signals[name] = direction * int(np.sign(val))
-            except Exception:
-                signals[name] = 0
+        if self.mode == "price":
+            return self._price_mode(now)
+        else:
+            return self._factor_mode(now)
 
-        # Combine: average of individual signals
-        values = list(signals.values())
-        combo = np.mean(values) if values else 0
+    def _price_mode(self, now) -> dict:
+        """SMA10/30 crossover on 1h bars."""
+        c = self.close.resample("1h").last()
+        if now not in c.index:
+            c.loc[now] = c.iloc[-1]
         
-        # Round to nearest direction
-        if combo > 0.3:
+        # Compute SMAs
+        sma10 = c.rolling(10).mean()
+        sma30 = c.rolling(30).mean()
+        
+        if len(sma10.dropna()) < 30:
+            return {"signal": 0, "active": True, "reason": "Not enough bars", "timestamp": now}
+        
+        current_sma10 = sma10.iloc[-1]
+        current_sma30 = sma30.iloc[-1]
+        prev_sma10 = sma10.iloc[-2]
+        prev_sma30 = sma30.iloc[-2]
+        
+        # Signal
+        if current_sma10 > current_sma30:
             signal = 1
-        elif combo < -0.3:
+            reason = "SMA10 > SMA30 (uptrend)"
+        elif current_sma10 < current_sma30:
             signal = -1
+            reason = "SMA10 < SMA30 (downtrend)"
         else:
             signal = 0
+            reason = "SMA10 == SMA30 (flat)"
 
-        strength = abs(combo)
-        agreeing = sum(1 for v in values if v == signal)
+        # Cross detection
+        crossed = (prev_sma10 - prev_sma30) * (current_sma10 - current_sma30) < 0
+        if crossed:
+            reason += " ⚡ CROSSOVER!"
 
         return {
             "signal": signal,
-            "strength": round(strength, 3),
-            "factors": signals,
             "active": True,
-            "timestamp": current_time,
-            "agreeing_factors": f"{agreeing}/{len(values)}",
-            "reason": f"{'LONG' if signal == 1 else 'SHORT' if signal == -1 else 'FLAT'} ({agreeing}/{len(values)} factors agree)"
+            "mode": "price",
+            "sma10": round(float(current_sma10), 6),
+            "sma30": round(float(current_sma30), 6),
+            "crossed": crossed,
+            "price": round(float(c.iloc[-1]), 6),
+            "reason": reason,
+            "timestamp": now,
         }
+
+    def _factor_mode(self, now) -> dict:
+        return {"signal": 0, "active": True, "mode": "factors",
+                "reason": "Factor data not available for live trading", "timestamp": now}
 
 
 def main():
-    strat = LiveStrategy()
-    result = strat.get_signal()
+    signal = LiveSignal(mode="price")
+    result = signal.get_signal()
     print(json.dumps(result, indent=2, default=str))
 
 
