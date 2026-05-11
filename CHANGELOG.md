@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.6.0](https://github.com/TPTBusiness/NexQuant/compare/v1.5.0...v1.6.0) (2026-05-11)
+
+
+### Features
+
+* 1h London session momentum — +3.17%/month unlevered, -1.1% DD, FTMO-safe ([4344cba](https://github.com/TPTBusiness/NexQuant/commit/4344cba29b915e8dcd06fdc64cfe6e636d727e18))
+* 1h SMA10/30 signal integrated into FTMO live trader ([dd64a97](https://github.com/TPTBusiness/NexQuant/commit/dd64a978a158a8e851d140844dbe14dc8782c92e))
+* 30min factor combo bests 1h — +3.59%/month (+54% annual) ([99cd761](https://github.com/TPTBusiness/NexQuant/commit/99cd761c2c23b3943eca7a8e4c84e8a676af1275))
+* 9 additional daily strategies — ensembles, trailing stops, day filters ([34d0127](https://github.com/TPTBusiness/NexQuant/commit/34d0127cb6501b1eeec0417a79ec94d0418ebfa6))
+* auto-mode live strategy — factors when fresh, SMA fallback ([15e6d17](https://github.com/TPTBusiness/NexQuant/commit/15e6d1712e3be71e5646ddb5da04b87883224a45))
+* auto-post releases to Mastodon and X/Twitter via GitHub Actions ([dbc025a](https://github.com/TPTBusiness/NexQuant/commit/dbc025aeb7a17a9659520299089ba8da5b8c0aa2))
+* daily strategy generator — grid search SMA/EMA/RSI/MACD/BB (14/55 profitable) ([1c11962](https://github.com/TPTBusiness/NexQuant/commit/1c11962e9226ac70ca31cbd738403fd621e08fc4))
+* integrate Kronos foundation model into fin_quant R&D loop ([e5d8131](https://github.com/TPTBusiness/NexQuant/commit/e5d8131cd524cee645009083f650281cf99ccb73))
+* inverse factor signal combos — top-3 gives +0.57%/month with -3.7% DD ([d235ebf](https://github.com/TPTBusiness/NexQuant/commit/d235ebf44c06f29e07d4c1eaae3c07baf7a4f3e6))
+* live 1h London momentum strategy + multi-timeframe generator ([c293d5c](https://github.com/TPTBusiness/NexQuant/commit/c293d5cfad5156f05265ae3e0691c523e57c57e6))
+* multi-asset data pipeline, daily strategy generator, ML pipeline ([96154e2](https://github.com/TPTBusiness/NexQuant/commit/96154e273ea9f2eab9d80c498eb96c1c4b8a1c10))
+* Optuna-optimized RF ML pipeline for daily strategies (+0.61%/month) ([3869732](https://github.com/TPTBusiness/NexQuant/commit/3869732f834c6f9ff4e8046dda7d62a6d1ddd6f0))
+* prioritize Kronos foundation model factors in strategy selection ([b0ba0bc](https://github.com/TPTBusiness/NexQuant/commit/b0ba0bc295bd7b7647d3a500d2106962edcdac46))
+* run Kronos on CPU to avoid GPU conflict with llama-server ([6e2b15e](https://github.com/TPTBusiness/NexQuant/commit/6e2b15e4322af96efb7e372837ab10b2f4cbc223))
+* support Kronos-small and Kronos-base models, auto-select GPU/CPU ([e877b2f](https://github.com/TPTBusiness/NexQuant/commit/e877b2f46c54d41f8bbd2d6f1e58feece5001622))
+
+
+### Bug Fixes
+
+* add hypothesis to test deps and fix missing imports in deep tests ([ace4325](https://github.com/TPTBusiness/NexQuant/commit/ace432547bea8f1ea62b4312ba4043ef60cb9d15))
+* add missing debug() method to RDAgentLog ([2331613](https://github.com/TPTBusiness/NexQuant/commit/2331613621177f7c413ea2b134b162d75c90c53a))
+* bump axios 1.15.2→1.16.0, postcss 8.4.31→8.5.14 (Dependabot CVEs) ([8d9caa9](https://github.com/TPTBusiness/NexQuant/commit/8d9caa95044ef4e1e1d7781f3bc65753935000cb))
+* prevent LLM retry loop from consecutive assistant message corruption ([8c4d2a8](https://github.com/TPTBusiness/NexQuant/commit/8c4d2a8ce9d76d10223d57898305dc3ddf193706))
+* restore KronosPredictor instantiation deleted during refactor ([d8f9c80](https://github.com/TPTBusiness/NexQuant/commit/d8f9c80449eb4c8f3d49dac0527bca96dcd1bd1a))
+
+
+### Reverts
+
+* remove automated release social workflow ([f93f5ea](https://github.com/TPTBusiness/NexQuant/commit/f93f5ead3053c5baaeb70c16681687fb22295968))
+
+
+### Documentation
+
+* add precise release trigger rules (5+ feats, 10+ fixes, 30+ commits, major feature, security) ([29c6ad6](https://github.com/TPTBusiness/NexQuant/commit/29c6ad6fc18f088b6f2515d8f3c9f904c81f2ecf))
+* fix script paths in README after rename ([2462b11](https://github.com/TPTBusiness/NexQuant/commit/2462b1107c7d8b823cc2466b7e47a307c04d3d42))
+* update README — Kronos-small, test depth, daemon setup, project structure ([ba64f35](https://github.com/TPTBusiness/NexQuant/commit/ba64f3509f26408310cf49e70652bf4190325685))
+
 ## [0.8.0](https://github.com/TPTBusiness/NexQuant/compare/v1.4.2...v0.8.0) (2026-05-04)
 
 
