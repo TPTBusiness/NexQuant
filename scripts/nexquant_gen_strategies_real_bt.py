@@ -15,20 +15,27 @@ Usage:
     # With parallel workers (default: CPU count)
     TRADING_STYLE=daytrading WORKERS=4 python nexquant_gen_strategies_real_bt.py 20
 """
-import os, sys, json, time, math, random, logging, warnings, subprocess
-from pathlib import Path
+import json
+import logging
+import os
+import random
+import subprocess
+import sys
+import time
+import warnings
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
 # Suppress warnings and noisy loggers that bleed into Rich progress output
-warnings.filterwarnings('ignore')
-for _noisy in ('rdagent', 'litellm', 'LiteLLM', 'litellm.utils',
-               'litellm.main', 'httpx', 'httpcore', 'openai', 'urllib3'):
+warnings.filterwarnings("ignore")
+for _noisy in ("rdagent", "litellm", "LiteLLM", "litellm.utils",
+               "litellm.main", "httpx", "httpcore", "openai", "urllib3"):
     logging.getLogger(_noisy).setLevel(logging.CRITICAL)
 # Suppress litellm verbose flag if already imported
 try:
@@ -42,36 +49,38 @@ except Exception:
 # ============================================================================
 # Configuration
 # ============================================================================
-OHLCV_PATH = Path('/home/nico/NexQuant/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5')
-FACTORS_DIR = Path('/home/nico/NexQuant/results/factors')
-STRATEGIES_DIR = Path('/home/nico/NexQuant/results/strategies_new')
+OHLCV_PATH = Path("/home/nico/NexQuant/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
+FACTORS_DIR = Path("/home/nico/NexQuant/results/factors")
+STRATEGIES_DIR = Path("/home/nico/NexQuant/results/strategies_new")
 STRATEGIES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Trading style
-TRADING_STYLE = os.getenv('TRADING_STYLE', 'swing')
-N_WORKERS = int(os.getenv('WORKERS', os.cpu_count() or 4))
+TRADING_STYLE = os.getenv("TRADING_STYLE", "swing")
+N_WORKERS = int(os.getenv("WORKERS", os.cpu_count() or 4))
 
-if TRADING_STYLE == 'daytrading':
-    FORWARD_BARS = int(os.getenv('FORWARD_BARS', '12'))
+if TRADING_STYLE == "daytrading":
+    FORWARD_BARS = int(os.getenv("FORWARD_BARS", "12"))
     MIN_IC = 0.02
     MIN_SHARPE = 0.5
     MIN_TRADES = 300
     MAX_DRAWDOWN = -0.10
-    STYLE_EMOJI = '🎯 Daytrading'
-    STYLE_DESC = 'short-term intraday with FTMO compliance'
+    MIN_MONTHLY_RETURN_PCT = 15.0
+    STYLE_EMOJI = "🎯 Daytrading"
+    STYLE_DESC = "short-term intraday with FTMO compliance"
 else:
-    FORWARD_BARS = int(os.getenv('FORWARD_BARS', '96'))
+    FORWARD_BARS = int(os.getenv("FORWARD_BARS", "96"))
     MIN_IC = 0.02
     MIN_SHARPE = 0.5
     MIN_TRADES = 10
     MAX_DRAWDOWN = -0.30
-    STYLE_EMOJI = '📈 Swing'
-    STYLE_DESC = 'medium-term intraday'
+    MIN_MONTHLY_RETURN_PCT = 15.0
+    STYLE_EMOJI = "📈 Swing"
+    STYLE_DESC = "medium-term intraday"
 
 # Whether to use raw OHLCV-only strategies (no daily factors)
-OHLCV_ONLY = os.getenv('OHLCV_ONLY', '0') == '1'
+OHLCV_ONLY = os.getenv("OHLCV_ONLY", "0") == "1"
 
-TXN_COST_BPS = float(os.getenv('TXN_COST_BPS', '2.14'))  # 2.35 pip realistic EUR/USD costs
+TXN_COST_BPS = float(os.getenv("TXN_COST_BPS", "2.14"))  # 2.35 pip realistic EUR/USD costs
 
 # ── Logging setup: everything printed goes to log file + stdout ───────────────
 _LOG_DIR = Path(__file__).parent.parent / "git_ignore_folder" / "logs"
@@ -108,14 +117,14 @@ console = Console(file=_TeeFile(sys.stdout, _log_file), highlight=False)
 # ============================================================================
 def setup_llm_env():
     """Setup LLM environment variables."""
-    load_dotenv(Path(__file__).parent.parent / '.env')
-    if os.getenv('OPENAI_API_KEY') == 'local' or os.getenv('LLM_BACKEND', '').lower() == 'local':
+    load_dotenv(Path(__file__).parent.parent / ".env")
+    if os.getenv("OPENAI_API_KEY") == "local" or os.getenv("LLM_BACKEND", "").lower() == "local":
         return
-    router_key = os.getenv('OPENROUTER_API_KEY', '')
+    router_key = os.getenv("OPENROUTER_API_KEY", "")
     if router_key:
-        os.environ['OPENAI_API_KEY'] = router_key
-        os.environ['OPENAI_API_BASE'] = 'https://openrouter.ai/api/v1'
-        os.environ['CHAT_MODEL'] = os.getenv('OPENROUTER_MODEL', 'openrouter/google/gemma-4-26b-a4b-it:free')
+        os.environ["OPENAI_API_KEY"] = router_key
+        os.environ["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
+        os.environ["CHAT_MODEL"] = os.getenv("OPENROUTER_MODEL", "openrouter/google/gemma-4-26b-a4b-it:free")
 
 # ============================================================================
 # Factor Loading (cached at module level for each process)
@@ -127,20 +136,20 @@ def load_available_factors(top_n=20):
     global _FACTORS_CACHE
     if _FACTORS_CACHE is not None:
         return _FACTORS_CACHE[:top_n]
-    
+
     factors = []
-    for f in FACTORS_DIR.glob('*.json'):
+    for f in FACTORS_DIR.glob("*.json"):
         try:
             data = json.load(open(f))
-            fname = data.get('factor_name', '')
-            ic = data.get('ic') or 0
-            safe = fname.replace('/','_').replace('\\','_')[:150]
-            if (FACTORS_DIR / 'values' / f"{safe}.parquet").exists():
-                factors.append({'name': fname, 'ic': ic})
+            fname = data.get("factor_name", "")
+            ic = data.get("ic") or 0
+            safe = fname.replace("/","_").replace("\\","_")[:150]
+            if (FACTORS_DIR / "values" / f"{safe}.parquet").exists():
+                factors.append({"name": fname, "ic": ic})
         except:
             pass
-    
-    factors.sort(key=lambda x: abs(x['ic']), reverse=True)
+
+    factors.sort(key=lambda x: abs(x["ic"]), reverse=True)
     _FACTORS_CACHE = factors
     return factors[:top_n]
 
@@ -154,18 +163,18 @@ def load_ohlcv_data():
     global _OHLCV_CACHE
     if _OHLCV_CACHE is not None:
         return _OHLCV_CACHE
-    
+
     if not OHLCV_PATH.exists():
         raise FileNotFoundError(f"OHLCV data not found: {OHLCV_PATH}")
-    
-    ohlcv = pd.read_hdf(str(OHLCV_PATH), key='data')
-    if '$close' in ohlcv.columns:
-        close = ohlcv['$close']
-    elif 'close' in ohlcv.columns:
-        close = ohlcv['close']
+
+    ohlcv = pd.read_hdf(str(OHLCV_PATH), key="data")
+    if "$close" in ohlcv.columns:
+        close = ohlcv["$close"]
+    elif "close" in ohlcv.columns:
+        close = ohlcv["close"]
     else:
         close = ohlcv.select_dtypes(include=[np.number]).iloc[:, 0]
-    
+
     _OHLCV_CACHE = close.dropna()
     return _OHLCV_CACHE
 
@@ -175,16 +184,16 @@ def load_ohlcv_data():
 def generate_single_strategy(args):
     """Generate and backtest ONE strategy. Runs in separate process."""
     idx, factor_subset, feedback, attempt = args
-    
+
     try:
         setup_llm_env()
-        
+
         from rdagent.oai.llm_utils import APIBackend
-        
+
         factor_list = "\n".join([f"- {f['name']} (IC={f['ic']:.4f})" for f in factor_subset])
-        
+
         # Optimized prompts for daytrading vs swing
-        if TRADING_STYLE == 'daytrading' and OHLCV_ONLY:
+        if TRADING_STYLE == "daytrading" and OHLCV_ONLY:
             system_prompt = """You are an expert EUR/USD intraday quant. You build strategies that work ONLY on raw price data (OHLCV), computing all indicators directly from the 1-minute close series.
 
 CRITICAL RULES:
@@ -219,9 +228,10 @@ Hard requirements:
 - Use EMA crossover thresholds of 0 (cross above/below) for maximum trade frequency
 - Use causal indicators only: rolling windows, shift(1) — NO look-ahead bias
 - No factor data — compute everything from 'close'
-- Keep it simple: 2-3 indicators max"""
+- Keep it simple: 2-3 indicators max
+- TARGET MONTHLY RETURN: Generate signals that can achieve >15% OOS monthly return after FTMO costs (2.35 pip/trade). Use high-conviction entries only."""
 
-        elif TRADING_STYLE == 'daytrading':
+        elif TRADING_STYLE == "daytrading":
             system_prompt = f"""You are an expert daytrading quant specializing in EUR/USD scalping and intraday strategies.
 
 CRITICAL RULES for {STYLE_DESC} (forward horizon: {FORWARD_BARS} bars = ~{FORWARD_BARS} minutes):
@@ -247,7 +257,8 @@ Hard requirements:
 - NEVER use ffill() or forward-fill on the signal — recompute fresh at every bar
 - Use rolling z-scores with windows of 5-20 bars (not 50-100), thresholds ±0.2 to ±0.5
 - Combine 2 factors: one momentum, one mean-reversion
-- NO global mean/std — always use rolling(window).mean() with shift(1) to avoid look-ahead bias"""
+- NO global mean/std — always use rolling(window).mean() with shift(1) to avoid look-ahead bias
+- TARGET MONTHLY RETURN: Generate signals that can achieve >15% OOS monthly return after FTMO costs (2.35 pip/trade). Use high-conviction entries only."""
 
         else:
             system_prompt = f"""You are a quantitative trading expert specializing in EUR/USD daily swing strategies.
@@ -278,26 +289,26 @@ Output ONLY valid JSON with these fields:
 
 {f'Previous feedback: {feedback}' if feedback else 'First attempt - be creative!'}
 
-Use daily-level signal logic (factor above/below rolling daily mean). Signal changes once per day."""
-        
+Use daily-level signal logic (factor above/below rolling daily mean). Signal changes once per day. TARGET MONTHLY RETURN: Generate signals that can achieve >15% OOS monthly return after FTMO costs (2.35 pip/trade)."""
+
         api = APIBackend()
         response = api.build_messages_and_create_chat_completion(
-            user_prompt=user_prompt, system_prompt=system_prompt, json_mode=True
+            user_prompt=user_prompt, system_prompt=system_prompt, json_mode=True,
         )
         strategy_data = json.loads(response)
-        
+
         # Validate response
-        if 'code' not in strategy_data or 'factor_names' not in strategy_data:
-            return {'status': 'invalid', 'reason': 'Missing required fields', 'idx': idx}
-        
+        if "code" not in strategy_data or "factor_names" not in strategy_data:
+            return {"status": "invalid", "reason": "Missing required fields", "idx": idx}
+
         return {
-            'status': 'generated',
-            'strategy': strategy_data,
-            'idx': idx
+            "status": "generated",
+            "strategy": strategy_data,
+            "idx": idx,
         }
-        
+
     except Exception as e:
-        return {'status': 'error', 'reason': str(e)[:200], 'idx': idx}
+        return {"status": "error", "reason": str(e)[:200], "idx": idx}
 
 # ============================================================================
 # Backtest Runner (runs in main process to avoid re-loading data)
@@ -345,32 +356,32 @@ signal.fillna(0).to_pickle('signal.pkl')
 
     with tempfile.TemporaryDirectory() as td:
         tdp = Path(td)
-        close.to_pickle(str(tdp / 'close.pkl'))
+        close.to_pickle(str(tdp / "close.pkl"))
         if not OHLCV_ONLY and factors_df is not None:
-            factors_df.to_pickle(str(tdp / 'factors.pkl'))
-        (tdp / 'run.py').write_text(script)
+            factors_df.to_pickle(str(tdp / "factors.pkl"))
+        (tdp / "run.py").write_text(script)
 
         try:
             result = subprocess.run(
-                ['python', 'run.py'],
+                ["python", "run.py"],
                 capture_output=True, text=True, timeout=60,
-                cwd=str(tdp)
+                cwd=str(tdp),
             )
             if result.returncode != 0:
-                return {'status': 'failed', 'reason': (result.stderr or result.stdout)[:200]}
+                return {"status": "failed", "reason": (result.stderr or result.stdout)[:200]}
 
-            signal = pd.read_pickle(tdp / 'signal.pkl')
+            signal = pd.read_pickle(tdp / "signal.pkl")
         except subprocess.TimeoutExpired:
-            return {'status': 'failed', 'reason': 'Timeout (60s)'}
+            return {"status": "failed", "reason": "Timeout (60s)"}
         except Exception as e:
-            return {'status': 'failed', 'reason': str(e)[:200]}
+            return {"status": "failed", "reason": str(e)[:200]}
 
     # Main process: FTMO-realistic backtest (leverage + daily/total loss limits).
     from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
 
     common = close.index.intersection(signal.index)
     if len(common) < 100:
-        return {'status': 'failed', 'reason': f'Not enough aligned data ({len(common)} bars)'}
+        return {"status": "failed", "reason": f"Not enough aligned data ({len(common)} bars)"}
 
     close_a  = close.loc[common]
     signal_a = signal.reindex(common).fillna(0)
@@ -409,9 +420,9 @@ def _rescale_thresholds(code: str, scale: float) -> str:
         return f"{val * scale:.3f}"
 
     # RSI-style thresholds: integers/floats between 10 and 90
-    code = re.sub(r'\b([1-9]\d(?:\.\d+)?)\b', replace_rsi, code)
+    code = re.sub(r"\b([1-9]\d(?:\.\d+)?)\b", replace_rsi, code)
     # Small float thresholds: 0.05 – 2.99
-    code = re.sub(r'\b(0\.\d+|[12]\.\d+)\b', replace_small, code)
+    code = re.sub(r"\b(0\.\d+|[12]\.\d+)\b", replace_small, code)
     return code
 
 
@@ -426,12 +437,12 @@ def tune_thresholds(close, factors_df, code: str) -> tuple:
     for scale in [1.0, 0.7, 0.5, 0.35, 0.2, 0.1, 0.05]:
         tuned = _rescale_thresholds(code, scale) if scale < 1.0 else code
         bt = run_backtest(close, factors_df, tuned)
-        if bt is None or bt.get('status') != 'success':
+        if bt is None or bt.get("status") != "success":
             continue
-        trades = bt.get('n_trades', 0)
-        sharpe = bt.get('sharpe', -999)
+        trades = bt.get("n_trades", 0)
+        sharpe = bt.get("sharpe", -999)
         if trades >= MIN_TRADES:
-            if best_bt is None or sharpe > best_bt.get('sharpe', -999):
+            if best_bt is None or sharpe > best_bt.get("sharpe", -999):
                 best_bt = bt
                 best_code = tuned
             break  # first scale that hits MIN_TRADES wins (they get looser after this)
@@ -461,46 +472,46 @@ def main(target_count=10):
     console.print(f"   Forward bars: {FORWARD_BARS}")
     console.print(f"   Target: {target_count} accepted strategies")
     console.print(f"   Workers: {N_WORKERS}\n")
-    
+
     # Load data (main process only)
     close = load_ohlcv_data()
     factors = load_available_factors(20)
-    
+
     console.print(f"[green]✓[/green] Loaded {len(factors)} factors, {len(close):,} OHLCV bars\n")
-    
+
     # Load factor time-series
     factor_data = {}
     with Progress(SpinnerColumn(), TextColumn("[bold blue]Loading factors..."), BarColumn(), TimeElapsedColumn()) as progress:
         task = progress.add_task("Loading...", total=len(factors))
         for f_info in factors:
-            safe = f_info['name'].replace('/','_').replace('\\','_')[:150]
-            pf = FACTORS_DIR / 'values' / f"{safe}.parquet"
+            safe = f_info["name"].replace("/","_").replace("\\","_")[:150]
+            pf = FACTORS_DIR / "values" / f"{safe}.parquet"
             if pf.exists():
                 try:
                     series = pd.read_parquet(str(pf)).iloc[:, 0]
-                    factor_data[f_info['name']] = series
+                    factor_data[f_info["name"]] = series
                 except:
                     pass
             progress.update(task, advance=1)
-    
+
     # Align factors with close prices
     all_factor_series = [factor_data[n] for n in factor_data if n in factor_data]
     if not all_factor_series:
         console.print("[red]✗ No factor data loaded![/red]")
         return
-    
+
     df_factors = pd.DataFrame({n: factor_data[n] for n in factor_data if n in factor_data})
-    common_idx = close.index.intersection(df_factors.dropna(how='all').index)
+    common_idx = close.index.intersection(df_factors.dropna(how="all").index)
     close_aligned = close.loc[common_idx]
     df_aligned = df_factors.loc[common_idx]
-    
+
     console.print(f"[green]✓[/green] Aligned {len(df_aligned):,} data points\n")
-    
+
     # Strategy generation loop
     accepted = []
     feedback_history = []
     max_attempts = target_count * 10  # Allow 10x attempts
-    
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[bold blue]{task.description}"),
@@ -511,11 +522,11 @@ def main(target_count=10):
         redirect_stderr=True,
     ) as progress:
         task = progress.add_task("Generating...", total=max_attempts)
-        
+
         for attempt in range(max_attempts):
             if len(accepted) >= target_count:
                 break
-            
+
             # Select random factor subset (2-5 factors) — empty for OHLCV-only mode
             if OHLCV_ONLY:
                 factor_subset = []
@@ -528,51 +539,51 @@ def main(target_count=10):
             # Generate in main process (LLM doesn't parallelize well)
             gen_result = generate_single_strategy((attempt, factor_subset, feedback, attempt))
 
-            if gen_result['status'] != 'generated':
+            if gen_result["status"] != "generated":
                 progress.update(task, advance=1)
                 continue
 
-            strategy = gen_result['strategy']
+            strategy = gen_result["strategy"]
 
             # Backtest (main process - needs data access)
             if OHLCV_ONLY:
                 strat_factors = None
-                bt_result = run_backtest(close, None, strategy.get('code', ''))
+                bt_result = run_backtest(close, None, strategy.get("code", ""))
             else:
-                strat_factors = df_aligned[[f for f in strategy.get('factor_names', []) if f in df_aligned.columns]]
+                strat_factors = df_aligned[[f for f in strategy.get("factor_names", []) if f in df_aligned.columns]]
                 if len(strat_factors.columns) < 2:
                     progress.update(task, advance=1)
                     continue
-                bt_result = run_backtest(close_aligned, strat_factors, strategy.get('code', ''))
-            
-            if bt_result and bt_result.get('status') == 'success':
-                ic = bt_result.get('ic', 0)
-                sharpe = bt_result.get('sharpe', 0)
-                trades = bt_result.get('n_trades', 0)
-                dd = bt_result.get('max_drawdown', 0)
+                bt_result = run_backtest(close_aligned, strat_factors, strategy.get("code", ""))
+
+            if bt_result and bt_result.get("status") == "success":
+                ic = bt_result.get("ic", 0)
+                sharpe = bt_result.get("sharpe", 0)
+                trades = bt_result.get("n_trades", 0)
+                dd = bt_result.get("max_drawdown", 0)
 
                 # If too few trades, auto-tune thresholds before giving up
-                original_code = strategy.get('code', '')
-                if trades < MIN_TRADES and bt_result.get('status') == 'success':
+                original_code = strategy.get("code", "")
+                if trades < MIN_TRADES and bt_result.get("status") == "success":
                     _log.info(f"TUNING  trades={trades}<{MIN_TRADES} — trying looser thresholds")
                     tuned_bt, tuned_code = tune_thresholds(
                         close if OHLCV_ONLY else close_aligned,
                         None if OHLCV_ONLY else strat_factors,
                         original_code,
                     )
-                    if tuned_bt and tuned_bt.get('n_trades', 0) >= MIN_TRADES:
+                    if tuned_bt and tuned_bt.get("n_trades", 0) >= MIN_TRADES:
                         bt_result = tuned_bt
-                        strategy['code'] = tuned_code
-                        ic = bt_result.get('ic', 0)
-                        sharpe = bt_result.get('sharpe', 0)
-                        trades = bt_result.get('n_trades', 0)
-                        dd = bt_result.get('max_drawdown', 0)
+                        strategy["code"] = tuned_code
+                        ic = bt_result.get("ic", 0)
+                        sharpe = bt_result.get("sharpe", 0)
+                        trades = bt_result.get("n_trades", 0)
+                        dd = bt_result.get("max_drawdown", 0)
                         _log.info(f"TUNED   Sharpe={sharpe:.2f}  Trades={trades}")
 
                 # OOS metrics — mandatory, no fallback to IS values
-                oos_sharpe  = bt_result.get('oos_sharpe')
-                oos_monthly = bt_result.get('oos_monthly_return_pct')
-                oos_trades  = bt_result.get('oos_n_trades', 0)
+                oos_sharpe  = bt_result.get("oos_sharpe")
+                oos_monthly = bt_result.get("oos_monthly_return_pct")
+                oos_trades  = bt_result.get("oos_n_trades", 0)
 
                 # Reject if OOS data is missing (strategy trained on data without OOS period)
                 if oos_sharpe is None or oos_monthly is None:
@@ -582,54 +593,54 @@ def main(target_count=10):
                     continue
 
                 # Monte Carlo p-value (edge significance)
-                mc_pvalue = bt_result.get('mc_pvalue')
+                mc_pvalue = bt_result.get("mc_pvalue")
 
                 # Rolling walk-forward metrics
-                wf_consistency = bt_result.get('wf_oos_consistency')
-                wf_sharpe_mean = bt_result.get('wf_oos_sharpe_mean')
+                wf_consistency = bt_result.get("wf_oos_consistency")
+                wf_sharpe_mean = bt_result.get("wf_oos_sharpe_mean")
 
                 # Check acceptance criteria — OOS must be profitable + statistically significant
                 mc_ok = mc_pvalue is None or mc_pvalue < 0.20  # lenient: top 20% non-random
                 wf_ok = wf_consistency is None or wf_consistency >= 0.5  # ≥50% of WF windows profitable
                 if (abs(ic or 0) > MIN_IC and sharpe > MIN_SHARPE and trades > MIN_TRADES and dd > MAX_DRAWDOWN
-                        and oos_sharpe > 0.0 and oos_monthly > 0.0 and mc_ok and wf_ok):
+                        and oos_sharpe > 0.0 and oos_monthly > MIN_MONTHLY_RETURN_PCT and mc_ok and wf_ok):
                     # ACCEPT
-                    strategy['real_backtest'] = bt_result
-                    strategy['metrics'] = bt_result
-                    strategy['summary'] = {
-                        'sharpe': sharpe, 'max_drawdown': dd, 'win_rate': bt_result.get('win_rate', 0),
-                        'monthly_return_pct': bt_result.get('monthly_return_pct', 0),
-                        'annual_return_pct': bt_result.get('annual_return_pct', 0),
-                        'real_ic': ic, 'real_n_trades': trades, 'real_backtest_status': 'success',
-                        'n_bars': bt_result.get('n_bars', 0), 'n_months': bt_result.get('n_months', 0),
-                        'trading_style': TRADING_STYLE,
-                        'ohlcv_only': OHLCV_ONLY,
-                        'engine': 'ftmo_v2',
-                        'txn_cost_bps': TXN_COST_BPS,
+                    strategy["real_backtest"] = bt_result
+                    strategy["metrics"] = bt_result
+                    strategy["summary"] = {
+                        "sharpe": sharpe, "max_drawdown": dd, "win_rate": bt_result.get("win_rate", 0),
+                        "monthly_return_pct": bt_result.get("monthly_return_pct", 0),
+                        "annual_return_pct": bt_result.get("annual_return_pct", 0),
+                        "real_ic": ic, "real_n_trades": trades, "real_backtest_status": "success",
+                        "n_bars": bt_result.get("n_bars", 0), "n_months": bt_result.get("n_months", 0),
+                        "trading_style": TRADING_STYLE,
+                        "ohlcv_only": OHLCV_ONLY,
+                        "engine": "ftmo_v2",
+                        "txn_cost_bps": TXN_COST_BPS,
                         # Walk-forward OOS split
-                        'oos_sharpe': bt_result.get('oos_sharpe'),
-                        'oos_monthly_return_pct': bt_result.get('oos_monthly_return_pct'),
-                        'oos_max_drawdown': bt_result.get('oos_max_drawdown'),
-                        'oos_win_rate': bt_result.get('oos_win_rate'),
-                        'oos_n_trades': bt_result.get('oos_n_trades'),
-                        'is_sharpe': bt_result.get('is_sharpe'),
-                        'is_monthly_return_pct': bt_result.get('is_monthly_return_pct'),
-                        'oos_start': bt_result.get('oos_start'),
+                        "oos_sharpe": bt_result.get("oos_sharpe"),
+                        "oos_monthly_return_pct": bt_result.get("oos_monthly_return_pct"),
+                        "oos_max_drawdown": bt_result.get("oos_max_drawdown"),
+                        "oos_win_rate": bt_result.get("oos_win_rate"),
+                        "oos_n_trades": bt_result.get("oos_n_trades"),
+                        "is_sharpe": bt_result.get("is_sharpe"),
+                        "is_monthly_return_pct": bt_result.get("is_monthly_return_pct"),
+                        "oos_start": bt_result.get("oos_start"),
                         # Rolling walk-forward
-                        'wf_n_windows': bt_result.get('wf_n_windows'),
-                        'wf_oos_sharpe_mean': wf_sharpe_mean,
-                        'wf_oos_sharpe_std': bt_result.get('wf_oos_sharpe_std'),
-                        'wf_oos_monthly_return_mean': bt_result.get('wf_oos_monthly_return_mean'),
-                        'wf_oos_consistency': wf_consistency,
+                        "wf_n_windows": bt_result.get("wf_n_windows"),
+                        "wf_oos_sharpe_mean": wf_sharpe_mean,
+                        "wf_oos_sharpe_std": bt_result.get("wf_oos_sharpe_std"),
+                        "wf_oos_monthly_return_mean": bt_result.get("wf_oos_monthly_return_mean"),
+                        "wf_oos_consistency": wf_consistency,
                         # Monte Carlo significance
-                        'mc_pvalue': mc_pvalue,
-                        'mc_n_permutations': bt_result.get('mc_n_permutations'),
+                        "mc_pvalue": mc_pvalue,
+                        "mc_n_permutations": bt_result.get("mc_n_permutations"),
                     }
-                    
+
                     fname = f"{int(time.time())}_{strategy['strategy_name']}.json"
-                    with open(STRATEGIES_DIR / fname, 'w') as f:
+                    with open(STRATEGIES_DIR / fname, "w") as f:
                         json.dump(strategy, f, indent=2, ensure_ascii=False)
-                    
+
                     # Generate PDF report
                     try:
                         from nexquant_strategy_report import StrategyPerformanceReporter
@@ -637,7 +648,7 @@ def main(target_count=10):
                         reporter.generate_report()
                     except:
                         pass
-                    
+
                     accepted.append(strategy)
                     _log.success(f"ACCEPTED  {strategy['strategy_name']}  IC={ic:.4f}  Sharpe={sharpe:.3f}  Trades={trades}  DD={dd:.1%}")
                     feedback_history.append(f"Excellent! IC={ic:.4f}, Sharpe={sharpe:.2f}, Trades={trades}. Try to improve further.")
@@ -656,27 +667,27 @@ def main(target_count=10):
                         + (f", MC_p={mc_pvalue:.2f}" if mc_pvalue is not None else "")
                         + (f", WF_consistency={wf_consistency:.0%}" if wf_consistency is not None else "")
                         + f". Need |IC|>{MIN_IC}, Sharpe>{MIN_SHARPE}, Trades>{MIN_TRADES}, "
-                        f"OOS_Sharpe>0, OOS_Monthly>0, MC_p<0.20, WF_consistency≥50%."
+                        f"OOS_Sharpe>0, OOS_Monthly>{MIN_MONTHLY_RETURN_PCT}%, MC_p<0.20, WF_consistency≥50%.",
                     )
-            
+
             progress.update(task, advance=1)
-    
+
     # Summary
     _log.info(f"DONE  accepted={len(accepted)}  target={target_count}")
-    for i, s in enumerate(sorted(accepted, key=lambda x: x['real_backtest'].get('ic', 0), reverse=True), 1):
-        bt = s['real_backtest']
+    for i, s in enumerate(sorted(accepted, key=lambda x: x["real_backtest"].get("ic", 0), reverse=True), 1):
+        bt = s["real_backtest"]
         _log.info(f"  #{i}  {s['strategy_name']}  IC={bt.get('ic',0):.4f}  Sharpe={bt.get('sharpe',0):.3f}  Monthly={bt.get('monthly_return_pct',0):.2f}%")
 
     console.print(f"\n[bold green]✓ Generated {len(accepted)}/{target_count} accepted strategies[/bold green]\n")
 
     if accepted:
-        accepted.sort(key=lambda x: x['real_backtest'].get('ic', 0), reverse=True)
+        accepted.sort(key=lambda x: x["real_backtest"].get("ic", 0), reverse=True)
         console.print("[bold]Results:[/bold]")
         for i, s in enumerate(accepted, 1):
-            bt = s['real_backtest']
+            bt = s["real_backtest"]
             console.print(f"  {i}. {s['strategy_name']:30s} IC={bt.get('ic',0):.4f} Sharpe={bt.get('sharpe',0):.3f} "
                           f"Monthly={bt.get('monthly_return_pct',0):.2f}% Trades={bt.get('n_trades',0)}")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     count = int(sys.argv[1]) if len(sys.argv) > 1 else 10
     main(count)

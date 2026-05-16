@@ -41,7 +41,7 @@ OUTPUT_DIR = Path("results/realistic_backtest")
 PIP               = 0.0001
 COST_ENTRY        = 2.0 * PIP    # spread + slippage
 COST_EXIT         = 0.35 * PIP   # commission
-RISK_PCT          = 0.01          # 1% equity risk per trade
+RISK_PCT          = 0.015         # 1.5% equity risk per trade
 STOP              = 10 * PIP      # 10-pip hard stop
 MAX_LEVERAGE      = 30            # 1:30 max leverage (FTMO / EU standard)
 FTMO_MAX_DAILY    = 0.05          # 5% max daily loss of initial balance
@@ -268,7 +268,7 @@ def _worker(args: tuple) -> dict | None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Realistic backtest of all strategies")
-    parser.add_argument("--target-monthly", type=float, default=4.0,
+    parser.add_argument("--target-monthly", type=float, default=15.0,
                         help="Minimum OOS monthly return %% (default: 4.0)")
     parser.add_argument("--min-trades", type=int, default=30,
                         help="Minimum OOS trades (default: 30)")
