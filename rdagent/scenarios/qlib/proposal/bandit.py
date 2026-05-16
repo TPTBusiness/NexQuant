@@ -94,7 +94,7 @@ class LinearThompsonTwoArm:
 
 class EnvController:
     def __init__(self, weights: Tuple[float, ...] = None) -> None:
-        self.weights = np.asarray(weights or (0.1, 0.1, 0.05, 0.05, 0.25, 0.15, 0.1, 0.2))
+        self.weights = np.asarray(weights or (0.2, 0.1, 0.05, 0.05, 0.25, 0.1, 0.1, 0.15))
         self.bandit = LinearThompsonTwoArm(dim=8, prior_var=10.0, noise_var=0.5)
 
     def reward(self, m: Metrics) -> float:

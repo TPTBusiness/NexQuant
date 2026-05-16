@@ -393,3 +393,155 @@ Files: [affected files]
 - Infrastructure, config, deps, CI → `infra`
 
 Never skip this step. This is mandatory after every task.
+
+---
+
+## 15% Monatsrendite — Mission Plan
+
+> **Ziel**: Strategien mit 15% Netto-Monatsrendite (FTMO-verifiziert, OOS).
+> **Zeitrahmen**: 4–8 Wochen.
+> **Aktueller Bestwert**: 2.3% OOS/Monat → **6.5× Lücke**.
+
+### Vier Haupthebel
+
+| Hebel | Von | Auf | Datei |
+|-------|-----|-----|-------|
+| Risk per Trade | 0.5% | 1.5% | `vbt_backtest.py` → `FTMO_RISK_PER_TRADE` |
+| Acceptance Filter | keiner | 15% Monthly Min | `strategy_orchestrator.py` → `_check_acceptance()` |
+| CLI Parameter | kein `--min-monthly-return` | `--min-monthly-return 15` | `nexquant.py` |
+| LLM Prompt | kein Return-Target | "Target 15% monthly" | `strategy_generation_v4.yaml` |
+
+### Drei Phasen
+
+```
+Phase 1 (Woche 1–2): INFRASTRUKTUR
+  → Risk-Parameter, Acceptance-Filter, CLI, Prompts
+  → Verify: Test-Run mit 5 Strategien
+
+Phase 2 (Woche 2–4): FAKTOR-OFFENSIVE
+  → R&D Loop mit IC > 0.04 Target, 100+ neue Faktoren
+  → Verify: Top-30 Faktoren nach OOS-Monthly-Return
+
+Phase 3 (Woche 4–8): STRATEGIE-MASSENPRODUKTION
+  → StrategyOrchestrator im Dauerlauf mit 15%-Filter
+  → Optuna 3-Stage auf jede vielversprechende Strategie
+  → Portfolio: 5 Strategien × 3% = 15% (unkorreliert)
+  → Verify: 3 aufeinanderfolgende Wochen ≥15% OOS-Monthly
+```
+
+### Fallback nach 4 Wochen
+
+Falls keine Strategie >8% OOS-Monthly:
+- Risk per Trade auf 2.5% erhöhen
+- Auf 5min/15min-Horizont wechseln (bessere R:R, weniger Noise)
+- ML-Modelle (Transformer/TCN) statt regelbasierter Strategien priorisieren
+
+### Key Files
+
+| File | Change |
+|------|--------|
+| `rdagent/components/backtesting/vbt_backtest.py` | `FTMO_RISK_PER_TRADE = 0.015` |
+| `rdagent/scenarios/qlib/local/strategy_orchestrator.py` | `min_monthly_return_pct` in init + acceptance |
+| `nexquant.py` | `--min-monthly-return` CLI option |
+| `prompts/strategy_generation_v4.yaml` | TARGET MONTHLY RETURN Block |
+| `scripts/nexquant_gen_strategies_real_bt.py` | `MIN_MONTHLY_RETURN_PCT = 15.0` |
+| `scripts/nexquant_smart_strategy_gen.py` | `min_monthly_return: 0.15` |
+| `rdagent/scenarios/qlib/local/optuna_optimizer.py` | Monthly Return als Optimierungsziel |
+
+---
+
+## 🚨 Non-Negotiable Rules — 15% Mission
+
+Diese Regeln gelten ab sofort für JEDE Entscheidung und JEDE Code-Änderung.
+Keine Abweichung, keine Diskussion, kein "nur diesmal anders".
+
+### R1: Summary-Metriken sind die einzige Wahrheit
+
+**Niemals `real_backtest` oder `metrics` als Erfolgsmaßstab verwenden.**
+Jedes Strategy-JSON hat zwei Metrik-Sets:
+- `real_backtest` / `metrics`: Rohwerte OHNE Kosten, OHNE FTMO-Regeln → **illusorisch, ignorieren**
+- `summary`: FTMO-verifiziert mit 2.35 Pip Kosten, Risk-Management, OOS-Split → **nur das zählt**
+
+Immer prüfen mit: `python nexquant.py best -n 20 -m monthly_return --min-trades 30`
+
+### R2: OOS ist der einzige Richter
+
+In-Sample (IS) Sharpe 10? Egal. IS Monthly Return 40%? Egal.
+**Nur OOS-Metriken zählen für die 15%-Entscheidung:**
+- `oos_sharpe`, `oos_monthly_return_pct`, `oos_max_drawdown`, `oos_win_rate`
+- Walk-Forward Consistency ≥ 50%
+- Monte Carlo p < 0.10
+
+Eine Strategie die IS 50% macht aber OOS negativ ist → **verwerfen, keine Diskussion**.
+
+### R3: Eine Änderung nach der anderen
+
+Nicht 5 Dateien auf einmal ändern. Reihenfolge:
+1. Eine Code-Änderung
+2. Test / Smoke-Check
+3. Ergebnis verifizieren
+4. Nächste Änderung
+
+Kein "ich änder schonmal alles und test dann am Ende". Jede Änderung muss einzeln nachvollziehbar sein.
+
+### R4: Vor jeder Änderung Baseline messen
+
+Bevor ein Parameter geändert wird (Risk, Schwelle, Prompt):
+1. Aktuellen Zustand messen: `python nexquant.py best -n 5 -m monthly_return`
+2. Wert notieren
+3. Änderung durchführen
+4. Nach der Änderung erneut messen
+5. Vergleich ziehen
+
+Keine blinden Änderungen. Jeder Schritt muss eine messbare Verbesserung bringen (oder zumindest nicht verschlechtern).
+
+### R5: Kein Overengineering
+
+- Keine neuen Abstraktionsschichten "für später"
+- Keine Config-Dateien für einen einzelnen Wert
+- Keine "generische Lösung" wenn ein Hardcode reicht
+- Wenn 3 Zeilen reichen, schreib keine 30
+
+Das Ziel ist eine 15%-Strategie, kein preisgekröntes Framework.
+
+### R6: Keine Endlos-Diskussionen
+
+Wenn wir einen klaren Plan haben → ausführen. Nicht neu diskutieren.
+Nur zwei Gründe um eine Entscheidung zu revidieren:
+1. Backtest-Ergebnisse widerlegen sie (Daten > Meinung)
+2. Ein Bug macht die Umsetzung unmöglich
+
+"Vielleicht wäre X besser" ist kein Grund. Erst Y zu Ende machen, dann X evaluieren.
+
+### R7: Alles muss reproduzierbar sein
+
+- Jeder Parameterwechsel muss als Commit nachvollziehbar sein
+- Kein manuelles Editieren von Ergebnis-JSONs
+- Scripts nicht "mal eben schnell" ändern und dann vergessen zu committen
+- `git diff` muss immer den aktuellen Zustand zeigen
+
+### R8: Trades müssen statistisch signifikant sein
+
+- Minimum 30 Trades im OOS-Zeitraum
+- Keine Strategie mit 5 Trades und Sharpe 20 akzeptieren
+- Monte Carlo p-value < 0.10 (besser < 0.05)
+- Walk-Forward Consistency ≥ 50%
+
+Wenige Trades = Glück, nicht Skill.
+
+### R9: Closed-Source-Schutz
+
+- `rdagent/scenarios/qlib/local/` = **closed source, nie in Git**
+- Änderungen daran sind erlaubt, aber NUR lokal
+- Commit-Messages erwähnen closed-source Änderungen NIE
+- `git status` vor jedem Commit prüfen
+
+### R10: Fortschritt täglich messen
+
+Jeden Tag EINMAL:
+```bash
+python nexquant.py best -n 10 -m monthly_return --min-trades 30
+```
+Die Top-Zahl ist der Tagesfortschritt. Notieren. Nächster Tag besser sein.
+
+Keine Woche ohne Fortschritt. Wenn 3 Tage keine Verbesserung → Plan hinterfragen, nicht weitermachen wie bisher.

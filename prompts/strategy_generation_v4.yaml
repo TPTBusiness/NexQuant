@@ -34,9 +34,9 @@ strategy_generation:
     5. signal.name must be 'signal'
 
     IC-Guided Factor Selection:
-    - Factors with |IC| > 0.10 are highly predictive - PRIORITIZE these
-    - Factors with |IC| > 0.05 are moderately predictive - USE these
-    - Factors with |IC| < 0.05 are weak - AVOID unless complementary
+    - Factors with |IC| > 0.15 are highly predictive - PRIORITIZE these
+    - Factors with |IC| > 0.08 are moderately predictive - USE these
+    - Factors with |IC| < 0.08 are weak - AVOID unless complementary
     - Combine factors with different signs of IC for diversification
     - Weight factors proportionally to their |IC| values
 
@@ -62,6 +62,7 @@ strategy_generation:
     TRADING STYLE: {{ trading_style }}
     TARGET SHARPE: > {{ min_sharpe }}
     MAX DRAWDOWN: {{ max_drawdown }}
+    TARGET MONTHLY RETURN: > {{ min_monthly_return }}%
 
     CRITICAL CODE RULES:
     1. DO NOT define functions - write direct executable code

@@ -42,8 +42,8 @@ EXTREME_BAR_THRESHOLD = 0.05  # |ret| > 5% on a single 1-min bar → suspicious
 FTMO_INITIAL_CAPITAL   = 100_000.0
 FTMO_MAX_DAILY_LOSS    = 0.05   # 5%  of initial → block new trades rest of day
 FTMO_MAX_TOTAL_LOSS    = 0.10   # 10% of initial → simulation ends
-# Risk-based position sizing: 0.5% equity risk per trade, 10-pip stop, max 1:30 leverage
-FTMO_RISK_PER_TRADE    = 0.005
+# Risk-based position sizing: 1.5% equity risk per trade, 10-pip stop, max 1:30 leverage
+FTMO_RISK_PER_TRADE    = 0.015
 FTMO_STOP_PIPS         = 10
 FTMO_PIP               = 0.0001
 FTMO_MAX_LEVERAGE      = 30
@@ -343,7 +343,7 @@ def _apply_ftmo_mask(
 OOS_START_DEFAULT = "2024-01-01"
 
 # Rolling walk-forward default windows (IS years, OOS years, step years)
-WF_IS_YEARS  = 3
+WF_IS_YEARS  = 1
 WF_OOS_YEARS = 1
 WF_STEP_YEARS = 1
 
