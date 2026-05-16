@@ -387,6 +387,10 @@ class QlibFactorRunner(CachedRunner[QlibFactorExperiment]):
                         warnings.append(
                             f"IC is near zero ({ic_float:.6f}) — factor may not predict returns",
                         )
+                    if abs(ic_float) < 0.04:
+                        warnings.append(
+                            f"IC below target ({ic_float:.4f}) — factor will be excluded from strategy building (min IC=0.04)",
+                        )
                 except (ValueError, TypeError):
                     warnings.append(f"IC value is not numeric: {ic_value}")
 

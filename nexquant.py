@@ -1481,6 +1481,7 @@ def generate_strategies(
     min_sharpe: float = typer.Option(1.5, "--min-sharpe", help="Minimum Sharpe for acceptance"),
     max_drawdown: float = typer.Option(-0.30, "--max-dd", help="Maximum drawdown allowed"),
     min_win_rate: float = typer.Option(0.40, "--min-winrate", help="Minimum win rate for acceptance"),
+    min_monthly_return: float = typer.Option(15.0, "--min-monthly-return", help="Minimum OOS monthly return %% for acceptance"),
 ):
     """
     Generate trading strategies from top factors using LLM + Optuna optimization.
@@ -1498,8 +1499,8 @@ def generate_strategies(
         $ nexquant generate-strategies --min-sharpe 3.0   # Stricter acceptance
         $ nexquant generate-strategies -s daytrading      # Day trading style
         $ nexquant generate-strategies --no-optuna        # Skip optimization
+        $ nexquant generate-strategies --min-monthly-return 15  # 15% OOS monthly target
     """
-    from rich.console import Console as RichConsole
     from rich.table import Table as RichTable
 
     console.print(f"\n[bold cyan]{'='*60}[/bold cyan]")
@@ -1507,7 +1508,7 @@ def generate_strategies(
     console.print(f"[bold cyan]{'='*60}[/bold cyan]")
     console.print(f"  Strategies: [cyan]{count}[/cyan]  Workers: [cyan]{workers}[/cyan]  Style: [cyan]{style}[/cyan]")
     console.print(f"  Optuna: {'[green]Yes[/green]' if optuna else '[yellow]No[/yellow]'} (trials={optuna_trials})  Factors: [cyan]{top_factors}[/cyan]")
-    console.print(f"  Accept: Sharpe≥[green]{min_sharpe}[/green]  DD≥[green]{max_drawdown}[/green]  WR≥[green]{min_win_rate}[/green]")
+    console.print(f"  Accept: Sharpe≥[green]{min_sharpe}[/green]  DD≥[green]{max_drawdown}[/green]  WR≥[green]{min_win_rate}[/green]  Mon≥[green]{min_monthly_return}%[/green]")
     console.print(f"[bold cyan]{'='*60}[/bold cyan]\n")
 
     try:
@@ -1519,6 +1520,7 @@ def generate_strategies(
             min_sharpe=min_sharpe,
             max_drawdown=max_drawdown,
             min_win_rate=min_win_rate,
+            min_monthly_return_pct=min_monthly_return,
             use_optuna=optuna,
             optuna_trials=optuna_trials,
             continuous_optimization=optuna,
@@ -1544,7 +1546,7 @@ def generate_strategies(
                 table.add_row(
                     str(i), r.get("strategy_name", "?")[:28],
                     f"{r.get('sharpe_ratio', 0):.2f}", f"{r.get('max_drawdown', 0):.1%}",
-                    f"{r.get('win_rate', 0):.1%}", str(r.get('num_trades', '?')),
+                    f"{r.get('win_rate', 0):.1%}", str(r.get("num_trades", "?")),
                 )
             console.print(table)
 
@@ -1660,7 +1662,7 @@ def _load_strategies():
             try:
                 raw = json.loads(p.read_text())
             except Exception:
-                logger.warning("Failed to load strategy file %s", p, exc_info=True)
+                logger.warning(f"Failed to load strategy file {p}")
                 continue
             if not isinstance(raw, dict):
                 continue

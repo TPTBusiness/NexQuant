@@ -13,44 +13,51 @@ Usage:
     python nexquant_smart_strategy_gen.py 5 --style daytrading
     python nexquant_smart_strategy_gen.py 20 --style swing --max-attempts 200
 """
-import os, sys, json, time, math, random, logging, warnings, subprocess  # nosec
-from pathlib import Path
+import json
+import logging
+import os
+import random
+import subprocess  # nosec
+import sys
+import time
+import warnings
 from datetime import datetime
 from itertools import product
-from typing import Dict, List, Optional, Tuple, Any
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
-from rich.table import Table
-from rich.logging import RichHandler
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.logging import RichHandler
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.table import Table
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 # ============================================================================
 # Configuration & Constants
 # ============================================================================
-OHLCV_PATH = Path('/home/nico/NexQuant/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5')
-FACTORS_DIR = Path('/home/nico/NexQuant/results/factors')
-STRATEGIES_DIR = Path('/home/nico/NexQuant/results/strategies_new')
+OHLCV_PATH = Path("/home/nico/NexQuant/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
+FACTORS_DIR = Path("/home/nico/NexQuant/results/factors")
+STRATEGIES_DIR = Path("/home/nico/NexQuant/results/strategies_new")
 STRATEGIES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Logging setup
-LOG_DIR = Path('/home/nico/NexQuant/results/logs')
+LOG_DIR = Path("/home/nico/NexQuant/results/logs")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 log_file = LOG_DIR / f"smart_strategy_gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler(log_file),
-        RichHandler(rich_tracebacks=True, show_time=False, show_path=False)
-    ]
+        RichHandler(rich_tracebacks=True, show_time=False, show_path=False),
+    ],
 )
-logger = logging.getLogger('SmartStrategyGen')
+logger = logging.getLogger("SmartStrategyGen")
 
 console = Console()
 
@@ -70,36 +77,36 @@ class FTMORiskLimits:
 # Acceptance Criteria
 # ============================================================================
 ACCEPTANCE_CRITERIA = {
-    'daytrading': {
-        'min_abs_ic': 0.02,
-        'min_sharpe': 1.0,
-        'min_trades': 50,
-        'max_drawdown': -0.15,
-        'min_win_rate': 0.45,
-        'min_monthly_return': 0.01,
-        'max_daily_loss': 0.05,
+    "daytrading": {
+        "min_abs_ic": 0.02,
+        "min_sharpe": 1.0,
+        "min_trades": 50,
+        "max_drawdown": -0.15,
+        "min_win_rate": 0.45,
+        "min_monthly_return": 0.15,
+        "max_daily_loss": 0.05,
     },
-    'daytrading': {
-        'min_abs_ic': 0.02,
-        'min_sharpe': 0.5,
-        'min_trades': 10,
-        'max_drawdown': -0.15,
-        'min_win_rate': 0.40,
-        'min_monthly_return': 0.01,
-        'max_daily_loss': 0.05,
-    }
+    "swing": {
+        "min_abs_ic": 0.02,
+        "min_sharpe": 0.5,
+        "min_trades": 10,
+        "max_drawdown": -0.15,
+        "min_win_rate": 0.40,
+        "min_monthly_return": 0.15,
+        "max_daily_loss": 0.05,
+    },
 }
 
 # ============================================================================
 # Parameter Grid for Optimization
 # ============================================================================
 PARAMETER_GRID = {
-    'threshold_entry': [0.2, 0.3, 0.4, 0.5],
-    'rolling_window': [10, 20, 30, 60],
-    'stop_loss': [0.01, 0.015, 0.02],        # 1%, 1.5%, 2% (HARD MAX: 2% for FTMO)
-    'take_profit': [0.02, 0.03, 0.04, 0.06], # 2x-3x SL
-    'trailing_stop': [0.01, 0.015],           # 1%, 1.5% after profit threshold
-    'trailing_activation': [0.015, 0.02],     # Activate trail after 1.5%, 2% profit
+    "threshold_entry": [0.2, 0.3, 0.4, 0.5],
+    "rolling_window": [10, 20, 30, 60],
+    "stop_loss": [0.01, 0.015, 0.02],        # 1%, 1.5%, 2% (HARD MAX: 2% for FTMO)
+    "take_profit": [0.02, 0.03, 0.04, 0.06], # 2x-3x SL
+    "trailing_stop": [0.01, 0.015],           # 1%, 1.5% after profit threshold
+    "trailing_activation": [0.015, 0.02],     # Activate trail after 1.5%, 2% profit
 }
 
 # ============================================================================
@@ -109,9 +116,9 @@ class DataCache:
     """Thread-safe data cache for OHLCV and factors."""
 
     def __init__(self):
-        self._ohlcv_cache: Optional[pd.Series] = None
-        self._factors_cache: Optional[List[Dict]] = None
-        self._factor_data_cache: Dict[str, pd.Series] = {}
+        self._ohlcv_cache: pd.Series | None = None
+        self._factors_cache: list[dict] | None = None
+        self._factor_data_cache: dict[str, pd.Series] = {}
 
     def load_ohlcv(self) -> pd.Series:
         """Load OHLCV close prices from HDF5."""
@@ -121,10 +128,10 @@ class DataCache:
         if not OHLCV_PATH.exists():
             raise FileNotFoundError(f"OHLCV data not found: {OHLCV_PATH}")
 
-        ohlcv = pd.read_hdf(str(OHLCV_PATH), key='data')
-        close_col = '$close' if '$close' in ohlcv.columns else 'close' if 'close' in ohlcv.columns else ohlcv.select_dtypes(include=[np.number]).columns[0]
+        ohlcv = pd.read_hdf(str(OHLCV_PATH), key="data")
+        close_col = "$close" if "$close" in ohlcv.columns else "close" if "close" in ohlcv.columns else ohlcv.select_dtypes(include=[np.number]).columns[0]
         close = ohlcv[close_col].dropna()
-        
+
         # Limit to last 200k bars to avoid OOM during optimization
         # (372k bars × 15 combinations = too much memory)
         MAX_BARS = 200000
@@ -136,34 +143,34 @@ class DataCache:
         logger.info(f"Loaded {len(close):,} OHLCV bars")
         return close
 
-    def load_top_factors(self, top_n: int = 20) -> List[Dict]:
+    def load_top_factors(self, top_n: int = 20) -> list[dict]:
         """Load top factors by IC that have parquet files."""
         if self._factors_cache is not None:
             return self._factors_cache[:top_n]
 
         factors = []
-        for f in FACTORS_DIR.glob('*.json'):
+        for f in FACTORS_DIR.glob("*.json"):
             try:
                 data = json.load(open(f))
-                fname = data.get('factor_name', '')
-                ic = data.get('ic') or 0
-                safe = fname.replace('/', '_').replace('\\', '_')[:150]
-                if (FACTORS_DIR / 'values' / f"{safe}.parquet").exists():
-                    factors.append({'name': fname, 'ic': ic})
+                fname = data.get("factor_name", "")
+                ic = data.get("ic") or 0
+                safe = fname.replace("/", "_").replace("\\", "_")[:150]
+                if (FACTORS_DIR / "values" / f"{safe}.parquet").exists():
+                    factors.append({"name": fname, "ic": ic})
             except Exception as e:
                 logger.debug(f"Failed to load factor metadata: {f.name} - {e}")
 
-        factors.sort(key=lambda x: abs(x['ic']), reverse=True)
+        factors.sort(key=lambda x: abs(x["ic"]), reverse=True)
         self._factors_cache = factors
         return factors[:top_n]
 
-    def load_factor_timeseries(self, factor_name: str) -> Optional[pd.Series]:
+    def load_factor_timeseries(self, factor_name: str) -> pd.Series | None:
         """Load factor time-series from parquet."""
         if factor_name in self._factor_data_cache:
             return self._factor_data_cache[factor_name]
 
-        safe = factor_name.replace('/', '_').replace('\\', '_')[:150]
-        pf = FACTORS_DIR / 'values' / f"{safe}.parquet"
+        safe = factor_name.replace("/", "_").replace("\\", "_")[:150]
+        pf = FACTORS_DIR / "values" / f"{safe}.parquet"
 
         if not pf.exists():
             return None
@@ -183,36 +190,36 @@ data_cache = DataCache()
 # ============================================================================
 def setup_llm_env():
     """Setup LLM environment variables with fallback chain."""
-    load_dotenv(Path(__file__).parent / '.env', override=True)
-    
+    load_dotenv(Path(__file__).parent / ".env", override=True)
+
     # Priority 1: OpenRouter (free models with fallback)
-    router_key = os.getenv('OPENROUTER_API_KEY', '')
-    if router_key and router_key != 'local':
+    router_key = os.getenv("OPENROUTER_API_KEY", "")
+    if router_key and router_key != "local":
         # Build model fallback chain
         models = [
-            os.getenv('OPENROUTER_MODEL', ''),
-            os.getenv('OPENROUTER_MODEL_2', ''),
-            os.getenv('OPENROUTER_MODEL_3', ''),
+            os.getenv("OPENROUTER_MODEL", ""),
+            os.getenv("OPENROUTER_MODEL_2", ""),
+            os.getenv("OPENROUTER_MODEL_3", ""),
         ]
         models = [m for m in models if m]  # Remove empty
-        
+
         if models:
-            os.environ['OPENAI_API_KEY'] = router_key
-            os.environ['OPENAI_API_BASE'] = 'https://openrouter.ai/api/v1'
-            os.environ['OPENROUTER_MODELS'] = json.dumps(models)  # Store for fallback
-            os.environ['CHAT_MODEL'] = models[0]
+            os.environ["OPENAI_API_KEY"] = router_key
+            os.environ["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
+            os.environ["OPENROUTER_MODELS"] = json.dumps(models)  # Store for fallback
+            os.environ["CHAT_MODEL"] = models[0]
             logger.info(f"LLM environment configured for OpenRouter: {', '.join(models)}")
             return
-    
+
     # Priority 2: Local LLM (llama.cpp)
-    api_key = os.getenv('OPENAI_API_KEY', '')
-    api_base = os.getenv('OPENAI_API_BASE', '')
-    chat_model = os.getenv('CHAT_MODEL', '')
-    
-    if api_key == 'local' and api_base:
-        os.environ['OPENAI_API_KEY'] = 'local'
-        os.environ['OPENAI_API_BASE'] = api_base
-        os.environ['CHAT_MODEL'] = chat_model or 'openai/qwen3.5-35b'
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    api_base = os.getenv("OPENAI_API_BASE", "")
+    chat_model = os.getenv("CHAT_MODEL", "")
+
+    if api_key == "local" and api_base:
+        os.environ["OPENAI_API_KEY"] = "local"
+        os.environ["OPENAI_API_BASE"] = api_base
+        os.environ["CHAT_MODEL"] = chat_model or "openai/qwen3.5-35b"
         logger.info(f"LLM environment configured for LOCAL LLM: {api_base}")
     else:
         logger.warning("No API key found - LLM generation will fail")
@@ -318,7 +325,7 @@ class RiskManagementEngine:
                 continue
 
             # Track daily PnL for max daily loss
-            bar_date = idx.date() if hasattr(idx, 'date') else idx
+            bar_date = idx.date() if hasattr(idx, "date") else idx
             if current_date is None:
                 current_date = bar_date
             elif bar_date != current_date:
@@ -387,16 +394,16 @@ class RiskManagementEngine:
 
         return strategy_returns
 
-    def get_config(self) -> Dict[str, float]:
+    def get_config(self) -> dict[str, float]:
         """Return risk management configuration."""
         return {
-            'stop_loss': self.stop_loss,
-            'take_profit': self.take_profit,
-            'trailing_stop': self.trailing_stop,
-            'trailing_activation': self.trailing_activation,
-            'max_daily_loss': self.max_daily_loss,
-            'max_positions': self.max_positions,
-            'risk_reward_ratio': self.take_profit / self.stop_loss,
+            "stop_loss": self.stop_loss,
+            "take_profit": self.take_profit,
+            "trailing_stop": self.trailing_stop,
+            "trailing_activation": self.trailing_activation,
+            "max_daily_loss": self.max_daily_loss,
+            "max_positions": self.max_positions,
+            "risk_reward_ratio": self.take_profit / self.stop_loss,
         }
 
 # ============================================================================
@@ -407,17 +414,17 @@ class StrategyEvaluator:
     Comprehensive strategy evaluation with FTMO metrics.  # nosec
     """
 
-    def __init__(self, trading_style: str = 'daytrading', forward_bars: int = 96):
+    def __init__(self, trading_style: str = "daytrading", forward_bars: int = 96):
         self.trading_style = trading_style
         self.forward_bars = forward_bars
-        self.criteria = ACCEPTANCE_CRITERIA.get(trading_style, ACCEPTANCE_CRITERIA['daytrading'])
+        self.criteria = ACCEPTANCE_CRITERIA.get(trading_style, ACCEPTANCE_CRITERIA["daytrading"])
 
     def evaluate(  # nosec
         self,
         signal: pd.Series,
         close: pd.Series,
         strategy_returns: pd.Series,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Evaluate strategy with comprehensive metrics.
 
@@ -436,14 +443,14 @@ class StrategyEvaluator:
             Evaluation metrics dict
         """
         if len(strategy_returns) < 10:
-            return {'status': 'failed', 'reason': 'Insufficient data'}
+            return {"status": "failed", "reason": "Insufficient data"}
 
         # Forward returns for IC calculation
         fwd_returns = close.pct_change(self.forward_bars).shift(-self.forward_bars)
         common_idx = signal.index.intersection(fwd_returns.dropna().index)
 
         if len(common_idx) < 10:
-            return {'status': 'failed', 'reason': 'Insufficient overlapping data'}
+            return {"status": "failed", "reason": "Insufficient overlapping data"}
 
         signal_aligned = signal.loc[common_idx]
         fwd_aligned = fwd_returns.loc[common_idx]
@@ -490,7 +497,7 @@ class StrategyEvaluator:
 
         # Daily loss analysis (for FTMO compliance)
         daily_returns = strategy_returns.groupby(
-            strategy_returns.index.date if hasattr(strategy_returns.index[0], 'date') else strategy_returns.index
+            strategy_returns.index.date if hasattr(strategy_returns.index[0], "date") else strategy_returns.index,
         ).sum()
         max_daily_loss = abs(daily_returns.min()) if len(daily_returns) > 0 else 0.0
 
@@ -506,34 +513,34 @@ class StrategyEvaluator:
         )
 
         result = {
-            'status': 'accepted' if passed else 'rejected',
-            'failed_criteria': failed_criteria,
+            "status": "accepted" if passed else "rejected",
+            "failed_criteria": failed_criteria,
 
             # Core metrics
-            'ic': float(ic) if not np.isnan(ic) else 0.0,
-            'sharpe': float(sharpe),
-            'max_drawdown': float(max_drawdown),
-            'win_rate': float(win_rate),
-            'total_return': float(total_return),
-            'monthly_return_pct': float(monthly_return * 100),
-            'annual_return_pct': float(annual_return * 100),
+            "ic": float(ic) if not np.isnan(ic) else 0.0,
+            "sharpe": float(sharpe),
+            "max_drawdown": float(max_drawdown),
+            "win_rate": float(win_rate),
+            "total_return": float(total_return),
+            "monthly_return_pct": float(monthly_return * 100),
+            "annual_return_pct": float(annual_return * 100),
 
             # Trade statistics
-            'n_trades': n_signals,
-            'n_long': n_long,
-            'n_short': n_short,
-            'n_neutral': n_neutral,
-            'n_bars': total_bars,
-            'n_months': float(n_months),
+            "n_trades": n_signals,
+            "n_long": n_long,
+            "n_short": n_short,
+            "n_neutral": n_neutral,
+            "n_bars": total_bars,
+            "n_months": float(n_months),
 
             # FTMO compliance
-            'max_daily_loss': float(max_daily_loss),
-            'ftmo_compliant': max_daily_loss <= 0.05,
+            "max_daily_loss": float(max_daily_loss),
+            "ftmo_compliant": max_daily_loss <= 0.05,
 
             # Signal distribution
-            'signal_long_pct': n_long / total_bars if total_bars > 0 else 0,
-            'signal_short_pct': n_short / total_bars if total_bars > 0 else 0,
-            'signal_neutral_pct': n_neutral / total_bars if total_bars > 0 else 0,
+            "signal_long_pct": n_long / total_bars if total_bars > 0 else 0,
+            "signal_short_pct": n_short / total_bars if total_bars > 0 else 0,
+            "signal_neutral_pct": n_neutral / total_bars if total_bars > 0 else 0,
         }
 
         return result
@@ -547,29 +554,29 @@ class StrategyEvaluator:
         win_rate: float,
         monthly_return: float,
         max_daily_loss: float,
-    ) -> Tuple[bool, List[str]]:
+    ) -> tuple[bool, list[str]]:
         """Check if strategy meets acceptance criteria."""
         failed = []
 
-        if abs(ic) < self.criteria['min_abs_ic']:
+        if abs(ic) < self.criteria["min_abs_ic"]:
             failed.append(f"IC too low: {ic:.4f} < {self.criteria['min_abs_ic']}")
 
-        if sharpe < self.criteria['min_sharpe']:
+        if sharpe < self.criteria["min_sharpe"]:
             failed.append(f"Sharpe too low: {sharpe:.3f} < {self.criteria['min_sharpe']}")
 
-        if n_trades < self.criteria['min_trades']:
+        if n_trades < self.criteria["min_trades"]:
             failed.append(f"Too few trades: {n_trades} < {self.criteria['min_trades']}")
 
-        if max_drawdown < self.criteria['max_drawdown']:
+        if max_drawdown < self.criteria["max_drawdown"]:
             failed.append(f"Max drawdown exceeded: {max_drawdown:.1%} < {self.criteria['max_drawdown']}")
 
-        if win_rate < self.criteria['min_win_rate']:
+        if win_rate < self.criteria["min_win_rate"]:
             failed.append(f"Win rate too low: {win_rate:.1%} < {self.criteria['min_win_rate']}")
 
-        if monthly_return < self.criteria['min_monthly_return']:
+        if monthly_return < self.criteria["min_monthly_return"]:
             failed.append(f"Monthly return too low: {monthly_return:.2%} < {self.criteria['min_monthly_return']}")
 
-        if max_daily_loss > self.criteria['max_daily_loss']:
+        if max_daily_loss > self.criteria["max_daily_loss"]:
             failed.append(f"Daily loss exceeded: {max_daily_loss:.2%} > {self.criteria['max_daily_loss']}")
 
         return len(failed) == 0, failed
@@ -584,10 +591,10 @@ class FeedbackGenerator:
 
     @staticmethod
     def generate_feedback(
-        evaluation: Dict[str, Any],  # nosec
-        factor_list: List[Dict],
+        evaluation: dict[str, Any],  # nosec
+        factor_list: list[dict],
         attempt: int,
-        param_config: Optional[Dict] = None,
+        param_config: dict | None = None,
     ) -> str:
         """
         Generate actionable feedback based on strategy performance.
@@ -608,13 +615,13 @@ class FeedbackGenerator:
         str
             Feedback string for LLM
         """
-        ic = evaluation.get('ic', 0)  # nosec
-        sharpe = evaluation.get('sharpe', 0)  # nosec
-        trades = evaluation.get('n_trades', 0)  # nosec
-        dd = evaluation.get('max_drawdown', 0)  # nosec
-        win_rate = evaluation.get('win_rate', 0)  # nosec
-        monthly_ret = evaluation.get('monthly_return_pct', 0)  # nosec
-        failed = evaluation.get('failed_criteria', [])  # nosec
+        ic = evaluation.get("ic", 0)  # nosec
+        sharpe = evaluation.get("sharpe", 0)  # nosec
+        trades = evaluation.get("n_trades", 0)  # nosec
+        dd = evaluation.get("max_drawdown", 0)  # nosec
+        win_rate = evaluation.get("win_rate", 0)  # nosec
+        monthly_ret = evaluation.get("monthly_return_pct", 0)  # nosec
+        failed = evaluation.get("failed_criteria", [])  # nosec
 
         feedback_parts = [f"Attempt {attempt} results:"]
 
@@ -625,37 +632,37 @@ class FeedbackGenerator:
         if failed:
             feedback_parts.append("\nIssues found:")
 
-            if any('IC' in f for f in failed):
+            if any("IC" in f for f in failed):
                 # Suggest top factors
-                top_factors = sorted(factor_list, key=lambda x: abs(x['ic']), reverse=True)[:5]
-                top_factor_names = [f['name'] for f in top_factors]
+                top_factors = sorted(factor_list, key=lambda x: abs(x["ic"]), reverse=True)[:5]
+                top_factor_names = [f["name"] for f in top_factors]
                 feedback_parts.append(
-                    f"\n- IC too low ({ic:.4f}). Try different factors. Top factors by IC: {', '.join(top_factor_names)}"
+                    f"\n- IC too low ({ic:.4f}). Try different factors. Top factors by IC: {', '.join(top_factor_names)}",
                 )
 
-            if any('trades' in f.lower() for f in failed):
+            if any("trades" in f.lower() for f in failed):
                 feedback_parts.append(
-                    f"\n- Too few trades ({trades}). Lower thresholds (try 0.2-0.3), use more sensitive factors, or reduce rolling window (10-20 bars)"
+                    f"\n- Too few trades ({trades}). Lower thresholds (try 0.2-0.3), use more sensitive factors, or reduce rolling window (10-20 bars)",
                 )
 
-            if any('drawdown' in f.lower() for f in failed):
+            if any("drawdown" in f.lower() for f in failed):
                 feedback_parts.append(
-                    f"\n- High drawdown ({dd:.1%}). Add filters (volatility, trend), reduce position size, or tighten stop loss"
+                    f"\n- High drawdown ({dd:.1%}). Add filters (volatility, trend), reduce position size, or tighten stop loss",
                 )
 
-            if any('sharpe' in f.lower() for f in failed):
+            if any("sharpe" in f.lower() for f in failed):
                 feedback_parts.append(
-                    f"\n- Low Sharpe ({sharpe:.2f}). Improve signal quality: combine momentum + mean reversion, add regime filters"
+                    f"\n- Low Sharpe ({sharpe:.2f}). Improve signal quality: combine momentum + mean reversion, add regime filters",
                 )
 
-            if any('win rate' in f.lower() for f in failed):
+            if any("win rate" in f.lower() for f in failed):
                 feedback_parts.append(
-                    f"\n- Low win rate ({win_rate:.1%}). Try higher take profit (4-6%), or add confirmation filters"
+                    f"\n- Low win rate ({win_rate:.1%}). Try higher take profit (4-6%), or add confirmation filters",
                 )
 
-            if any('monthly return' in f.lower() for f in failed):
+            if any("monthly return" in f.lower() for f in failed):
                 feedback_parts.append(
-                    f"\n- Low monthly return ({monthly_ret:.2%}). Increase signal frequency or use higher-IC factors"
+                    f"\n- Low monthly return ({monthly_ret:.2%}). Increase signal frequency or use higher-IC factors",
                 )
 
         else:
@@ -664,13 +671,13 @@ class FeedbackGenerator:
 
             if sharpe < 1.5:
                 feedback_parts.append(
-                    f"\nTry optimizing: 1) Test SL=1.5% vs 2% 2) Test TP=3% vs 4% 3) Add trailing stop at 1.5%"
+                    "\nTry optimizing: 1) Test SL=1.5% vs 2% 2) Test TP=3% vs 4% 3) Add trailing stop at 1.5%",
                 )
 
             if abs(ic) < 0.05:
-                top_factors = sorted(factor_list, key=lambda x: abs(x['ic']), reverse=True)[:3]
+                top_factors = sorted(factor_list, key=lambda x: abs(x["ic"]), reverse=True)[:3]
                 feedback_parts.append(
-                    f"\nIC could be higher. Consider adding: {', '.join(f['name'] for f in top_factors)}"
+                    f"\nIC could be higher. Consider adding: {', '.join(f['name'] for f in top_factors)}",
                 )
 
             if param_config:
@@ -678,7 +685,7 @@ class FeedbackGenerator:
                     f"\nCurrent params: threshold={param_config.get('threshold_entry', 'N/A')}, "
                     f"window={param_config.get('rolling_window', 'N/A')}, "
                     f"SL={param_config.get('stop_loss', 'N/A'):.1%}, "
-                    f"TP={param_config.get('take_profit', 'N/A'):.1%}"
+                    f"TP={param_config.get('take_profit', 'N/A'):.1%}",
                 )
 
         return " ".join(feedback_parts)
@@ -696,11 +703,11 @@ class LLMStrategyGenerator:
 
     def generate(
         self,
-        factor_subset: List[Dict],
-        feedback: Optional[str] = None,
-        trading_style: str = 'daytrading',
+        factor_subset: list[dict],
+        feedback: str | None = None,
+        trading_style: str = "daytrading",
         forward_bars: int = 96,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate a single strategy via qwen CLI.
 
@@ -721,11 +728,11 @@ class LLMStrategyGenerator:
             Strategy dict with 'status', 'strategy', 'error'
         """
         try:
-            import subprocess  # nosec B404
             import re
+            import subprocess  # nosec B404
 
             factor_list = ", ".join([f"{f['name']} (IC={f['ic']:.4f})" for f in factor_subset])
-            factor_names = ", ".join([f['name'] for f in factor_subset])
+            factor_names = ", ".join([f["name"] for f in factor_subset])
 
             feedback_text = f" Vorheriges Feedback: {feedback}" if feedback else " Erster Versuch - sei kreativ!"
 
@@ -777,16 +784,16 @@ Antworte NUR mit dem JSON Objekt!"""
             # Call qwen CLI
             logger.info(f"Calling qwen CLI with prompt ({len(prompt)} chars)...")
             result = subprocess.run( # nosec B603
-                ['qwen', '-p', prompt],
+                ["qwen", "-p", prompt],
                 capture_output=True,
                 text=True,
                 timeout=120,
-                cwd=str(Path(__file__).parent)
+                cwd=str(Path(__file__).parent),
             )
 
             if result.returncode != 0:
                 logger.error(f"qwen CLI failed: {result.stderr[:300]}")
-                return {'status': 'error', 'error': f'qwen CLI failed: {result.stderr[:200]}'}
+                return {"status": "error", "error": f"qwen CLI failed: {result.stderr[:200]}"}
 
             response = result.stdout.strip()
             logger.info(f"qwen CLI response ({len(response)} chars)")
@@ -795,7 +802,7 @@ Antworte NUR mit dem JSON Objekt!"""
             # qwen CLI might output to file OR stdout
             # Check if a file was created in results/strategies_new/
             import glob
-            new_files = glob.glob(str(STRATEGIES_DIR / '*.json'))
+            new_files = glob.glob(str(STRATEGIES_DIR / "*.json"))
             if new_files:
                 latest = max(new_files, key=os.path.getmtime)
                 if os.path.getmtime(latest) > time.time() - 120:  # Created in last 120s
@@ -805,7 +812,7 @@ Antworte NUR mit dem JSON Objekt!"""
                     # Convert qwen CLI format to our format
                     strategy_data = self._convert_qwen_output(raw_data, factor_subset)
                     if strategy_data:
-                        return {'status': 'generated', 'strategy': strategy_data}
+                        return {"status": "generated", "strategy": strategy_data}
 
             # Otherwise parse JSON from stdout
             # Try to find JSON object in response
@@ -816,24 +823,24 @@ Antworte NUR mit dem JSON Objekt!"""
             else:
                 # Try to parse entire response as JSON
                 raw_data = json.loads(response)
-            
+
             # Convert to our format
             strategy_data = self._convert_qwen_output(raw_data, factor_subset)
             if not strategy_data:
-                return {'status': 'invalid', 'error': 'Could not convert qwen output'}
+                return {"status": "invalid", "error": "Could not convert qwen output"}
 
             return {
-                'status': 'generated',
-                'strategy': strategy_data,
+                "status": "generated",
+                "strategy": strategy_data,
             }
 
         except subprocess.TimeoutExpired:  # nosec
-            return {'status': 'error', 'error': 'qwen CLI timeout (120s)'}
+            return {"status": "error", "error": "qwen CLI timeout (120s)"}
         except Exception as e:
             logger.error(f"qwen CLI generation failed: {e}")
-            return {'status': 'error', 'error': str(e)[:300]}
-    
-    def _convert_qwen_output(self, raw_data: Dict, factors: List[Dict]) -> Optional[Dict]:
+            return {"status": "error", "error": str(e)[:300]}
+
+    def _convert_qwen_output(self, raw_data: dict, factors: list[dict]) -> dict | None:
         """
         Convert qwen CLI output format to our standard format.
         
@@ -850,47 +857,47 @@ Antworte NUR mit dem JSON Objekt!"""
         """
         try:
             # Extract strategy name
-            strategy_name = raw_data.get('strategy_name') or raw_data.get('name', 'UnknownStrategy')
-            
+            strategy_name = raw_data.get("strategy_name") or raw_data.get("name", "UnknownStrategy")
+
             # Extract factor names
-            factor_names = raw_data.get('factor_names', [])
+            factor_names = raw_data.get("factor_names", [])
             if not factor_names:
                 # Use factors from the generation request
-                factor_names = [f['name'] for f in factors[:3]]
-            
+                factor_names = [f["name"] for f in factors[:3]]
+
             # Extract description
-            description = raw_data.get('description', raw_data.get('desc', 'Generated strategy'))
-            
+            description = raw_data.get("description", raw_data.get("desc", "Generated strategy"))
+
             # Extract and clean code
-            code = raw_data.get('code', '')
+            code = raw_data.get("code", "")
             if not code:
                 # Try to find code in nested structures
-                if 'strategy' in raw_data:
-                    code = raw_data['strategy'].get('code', '')
-                elif 'logic' in raw_data:
-                    code = raw_data['logic'].get('code', '')
-            
+                if "strategy" in raw_data:
+                    code = raw_data["strategy"].get("code", "")
+                elif "logic" in raw_data:
+                    code = raw_data["logic"].get("code", "")
+
             # Unescape code (convert literal \n to real newlines)
             if code:
-                code = code.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+                code = code.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
                 # Remove leading/trailing quotes if present
                 if code.startswith('"') and code.endswith('"'):
                     code = code[1:-1]
                 if code.startswith("'") and code.endswith("'"):
                     code = code[1:-1]
                 # Ensure variable name consistency: factors_df → factors
-                code = code.replace('factors_df', 'factors')
-            
+                code = code.replace("factors_df", "factors")
+
             # Validate we have what we need
             if not code or not strategy_name:
                 logger.warning(f"Missing required fields: name={strategy_name}, code={'yes' if code else 'no'}")
                 return None
-            
+
             return {
-                'strategy_name': strategy_name,
-                'factor_names': factor_names,
-                'description': description,
-                'code': code,
+                "strategy_name": strategy_name,
+                "factor_names": factor_names,
+                "description": description,
+                "code": code,
             }
         except Exception as e:
             logger.error(f"Failed to convert qwen output: {e}")
@@ -909,9 +916,9 @@ class BacktestRunner:
         close: pd.Series,
         factors_df: pd.DataFrame,
         strategy_code: str,
-        risk_config: Dict[str, float],
+        risk_config: dict[str, float],
         forward_bars: int = 96,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Run strategy backtest with risk management.
 
@@ -1130,33 +1137,33 @@ print(json.dumps(result))
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
-            close.to_pickle(str(td_path / 'close.pkl'))  # nosec
-            factors_df.to_pickle(str(td_path / 'factors.pkl'))  # nosec
-            (td_path / 'run.py').write_text(script)
+            close.to_pickle(str(td_path / "close.pkl"))  # nosec
+            factors_df.to_pickle(str(td_path / "factors.pkl"))  # nosec
+            (td_path / "run.py").write_text(script)
 
             try:
                 result = subprocess.run( # nosec B603
-                    [sys.executable, str(td_path / 'run.py')],
+                    [sys.executable, str(td_path / "run.py")],
                     capture_output=True, text=True, timeout=300,
-                    cwd=str(td_path)
+                    cwd=str(td_path),
                 )
 
                 if result.returncode != 0:
                     logger.warning(f"Backtest failed: {result.stderr[:200] or result.stdout[:200]}")
-                    return {'status': 'failed', 'reason': result.stderr[:200] or result.stdout[:200]}
+                    return {"status": "failed", "reason": result.stderr[:200] or result.stdout[:200]}
 
-                for line in result.stdout.strip().split('\n'):
+                for line in result.stdout.strip().split("\n"):
                     try:
                         return json.loads(line)
                     except json.JSONDecodeError:
                         continue
 
-                return {'status': 'failed', 'reason': 'No valid JSON output'}
+                return {"status": "failed", "reason": "No valid JSON output"}
 
             except subprocess.TimeoutExpired:  # nosec
-                return {'status': 'failed', 'reason': 'Timeout (90s)'}
+                return {"status": "failed", "reason": "Timeout (90s)"}
             except Exception as e:
-                return {'status': 'failed', 'reason': str(e)[:200]}
+                return {"status": "failed", "reason": str(e)[:200]}
 
 # ============================================================================
 # Parameter Optimizer
@@ -1183,7 +1190,7 @@ class ParameterOptimizer:
         factors_df: pd.DataFrame,
         strategy_code: str,
         forward_bars: int = 96,
-    ) -> Tuple[Dict[str, float], Dict[str, Any]]:
+    ) -> tuple[dict[str, float], dict[str, Any]]:
         """
         Optimize strategy parameters via grid search.
 
@@ -1205,12 +1212,12 @@ class ParameterOptimizer:
         """
         # Generate parameter combinations (sample if too many)
         all_combinations = list(product(
-            PARAMETER_GRID['threshold_entry'],
-            PARAMETER_GRID['rolling_window'],
-            PARAMETER_GRID['stop_loss'],
-            PARAMETER_GRID['take_profit'],
-            PARAMETER_GRID['trailing_stop'],
-            PARAMETER_GRID['trailing_activation'],
+            PARAMETER_GRID["threshold_entry"],
+            PARAMETER_GRID["rolling_window"],
+            PARAMETER_GRID["stop_loss"],
+            PARAMETER_GRID["take_profit"],
+            PARAMETER_GRID["trailing_stop"],
+            PARAMETER_GRID["trailing_activation"],
         ))
 
         # Filter invalid combinations (TP must be >= 2x SL)
@@ -1237,35 +1244,35 @@ class ParameterOptimizer:
 
             # Risk config for this combination
             risk_config = {
-                'stop_loss': sl,
-                'take_profit': tp,
-                'trailing_stop': trail,
-                'trailing_activation': trail_act,
-                'max_daily_loss': 0.05,
-                'max_positions': 1,
+                "stop_loss": sl,
+                "take_profit": tp,
+                "trailing_stop": trail,
+                "trailing_activation": trail_act,
+                "max_daily_loss": 0.05,
+                "max_positions": 1,
             }
 
             # Run backtest
             result = runner.run(close, factors_df, param_code, risk_config, forward_bars)
 
-            if result and result.get('status') == 'success':
+            if result and result.get("status") == "success":
                 # Score: prioritize IC and Sharpe, penalize drawdown and low trades
                 score = (
-                    abs(result.get('ic', 0)) * 10 +
-                    result.get('sharpe', 0) * 2 -
-                    abs(result.get('max_drawdown', 0)) * 5 +
-                    min(result.get('n_trades', 0) / 100, 2)
+                    abs(result.get("ic", 0)) * 10 +
+                    result.get("sharpe", 0) * 2 -
+                    abs(result.get("max_drawdown", 0)) * 5 +
+                    min(result.get("n_trades", 0) / 100, 2)
                 )
 
                 if score > best_score:
                     best_score = score
                     best_params = {
-                        'threshold_entry': threshold,
-                        'rolling_window': window,
-                        'stop_loss': sl,
-                        'take_profit': tp,
-                        'trailing_stop': trail,
-                        'trailing_activation': trail_act,
+                        "threshold_entry": threshold,
+                        "rolling_window": window,
+                        "stop_loss": sl,
+                        "take_profit": tp,
+                        "trailing_stop": trail,
+                        "trailing_activation": trail_act,
                     }
                     best_result = result
 
@@ -1275,14 +1282,14 @@ class ParameterOptimizer:
         if best_result is None:
             logger.warning("No successful backtests found, using default parameters")
             best_params = {
-                'threshold_entry': 0.3,
-                'rolling_window': 20,
-                'stop_loss': 0.02,
-                'take_profit': 0.04,
-                'trailing_stop': 0.015,
-                'trailing_activation': 0.02,
+                "threshold_entry": 0.3,
+                "rolling_window": 20,
+                "stop_loss": 0.02,
+                "take_profit": 0.04,
+                "trailing_stop": 0.015,
+                "trailing_activation": 0.02,
             }
-            best_result = {'status': 'failed', 'reason': 'No valid parameters found'}
+            best_result = {"status": "failed", "reason": "No valid parameters found"}
 
         return best_params, best_result
 
@@ -1313,8 +1320,8 @@ class SmartStrategyGenerator:
 
     def __init__(
         self,
-        trading_style: str = 'daytrading',
-        forward_bars: Optional[int] = None,
+        trading_style: str = "daytrading",
+        forward_bars: int | None = None,
         max_attempts: int = 100,
         enable_optimization: bool = True,
     ):
@@ -1333,7 +1340,7 @@ class SmartStrategyGenerator:
             Enable parameter grid search
         """
         self.trading_style = trading_style
-        self.forward_bars = forward_bars or (12 if trading_style == 'daytrading' else 96)
+        self.forward_bars = forward_bars or (12 if trading_style == "daytrading" else 96)
         self.max_attempts = max_attempts
         self.enable_optimization = enable_optimization
 
@@ -1349,9 +1356,9 @@ class SmartStrategyGenerator:
         # Load factor time-series
         self.factor_data = {}
         for f_info in self.factors:
-            series = data_cache.load_factor_timeseries(f_info['name'])
+            series = data_cache.load_factor_timeseries(f_info["name"])
             if series is not None:
-                self.factor_data[f_info['name']] = series
+                self.factor_data[f_info["name"]] = series
 
         # Align data
         all_series = [self.factor_data[n] for n in self.factor_data]
@@ -1359,25 +1366,25 @@ class SmartStrategyGenerator:
             raise ValueError("No factor data loaded!")
 
         self.df_factors = pd.DataFrame({n: self.factor_data[n] for n in self.factor_data})
-        self.common_idx = self.close.index.intersection(self.df_factors.dropna(how='all').index)
+        self.common_idx = self.close.index.intersection(self.df_factors.dropna(how="all").index)
         self.close_aligned = self.close.loc[self.common_idx]
         self.df_aligned = self.df_factors.loc[self.common_idx]
 
-        self.accepted_strategies: List[Dict] = []
-        self.feedback_history: List[str] = []
+        self.accepted_strategies: list[dict] = []
+        self.feedback_history: list[str] = []
 
         logger.info(
             f"SmartStrategyGenerator initialized: style={trading_style}, "
             f"forward_bars={self.forward_bars}, factors={len(self.factor_data)}, "
-            f"bars={len(self.close_aligned):,}"
+            f"bars={len(self.close_aligned):,}",
         )
 
     def generate_strategy(
         self,
         attempt_idx: int,
-        factor_subset: Optional[List[Dict]] = None,
-        feedback: Optional[str] = None,
-    ) -> Optional[Dict]:
+        factor_subset: list[dict] | None = None,
+        feedback: str | None = None,
+    ) -> dict | None:
         """
         Generate a single strategy with feedback loop.
 
@@ -1408,12 +1415,12 @@ class SmartStrategyGenerator:
             forward_bars=self.forward_bars,
         )
 
-        if gen_result['status'] != 'generated':
+        if gen_result["status"] != "generated":
             logger.warning(f"Attempt {attempt_idx}: LLM generation failed - {gen_result.get('error', 'Unknown')}")
             return None
 
-        strategy = gen_result['strategy']
-        factor_names = strategy.get('factor_names', [])
+        strategy = gen_result["strategy"]
+        factor_names = strategy.get("factor_names", [])
 
         # Build factors DataFrame
         valid_factors = [f for f in factor_names if f in self.df_aligned.columns]
@@ -1425,43 +1432,43 @@ class SmartStrategyGenerator:
 
         # Default risk config
         risk_config = {
-            'stop_loss': 0.02,
-            'take_profit': 0.04,
-            'trailing_stop': 0.015,
-            'trailing_activation': 0.02,
-            'max_daily_loss': 0.05,
-            'max_positions': 1,
+            "stop_loss": 0.02,
+            "take_profit": 0.04,
+            "trailing_stop": 0.015,
+            "trailing_activation": 0.02,
+            "max_daily_loss": 0.05,
+            "max_positions": 1,
         }
 
         # Parameter optimization (if enabled)
         if self.enable_optimization:
             logger.info(f"Attempt {attempt_idx}: Running parameter optimization...")
             best_params, opt_result = self.optimizer.optimize(
-                self.close_aligned, factors_df, strategy['code'], self.forward_bars
+                self.close_aligned, factors_df, strategy["code"], self.forward_bars,
             )
 
-            if opt_result.get('status') == 'success':
+            if opt_result.get("status") == "success":
                 risk_config.update(best_params)
                 logger.info(
                     f"  Best params: threshold={best_params['threshold_entry']}, "
                     f"window={best_params['rolling_window']}, "
-                    f"SL={best_params['stop_loss']:.1%}, TP={best_params['take_profit']:.1%}"
+                    f"SL={best_params['stop_loss']:.1%}, TP={best_params['take_profit']:.1%}",
                 )
             else:
-                logger.warning(f"  Optimization failed, using default parameters")
+                logger.warning("  Optimization failed, using default parameters")
 
         # Run final backtest with optimized/default risk config
         bt_result = self.backtest_runner.run(
-            self.close_aligned, factors_df, strategy['code'], risk_config, self.forward_bars
+            self.close_aligned, factors_df, strategy["code"], risk_config, self.forward_bars,
         )
 
-        if bt_result is None or bt_result.get('status') != 'success':
+        if bt_result is None or bt_result.get("status") != "success":
             logger.warning(f"Attempt {attempt_idx}: Backtest failed - {bt_result.get('reason', 'Unknown') if bt_result else 'No result'}")
             return None
 
         # Evaluate strategy
         # Reconstruct signal from backtest (approximate)
-        signal_approx = pd.Series(0, index=self.close_aligned.index[:bt_result.get('n_bars', len(self.close_aligned))])
+        signal_approx = pd.Series(0, index=self.close_aligned.index[:bt_result.get("n_bars", len(self.close_aligned))])
         evaluation = self.evaluator.evaluate(  # nosec
             signal=signal_approx,
             close=self.close_aligned.iloc[:len(signal_approx)],
@@ -1470,19 +1477,19 @@ class SmartStrategyGenerator:
 
         # Use backtest metrics directly for evaluation  # nosec
         evaluation = {  # nosec
-            'ic': bt_result.get('ic', 0),
-            'sharpe': bt_result.get('sharpe', 0),
-            'max_drawdown': bt_result.get('max_drawdown', 0),
-            'win_rate': bt_result.get('win_rate', 0),
-            'n_trades': bt_result.get('n_trades', 0),
-            'monthly_return': bt_result.get('monthly_return_pct', 0) / 100.0,
-            'max_daily_loss': bt_result.get('max_daily_loss', 0),
+            "ic": bt_result.get("ic", 0),
+            "sharpe": bt_result.get("sharpe", 0),
+            "max_drawdown": bt_result.get("max_drawdown", 0),
+            "win_rate": bt_result.get("win_rate", 0),
+            "n_trades": bt_result.get("n_trades", 0),
+            "monthly_return": bt_result.get("monthly_return_pct", 0) / 100.0,
+            "max_daily_loss": bt_result.get("max_daily_loss", 0),
         }
 
         # Check acceptance
         passed, failed_criteria = self.evaluator._check_acceptance(**evaluation)  # nosec
-        evaluation['status'] = 'accepted' if passed else 'rejected'  # nosec
-        evaluation['failed_criteria'] = failed_criteria  # nosec
+        evaluation["status"] = "accepted" if passed else "rejected"  # nosec
+        evaluation["failed_criteria"] = failed_criteria  # nosec
 
         # Generate feedback
         feedback = self.feedback_gen.generate_feedback(
@@ -1494,26 +1501,26 @@ class SmartStrategyGenerator:
         self.feedback_history.append(feedback)
 
         # Store strategy
-        strategy['metrics'] = bt_result
-        strategy['risk_config'] = risk_config
-        strategy['evaluation'] = evaluation  # nosec
-        strategy['feedback'] = feedback
+        strategy["metrics"] = bt_result
+        strategy["risk_config"] = risk_config
+        strategy["evaluation"] = evaluation  # nosec
+        strategy["feedback"] = feedback
 
         if passed:
             logger.info(
                 f"✓ Strategy #{len(self.accepted_strategies)+1} ACCEPTED: "
                 f"IC={evaluation['ic']:.4f}, Sharpe={evaluation['sharpe']:.2f}, "  # nosec
-                f"Trades={evaluation['n_trades']}, DD={evaluation['max_drawdown']:.1%}"  # nosec
+                f"Trades={evaluation['n_trades']}, DD={evaluation['max_drawdown']:.1%}",  # nosec
             )
             self.accepted_strategies.append(strategy)
         else:
             logger.info(
-                f"✗ Strategy REJECTED: {', '.join(failed_criteria[:3])}"
+                f"✗ Strategy REJECTED: {', '.join(failed_criteria[:3])}",
             )
 
         return strategy
 
-    def generate_strategies(self, target_count: int = 10) -> List[Dict]:
+    def generate_strategies(self, target_count: int = 10) -> list[dict]:
         """
         Generate multiple strategies with feedback loop.
 
@@ -1527,7 +1534,7 @@ class SmartStrategyGenerator:
         list
             List of accepted strategy dicts
         """
-        console.print(f"\n[bold cyan]🧠 Smart Strategy Generation[/bold cyan]")
+        console.print("\n[bold cyan]🧠 Smart Strategy Generation[/bold cyan]")
         console.print(f"   Style: {self.trading_style}")
         console.print(f"   Forward bars: {self.forward_bars}")
         console.print(f"   Target: {target_count} accepted strategies")
@@ -1557,7 +1564,7 @@ class SmartStrategyGenerator:
 
                 strategy = self.generate_strategy(attempt, feedback=feedback)
 
-                if strategy and strategy['evaluation']['status'] == 'accepted':  # nosec
+                if strategy and strategy["evaluation"]["status"] == "accepted":  # nosec
                     accepted.append(strategy)
 
                     # Save strategy
@@ -1569,7 +1576,7 @@ class SmartStrategyGenerator:
                         f"Sharpe={strategy['metrics'].get('sharpe', 0):.3f}, "
                         f"Trades={strategy['metrics'].get('n_trades', 0)}, "
                         f"DD={strategy['metrics'].get('max_drawdown', 0):.1%}, "
-                        f"Monthly={strategy['metrics'].get('monthly_return_pct', 0):.2f}%"
+                        f"Monthly={strategy['metrics'].get('monthly_return_pct', 0):.2f}%",
                     )
 
                 progress.update(task, advance=1)
@@ -1578,7 +1585,7 @@ class SmartStrategyGenerator:
         console.print(f"\n[bold green]✓ Generated {len(accepted)}/{target_count} accepted strategies[/bold green]\n")
 
         if accepted:
-            accepted.sort(key=lambda x: x['metrics'].get('ic', 0), reverse=True)
+            accepted.sort(key=lambda x: x["metrics"].get("ic", 0), reverse=True)
 
             table = Table(title=f"Top {len(accepted)} Accepted Strategies")
             table.add_column("#", justify="right")
@@ -1591,23 +1598,23 @@ class SmartStrategyGenerator:
             table.add_column("FTMO", justify="center")
 
             for i, s in enumerate(accepted, 1):
-                m = s['metrics']
+                m = s["metrics"]
                 table.add_row(
                     str(i),
-                    s['strategy_name'],
+                    s["strategy_name"],
                     f"{m.get('ic', 0):.4f}",
                     f"{m.get('sharpe', 0):.3f}",
-                    str(m.get('n_trades', 0)),
+                    str(m.get("n_trades", 0)),
                     f"{m.get('max_drawdown', 0):.1%}",
                     f"{m.get('monthly_return_pct', 0):.2f}%",
-                    "✅" if m.get('ftmo_compliant', False) else "❌",
+                    "✅" if m.get("ftmo_compliant", False) else "❌",
                 )
 
             console.print(table)
 
         return accepted
 
-    def _save_strategy(self, strategy: Dict) -> None:
+    def _save_strategy(self, strategy: dict) -> None:
         """Save strategy to JSON file."""
         fname = f"{int(time.time())}_{strategy['strategy_name'].replace(' ', '_')[:50]}.json"
         fpath = STRATEGIES_DIR / fname
@@ -1616,15 +1623,15 @@ class SmartStrategyGenerator:
         def convert_numpy(obj):
             if isinstance(obj, (np.integer,)):
                 return int(obj)
-            elif isinstance(obj, (np.floating,)):
+            if isinstance(obj, (np.floating,)):
                 return float(obj)
-            elif isinstance(obj, np.ndarray):
+            if isinstance(obj, np.ndarray):
                 return obj.tolist()
             return obj
 
         strategy_serializable = {k: convert_numpy(v) for k, v in strategy.items()}
 
-        with open(fpath, 'w') as f:
+        with open(fpath, "w") as f:
             json.dump(strategy_serializable, f, indent=2, ensure_ascii=False)
 
         # Generate PDF report if available
@@ -1645,7 +1652,7 @@ def parse_args():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Smart Strategy Generation with Feedback & Optimization',
+        description="Smart Strategy Generation with Feedback & Optimization",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -1657,40 +1664,40 @@ Examples:
     )
 
     parser.add_argument(
-        'count',
+        "count",
         type=int,
-        nargs='?',
+        nargs="?",
         default=10,
-        help='Number of strategies to generate (default: 10)',
+        help="Number of strategies to generate (default: 10)",
     )
     parser.add_argument(
-        '--style',
-        choices=['daytrading', 'swing'],
-        default='daytrading',
-        help='Trading style (default: daytrading)',
+        "--style",
+        choices=["daytrading", "swing"],
+        default="daytrading",
+        help="Trading style (default: daytrading)",
     )
     parser.add_argument(
-        '--forward-bars',
+        "--forward-bars",
         type=int,
         default=None,
-        help='Forward return bars (auto: 12 for daytrading, 96 for swing)',
+        help="Forward return bars (auto: 12 for daytrading, 96 for swing)",
     )
     parser.add_argument(
-        '--max-attempts',
+        "--max-attempts",
         type=int,
         default=150,
-        help='Maximum generation attempts (default: 150)',
+        help="Maximum generation attempts (default: 150)",
     )
     parser.add_argument(
-        '--no-optimization',
-        action='store_true',
-        help='Disable parameter grid search',
+        "--no-optimization",
+        action="store_true",
+        help="Disable parameter grid search",
     )
     parser.add_argument(
-        '--factors',
+        "--factors",
         type=int,
         default=20,
-        help='Number of top factors to consider (default: 20)',
+        help="Number of top factors to consider (default: 20)",
     )
 
     return parser.parse_args()
@@ -1700,7 +1707,7 @@ def main():
     args = parse_args()
 
     console.print(f"\n[bold magenta]{'='*70}[/bold magenta]")
-    console.print(f"[bold]🤖 PREDIX Smart Strategy Generator[/bold]")
+    console.print("[bold]🤖 PREDIX Smart Strategy Generator[/bold]")
     console.print(f"[bold magenta]{'='*70}[/bold magenta]\n")
 
     try:
@@ -1719,8 +1726,8 @@ def main():
             console.print(f"\n[bold green]✓ Success! {len(strategies)} strategies saved to:[/bold green]")
             console.print(f"   {STRATEGIES_DIR}\n")
         else:
-            console.print(f"\n[bold yellow]⚠ No strategies met acceptance criteria[/bold yellow]")
-            console.print(f"   Try: --max-attempts 200 or --style swing\n")
+            console.print("\n[bold yellow]⚠ No strategies met acceptance criteria[/bold yellow]")
+            console.print("   Try: --max-attempts 200 or --style swing\n")
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted by user[/yellow]")
@@ -1730,5 +1737,5 @@ def main():
         console.print(f"\n[red]✗ Fatal error: {e}[/red]")
         sys.exit(1)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
