@@ -73,7 +73,7 @@ class QlibQuantHypothesisGen(FactorAndModelHypothesisGen):
                 trace.controller.record(metric, prev_action)
                 action = trace.controller.decide(metric)
             else:
-                action = "factor"
+                action = "model"
         # ========= LLM ==========
         elif QUANT_PROP_SETTING.action_selection == "llm":
             hypothesis_and_feedback = (

@@ -53,7 +53,8 @@ def extract_metrics_from_experiment(experiment) -> Metrics:
 
 
 class LinearThompsonTwoArm:
-    def __init__(self, dim: int, prior_var: float = 1.0, noise_var: float = 1.0):
+    def __init__(self, dim: int, prior_var: float = 1.0, noise_var: float = 1.0,
+                 model_prior_bias: float = 0.5):
         self.dim = dim
         self.noise_var = noise_var
         # Each arm has its own posterior: mean & inverse of covariance (precision matrix)
@@ -61,6 +62,8 @@ class LinearThompsonTwoArm:
             "factor": np.zeros(dim),
             "model": np.zeros(dim),
         }
+        # Give model arm an initial positive bias toward all metrics
+        self.mean["model"][:] = model_prior_bias
         self.precision = {
             "factor": np.eye(dim) / prior_var,
             "model": np.eye(dim) / prior_var,
@@ -95,7 +98,7 @@ class LinearThompsonTwoArm:
 class EnvController:
     def __init__(self, weights: Tuple[float, ...] = None) -> None:
         self.weights = np.asarray(weights or (0.2, 0.1, 0.05, 0.05, 0.25, 0.1, 0.1, 0.15))
-        self.bandit = LinearThompsonTwoArm(dim=8, prior_var=10.0, noise_var=0.5)
+        self.bandit = LinearThompsonTwoArm(dim=8, prior_var=5.0, noise_var=0.5, model_prior_bias=2.0)
 
     def reward(self, m: Metrics) -> float:
         return float(np.dot(self.weights, m.as_vector()))
