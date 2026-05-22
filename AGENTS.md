@@ -71,12 +71,12 @@ Wiederkehrende `LLMUnavailableError` / "Failed to create chat completion after N
 Wenn der Nutzer nach "Hintergrundprozessen" oder "laufenden Tasks" fragt, sind damit folgende langlebigen Prozesse gemeint:
 
 - **`rdagent fin_quant`** — R&D Loop: Faktor-Generierung, Modell-Generierung, automatische Strategie-Optimierung (CoSTEER + Optuna). Läuft typischerweise für Stunden.
-- **`ftmo_live_trader.py`** — Live Trading: Führt Signale aus FTMO-Backtest-Ergebnissen live aus. Läuft dauerhaft.
+- **`riskmgmt_live_trader.py`** — Live Trading: Führt Signale aus RiskMgmt-Backtest-Ergebnissen live aus. Läuft dauerhaft.
 - **`predix_parallel.py`** — Parallele R&D Loop Instanzen (mehrere API-Keys).
 - **`predix_gen_strategies_real_bt.py`** — Einmalige Strategie-Generierung mit realem Backtest.
 - **`predix.py evaluate --all`** — Batch-Faktor-Evaluierung.
 
-Prüfen mit: `ps aux | grep -E "rdagent|ftmo_live_trader|predix" | grep -v grep`
+Prüfen mit: `ps aux | grep -E "rdagent|riskmgmt_live_trader|predix" | grep -v grep`
 
 Zugehörige Infrastruktur:
 - **`llama-server`** — LLM-Backend (Port 8081), muss laufen bevor `rdagent fin_quant --model local` startet.
@@ -275,6 +275,27 @@ Each `Scenario` subclass injects domain context into LLM prompts: market backgro
 - `results/` — backtest results, strategies, logs
 - `*.db`, `*.log`
 
+### 🚨 NEVER mention proprietary/protected terms in commits or releases
+- **NO FTMO, NO prop-firm names, NO broker names** in commit messages or release notes
+- **NO company names, NO platform names, NO trading-venue identifiers**
+- Use generic terms: "risk management", "position sizing", "leverage limits", "account rules"
+- Code variables/function names must NOT contain any proprietary trademark
+- Release notes must be sanitized before publishing
+- `git log` must be clean of any protected terms
+
+### Before every push:
+```bash
+git status
+git diff --staged --name-only
+git log --oneline origin/master..HEAD | grep -iE "ftmo|prop|broker|platform-name"
+```
+Stop if any of the above paths or terms appear in the output.
+- `models/local/` — improved models (Transformer, TCN, etc.)
+- `prompts/local/` — improved prompts
+- `.env` — API keys
+- `results/` — backtest results, strategies, logs
+- `*.db`, `*.log`
+
 ### Before every push:
 ```bash
 git status
@@ -398,7 +419,7 @@ Never skip this step. This is mandatory after every task.
 
 ## 15% Monatsrendite — Mission Plan
 
-> **Ziel**: Strategien mit 15% Netto-Monatsrendite (FTMO-verifiziert, OOS).
+> **Ziel**: Strategien mit 15% Netto-Monatsrendite (RiskMgmt-verifiziert, OOS).
 > **Zeitrahmen**: 4–8 Wochen.
 > **Aktueller Bestwert**: 2.3% OOS/Monat → **6.5× Lücke**.
 
@@ -406,7 +427,7 @@ Never skip this step. This is mandatory after every task.
 
 | Hebel | Von | Auf | Datei |
 |-------|-----|-----|-------|
-| Risk per Trade | 0.5% | 1.5% | `vbt_backtest.py` → `FTMO_RISK_PER_TRADE` |
+| Risk per Trade | 0.5% | 1.5% | `vbt_backtest.py` → `RiskMgmt_RISK_PER_TRADE` |
 | Acceptance Filter | keiner | 15% Monthly Min | `strategy_orchestrator.py` → `_check_acceptance()` |
 | CLI Parameter | kein `--min-monthly-return` | `--min-monthly-return 15` | `nexquant.py` |
 | LLM Prompt | kein Return-Target | "Target 15% monthly" | `strategy_generation_v4.yaml` |
@@ -440,7 +461,7 @@ Falls keine Strategie >8% OOS-Monthly:
 
 | File | Change |
 |------|--------|
-| `rdagent/components/backtesting/vbt_backtest.py` | `FTMO_RISK_PER_TRADE = 0.015` |
+| `rdagent/components/backtesting/vbt_backtest.py` | `RiskMgmt_RISK_PER_TRADE = 0.015` |
 | `rdagent/scenarios/qlib/local/strategy_orchestrator.py` | `min_monthly_return_pct` in init + acceptance |
 | `nexquant.py` | `--min-monthly-return` CLI option |
 | `prompts/strategy_generation_v4.yaml` | TARGET MONTHLY RETURN Block |
@@ -459,8 +480,8 @@ Keine Abweichung, keine Diskussion, kein "nur diesmal anders".
 
 **Niemals `real_backtest` oder `metrics` als Erfolgsmaßstab verwenden.**
 Jedes Strategy-JSON hat zwei Metrik-Sets:
-- `real_backtest` / `metrics`: Rohwerte OHNE Kosten, OHNE FTMO-Regeln → **illusorisch, ignorieren**
-- `summary`: FTMO-verifiziert mit 2.35 Pip Kosten, Risk-Management, OOS-Split → **nur das zählt**
+- `real_backtest` / `metrics`: Rohwerte OHNE Kosten, OHNE RiskMgmt-Regeln → **illusorisch, ignorieren**
+- `summary`: RiskMgmt-verifiziert mit 2.35 Pip Kosten, Risk-Management, OOS-Split → **nur das zählt**
 
 Immer prüfen mit: `python nexquant.py best -n 20 -m monthly_return --min-trades 30`
 

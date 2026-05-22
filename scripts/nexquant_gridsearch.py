@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Grid-Search Strategy Generator — no LLM, deterministic, FTMO-verified.
+"""Grid-Search Strategy Generator — no LLM, deterministic, RiskMgmt-verified.
 
 Core idea: Instead of LLM-generated code, use a fixed signal template and
 grid-search the parameters. Factors are aligned to daily resolution (where
 they have actual predictive power), signal is forward-filled to 1-min for
-FTMO backtest execution.
+RiskMgmt backtest execution.
 
 Template: z-score → IC-weighted composite → asymmetric thresholds → signal
 """
@@ -29,7 +29,7 @@ OHLCV_PATH = Path(
 )
 
 # ── Target ───────────────────────────────────────────────────────────────────
-MIN_MONTHLY_RETURN_PCT = 1.0   # Raw backtest target (FTMO will reduce ~50%)
+MIN_MONTHLY_RETURN_PCT = 1.0   # Raw backtest target (RiskMgmt will reduce ~50%)
 MIN_SHARPE = 0.5
 MAX_DRAWDOWN = -0.30
 MIN_WIN_RATE = 0.35
@@ -175,7 +175,7 @@ def evaluate_one(args: tuple) -> dict | None:
         # Forward-fill to 1-min for backtest
         signal_1min = daily_signal.reindex(close_1min.index).ffill().fillna(0).astype(int).clip(-1, 1)
 
-        # Fast backtest (no FTMO mask, no walk-forward — <1s per eval)
+        # Fast backtest (no RiskMgmt mask, no walk-forward — <1s per eval)
         from rdagent.components.backtesting.vbt_backtest import backtest_signal
 
         bt = backtest_signal(

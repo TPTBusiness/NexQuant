@@ -38,15 +38,15 @@ DEFAULT_TXN_COST_BPS = 2.14
 DEFAULT_BARS_PER_YEAR = 252 * 1440  # 252 trading days * 1440 min/day = 362,880
 EXTREME_BAR_THRESHOLD = 0.05  # |ret| > 5% on a single 1-min bar → suspicious
 
-# FTMO 100k account rules (enforced in backtest_signal when ftmo=True)
-FTMO_INITIAL_CAPITAL   = 100_000.0
-FTMO_MAX_DAILY_LOSS    = 0.05   # 5%  of initial → block new trades rest of day
-FTMO_MAX_TOTAL_LOSS    = 0.10   # 10% of initial → simulation ends
+# RiskMgmt 100k account rules (enforced in backtest_signal when riskmgmt=True)
+INITIAL_CAPITAL   = 100_000.0
+MAX_DAILY_LOSS    = 0.05   # 5%  of initial → block new trades rest of day
+MAX_TOTAL_LOSS    = 0.10   # 10% of initial → simulation ends
 # Risk-based position sizing: 1.5% equity risk per trade, 10-pip stop, max 1:30 leverage
-FTMO_RISK_PER_TRADE    = 0.015
-FTMO_STOP_PIPS         = 10
-FTMO_PIP               = 0.0001
-FTMO_MAX_LEVERAGE      = 30
+RISK_PER_TRADE    = 0.015
+STOP_PIPS         = 10
+PIP_SIZE               = 0.0001
+MAX_LEVERAGE      = 30
 
 
 def _compute_trade_pnl(position: pd.Series, strategy_returns: pd.Series) -> pd.Series:
@@ -274,31 +274,31 @@ def backtest_signal(
     return result
 
 
-def _apply_ftmo_mask(
+def _apply_risk_mask(
     signal: pd.Series,
     close: pd.Series,
     leverage: float,
     txn_cost_bps: float,
 ) -> tuple[pd.Series, dict]:
     """
-    Apply FTMO daily/total loss rules to a signal series.
+    Apply RiskMgmt daily/total loss rules to a signal series.
 
     Returns a masked signal (positions zeroed after each limit breach) and
-    a dict of FTMO compliance metrics.
+    a dict of RiskMgmt compliance metrics.
     """
     txn_cost = txn_cost_bps / 10_000.0
     position = signal.shift(1).fillna(0) * leverage
     bar_ret  = close.pct_change().fillna(0)
 
-    equity   = FTMO_INITIAL_CAPITAL
-    peak_day = FTMO_INITIAL_CAPITAL
+    equity   = INITIAL_CAPITAL
+    peak_day = INITIAL_CAPITAL
     masked   = signal.copy()
 
     daily_breaches = 0
     total_breached = False
     total_breach_ts: pd.Timestamp | None = None
     current_day    = None
-    day_start_eq   = FTMO_INITIAL_CAPITAL
+    day_start_eq   = INITIAL_CAPITAL
 
     pos_prev = 0.0
     for ts, sig_i in signal.items():
@@ -319,24 +319,24 @@ def _apply_ftmo_mask(
             masked.at[ts] = 0
             continue
 
-        daily_loss = (equity - day_start_eq) / FTMO_INITIAL_CAPITAL
-        total_loss = (equity - FTMO_INITIAL_CAPITAL) / FTMO_INITIAL_CAPITAL
+        daily_loss = (equity - day_start_eq) / INITIAL_CAPITAL
+        total_loss = (equity - INITIAL_CAPITAL) / INITIAL_CAPITAL
 
-        if daily_loss < -FTMO_MAX_DAILY_LOSS:
+        if daily_loss < -MAX_DAILY_LOSS:
             daily_breaches += 1
             day_start_eq = -999  # block rest of day
             masked.at[ts] = 0
 
-        if total_loss < -FTMO_MAX_TOTAL_LOSS:
+        if total_loss < -MAX_TOTAL_LOSS:
             total_breached = True
             total_breach_ts = ts
             masked.at[ts] = 0
 
     return masked, {
-        "ftmo_daily_breaches": daily_breaches,
-        "ftmo_total_breached": total_breached,
-        "ftmo_total_breach_ts": str(total_breach_ts) if total_breach_ts else None,
-        "ftmo_compliant": not total_breached and daily_breaches == 0,
+        "risk_daily_breaches": daily_breaches,
+        "risk_total_breached": total_breached,
+        "risk_total_breach_ts": str(total_breach_ts) if total_breach_ts else None,
+        "risk_compliant": not total_breached and daily_breaches == 0,
     }
 
 
@@ -403,7 +403,7 @@ def walk_forward_rolling(
     """
     Rolling walk-forward validation: multiple IS/OOS windows shifted by ``step_years``.
 
-    Each window runs an independent FTMO simulation on the IS and OOS slices.
+    Each window runs an independent RiskMgmt simulation on the IS and OOS slices.
     Produces aggregate OOS statistics to measure cross-time consistency.
 
     Returns
@@ -442,7 +442,7 @@ def walk_forward_rolling(
         for mask, prefix in [(is_mask, "is"), (oos_mask, "oos")]:
             close_s  = close.loc[mask]
             signal_s = signal.loc[mask]
-            masked_s, _ = _apply_ftmo_mask(signal_s, close_s, leverage, txn_cost_bps)
+            masked_s, _ = _apply_risk_mask(signal_s, close_s, leverage, txn_cost_bps)
             r = backtest_signal(close=close_s, signal=masked_s,
                                 txn_cost_bps=txn_cost_bps, bars_per_year=bars_per_year)
             window[f"{prefix}_sharpe"]       = r.get("sharpe", 0.0)
@@ -466,14 +466,14 @@ def walk_forward_rolling(
     }
 
 
-def backtest_signal_ftmo(
+def backtest_signal_risk(
     close: pd.Series,
     signal: pd.Series,
     txn_cost_bps: float = DEFAULT_TXN_COST_BPS,
     eurusd_price: float = 1.10,
-    risk_pct: float = FTMO_RISK_PER_TRADE,
-    stop_pips: float = FTMO_STOP_PIPS,
-    max_leverage: float = FTMO_MAX_LEVERAGE,
+    risk_pct: float = RISK_PER_TRADE,
+    stop_pips: float = STOP_PIPS,
+    max_leverage: float = MAX_LEVERAGE,
     bars_per_year: int = DEFAULT_BARS_PER_YEAR,
     forward_returns: pd.Series | None = None,
     oos_start: str | None = OOS_START_DEFAULT,
@@ -481,15 +481,15 @@ def backtest_signal_ftmo(
     mc_n_permutations: int = 0,
 ) -> dict[str, Any]:
     """
-    FTMO-compliant backtest of a strategy signal on EUR/USD.
+    RiskMgmt-compliant backtest of a strategy signal on EUR/USD.
 
     Applies on top of ``backtest_signal``:
       - Realistic costs: default 2.14 bps (≈ 2.35 pip spread+slippage+commission)
       - Risk-based position sizing: risk_pct equity per trade, stop_pips hard stop
-      - Max leverage cap: max_leverage (default 1:30, FTMO standard)
-      - FTMO daily loss limit (5%): positions zeroed rest of day after breach
-      - FTMO total loss limit (10%): all positions zeroed after breach
-      - FTMO-specific metrics added to result dict
+      - Max leverage cap: max_leverage (default 1:30, RiskMgmt standard)
+      - RiskMgmt daily loss limit (5%): positions zeroed rest of day after breach
+      - RiskMgmt total loss limit (10%): all positions zeroed after breach
+      - RiskMgmt-specific metrics added to result dict
       - Walk-forward OOS split: IS metrics (before oos_start) + OOS metrics (after)
 
     Parameters
@@ -507,7 +507,7 @@ def backtest_signal_ftmo(
     stop_pips : float
         Hard stop-loss distance in pips (default 10).
     max_leverage : float
-        Maximum leverage (default 30 = FTMO 1:30).
+        Maximum leverage (default 30 = RiskMgmt 1:30).
     oos_start : str or None
         Start of out-of-sample period (ISO date). None disables OOS split.
     wf_rolling : bool
@@ -518,11 +518,11 @@ def backtest_signal_ftmo(
         When > 0, computes ``mc_pvalue``: fraction of permuted sequences whose
         total return >= real total return. p < 0.05 indicates a genuine edge.
     """
-    stop_price = stop_pips * FTMO_PIP
+    stop_price = stop_pips * PIP_SIZE
     leverage_by_risk = risk_pct / (stop_price / eurusd_price)
     leverage = min(leverage_by_risk, max_leverage)
 
-    masked_signal, ftmo_metrics = _apply_ftmo_mask(signal, close, leverage, txn_cost_bps)
+    masked_signal, risk_metrics = _apply_risk_mask(signal, close, leverage, txn_cost_bps)
 
     result = backtest_signal(
         close=close,
@@ -532,14 +532,14 @@ def backtest_signal_ftmo(
         forward_returns=forward_returns,
     )
 
-    result.update(ftmo_metrics)
-    result["ftmo_leverage"] = round(leverage, 2)
-    result["ftmo_risk_pct"] = risk_pct
-    result["ftmo_stop_pips"] = stop_pips
+    result.update(risk_metrics)
+    result["risk_leverage"] = round(leverage, 2)
+    result["risk_risk_pct"] = risk_pct
+    result["risk_stop_pips"] = stop_pips
 
-    # Re-scale reported equity metrics to FTMO_INITIAL_CAPITAL
-    result["ftmo_end_equity"] = FTMO_INITIAL_CAPITAL * (1 + result.get("total_return", 0))
-    result["ftmo_monthly_profit"] = FTMO_INITIAL_CAPITAL * result.get("monthly_return", 0)
+    # Re-scale reported equity metrics to INITIAL_CAPITAL
+    result["risk_end_equity"] = INITIAL_CAPITAL * (1 + result.get("total_return", 0))
+    result["risk_monthly_profit"] = INITIAL_CAPITAL * result.get("monthly_return", 0)
 
     # Walk-forward OOS split
     if oos_start is not None:
@@ -551,9 +551,9 @@ def backtest_signal_ftmo(
             if mask.sum() < 100:
                 return
             close_s  = close.loc[mask]
-            signal_s = signal.loc[mask]  # raw signal, not masked — fresh FTMO sim per period
+            signal_s = signal.loc[mask]  # raw signal, not masked — fresh RiskMgmt sim per period
             fwd_split = forward_returns.loc[mask] if forward_returns is not None else None
-            masked_s, _ = _apply_ftmo_mask(signal_s, close_s, leverage, txn_cost_bps)
+            masked_s, _ = _apply_risk_mask(signal_s, close_s, leverage, txn_cost_bps)
             split_result = backtest_signal(
                 close=close_s,
                 signal=masked_s,

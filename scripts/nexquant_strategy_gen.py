@@ -17,7 +17,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
+from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk
 
 DATA_PATH = Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
 FACTORS_DIR = Path("results/factors")
@@ -58,7 +58,7 @@ def test_frequency(close: pd.Series, factors: list[dict], freq: str, session_fil
             sig[~is_sess] = 0
             if sig.abs().sum() < 20: continue
             
-            r = backtest_signal_ftmo(c, sig.fillna(0), txn_cost_bps=TXN_COST_BPS)
+            r = backtest_signal_risk(c, sig.fillna(0), txn_cost_bps=TXN_COST_BPS)
             oos = r.get("wf_oos_sharpe_mean") or r.get("oos_sharpe", -999)
             oos_m = r.get("oos_monthly_return_pct", 0) or 0
             if oos_m > 0.5:
@@ -90,7 +90,7 @@ def test_combo(close: pd.Series, top_signals: list[dict], freq: str, n: int) -> 
     if not signals: return {}
     
     combo = pd.DataFrame(signals, index=c.index).fillna(0).mean(axis=1)
-    r = backtest_signal_ftmo(c, combo.fillna(0), txn_cost_bps=TXN_COST_BPS, wf_rolling=True)
+    r = backtest_signal_risk(c, combo.fillna(0), txn_cost_bps=TXN_COST_BPS, wf_rolling=True)
     
     return {
         "frequency": freq, "n_signals": n,

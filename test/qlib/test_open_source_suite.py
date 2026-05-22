@@ -175,22 +175,22 @@ class TestPromptLoader:
             load_prompt("xyz_nonexistent")
 
 
-class TestApplyFTMOMask:
+class TestApplyRiskMgmtMask:
     def test_output_same_length(self):
-        from rdagent.components.backtesting.vbt_backtest import _apply_ftmo_mask
+        from rdagent.components.backtesting.vbt_backtest import _apply_risk_mask
         dates = pd.date_range("2024-01-01", periods=100, freq="1min")
         close = pd.Series(1.10, index=dates)
         signal = pd.Series(np.where(np.arange(100) % 2 == 0, 1.0, -1.0), index=dates)
-        masked, metrics = _apply_ftmo_mask(signal, close, leverage=1.0, txn_cost_bps=2.14)
+        masked, metrics = _apply_risk_mask(signal, close, leverage=1.0, txn_cost_bps=2.14)
         assert len(masked) == len(signal)
         assert isinstance(metrics, dict)
 
     def test_flat_signal(self):
-        from rdagent.components.backtesting.vbt_backtest import _apply_ftmo_mask
+        from rdagent.components.backtesting.vbt_backtest import _apply_risk_mask
         dates = pd.date_range("2024-01-01", periods=200, freq="1min")
         close = pd.Series(1.10, index=dates)
         signal = pd.Series(0.0, index=dates)
-        masked, metrics = _apply_ftmo_mask(signal, close, leverage=1.0, txn_cost_bps=2.14)
+        masked, metrics = _apply_risk_mask(signal, close, leverage=1.0, txn_cost_bps=2.14)
         assert isinstance(metrics, dict)
 
 

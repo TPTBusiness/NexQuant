@@ -22,7 +22,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import TimeSeriesSplit
 
-from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
+from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk
 
 DATA_PATH = Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
 FACTORS_DIR = Path("results/factors")
@@ -98,7 +98,7 @@ def make_target(c: pd.Series, horizon: int = 5) -> np.ndarray:
 def backtest_metric(c, y_pred, split_idx):
     test_c = c.iloc[split_idx:]
     sig = pd.Series(y_pred[split_idx:len(test_c)+split_idx], index=test_c.index[:len(y_pred)-split_idx])
-    r = backtest_signal_ftmo(test_c.iloc[:len(sig)], sig.astype(float), txn_cost_bps=TXN_COST_BPS)
+    r = backtest_signal_risk(test_c.iloc[:len(sig)], sig.astype(float), txn_cost_bps=TXN_COST_BPS)
     return r.get("oos_sharpe", -999) or -999
 
 
@@ -190,7 +190,7 @@ def main():
             model.fit(X[:split_idx], y_vals[:split_idx])
             y_pred = model.predict(X)
             sig = pd.Series(y_pred[split_idx:len(c)-split_idx+split_idx], index=c.index[split_idx:split_idx+len(y_pred)-split_idx])
-            r = backtest_signal_ftmo(c.iloc[split_idx:split_idx+len(sig)], sig.astype(float), txn_cost_bps=TXN_COST_BPS)
+            r = backtest_signal_risk(c.iloc[split_idx:split_idx+len(sig)], sig.astype(float), txn_cost_bps=TXN_COST_BPS)
 
             oos_s = r.get("oos_sharpe", -999)
             oos_m = (r.get("oos_monthly_return_pct", 0) or 0)

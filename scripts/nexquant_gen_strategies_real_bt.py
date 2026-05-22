@@ -9,7 +9,7 @@ Usage:
     # Swing trading (96-bar forward returns)
     python nexquant_gen_strategies_real_bt.py 10
 
-    # Daytrading with FTMO constraints (12-bar forward returns)
+    # Daytrading with RiskMgmt constraints (12-bar forward returns)
     TRADING_STYLE=daytrading python nexquant_gen_strategies_real_bt.py 5
 
     # With parallel workers (default: CPU count)
@@ -66,7 +66,7 @@ if TRADING_STYLE == "daytrading":
     MAX_DRAWDOWN = -0.10
     MIN_MONTHLY_RETURN_PCT = 15.0
     STYLE_EMOJI = "🎯 Daytrading"
-    STYLE_DESC = "short-term intraday with FTMO compliance"
+    STYLE_DESC = "short-term intraday with RiskMgmt compliance"
 else:
     FORWARD_BARS = int(os.getenv("FORWARD_BARS", "96"))
     MIN_IC = 0.02
@@ -229,7 +229,7 @@ Hard requirements:
 - Use causal indicators only: rolling windows, shift(1) — NO look-ahead bias
 - No factor data — compute everything from 'close'
 - Keep it simple: 2-3 indicators max
-- TARGET MONTHLY RETURN: Generate signals that can achieve >15% OOS monthly return after FTMO costs (2.35 pip/trade). Use high-conviction entries only."""
+- TARGET MONTHLY RETURN: Generate signals that can achieve >15% OOS monthly return after RiskMgmt costs (2.35 pip/trade). Use high-conviction entries only."""
 
         elif TRADING_STYLE == "daytrading":
             system_prompt = f"""You are an expert daytrading quant specializing in EUR/USD scalping and intraday strategies.
@@ -258,7 +258,7 @@ Hard requirements:
 - Use rolling z-scores with windows of 5-20 bars (not 50-100), thresholds ±0.2 to ±0.5
 - Combine 2 factors: one momentum, one mean-reversion
 - NO global mean/std — always use rolling(window).mean() with shift(1) to avoid look-ahead bias
-- TARGET MONTHLY RETURN: Generate signals that can achieve >15% OOS monthly return after FTMO costs (2.35 pip/trade). Use high-conviction entries only."""
+- TARGET MONTHLY RETURN: Generate signals that can achieve >15% OOS monthly return after RiskMgmt costs (2.35 pip/trade). Use high-conviction entries only."""
 
         else:
             system_prompt = f"""You are a quantitative trading expert specializing in EUR/USD daily swing strategies.
@@ -289,7 +289,7 @@ Output ONLY valid JSON with these fields:
 
 {f'Previous feedback: {feedback}' if feedback else 'First attempt - be creative!'}
 
-Use daily-level signal logic (factor above/below rolling daily mean). Signal changes once per day. TARGET MONTHLY RETURN: Generate signals that can achieve >15% OOS monthly return after FTMO costs (2.35 pip/trade)."""
+Use daily-level signal logic (factor above/below rolling daily mean). Signal changes once per day. TARGET MONTHLY RETURN: Generate signals that can achieve >15% OOS monthly return after RiskMgmt costs (2.35 pip/trade)."""
 
         api = APIBackend()
         response = api.build_messages_and_create_chat_completion(
@@ -376,8 +376,8 @@ signal.fillna(0).to_pickle('signal.pkl')
         except Exception as e:
             return {"status": "failed", "reason": str(e)[:200]}
 
-    # Main process: FTMO-realistic backtest (leverage + daily/total loss limits).
-    from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
+    # Main process: RiskMgmt-realistic backtest (leverage + daily/total loss limits).
+    from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk
 
     common = close.index.intersection(signal.index)
     if len(common) < 100:
@@ -388,7 +388,7 @@ signal.fillna(0).to_pickle('signal.pkl')
     fwd_returns = close_a.pct_change(FORWARD_BARS).shift(-FORWARD_BARS)
 
     from rdagent.components.backtesting.vbt_backtest import OOS_START_DEFAULT
-    return backtest_signal_ftmo(
+    return backtest_signal_risk(
         close=close_a,
         signal=signal_a,
         txn_cost_bps=TXN_COST_BPS,
@@ -615,7 +615,7 @@ def main(target_count=10):
                         "n_bars": bt_result.get("n_bars", 0), "n_months": bt_result.get("n_months", 0),
                         "trading_style": TRADING_STYLE,
                         "ohlcv_only": OHLCV_ONLY,
-                        "engine": "ftmo_v2",
+                        "engine": "riskmgmt_v2",
                         "txn_cost_bps": TXN_COST_BPS,
                         # Walk-forward OOS split
                         "oos_sharpe": bt_result.get("oos_sharpe"),

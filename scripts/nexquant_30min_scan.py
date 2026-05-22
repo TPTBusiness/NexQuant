@@ -2,7 +2,7 @@
 """30min Full Factor Scan — find all profitable signals."""
 import json, numpy as np, pandas as pd
 from pathlib import Path
-from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
+from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk
 
 c = pd.read_hdf("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5", key="data")["$close"]
 c = c.droplevel(-1).sort_index().dropna().resample("30min").last().dropna()
@@ -33,7 +33,7 @@ for i, f in enumerate(factors[:200]):
         sig = pd.Series(dr * np.sign(fac).fillna(0), index=c.index)
         sig[~is_s] = 0
         if sig.abs().sum() < 20: continue
-        r = backtest_signal_ftmo(c, sig.fillna(0), txn_cost_bps=2.14)
+        r = backtest_signal_risk(c, sig.fillna(0), txn_cost_bps=2.14)
         oos = r.get("wf_oos_sharpe_mean") or r.get("oos_sharpe", -999)
         oos_m = r.get("oos_monthly_return_pct", 0) or 0
         if oos_m > 0.2:
@@ -72,7 +72,7 @@ if results:
         print(f"\n=== COMBO TESTS ===")
         for n in [2, 3, 5, 8, len(cols)]:
             combo = df[cols[:n]].mean(axis=1)
-            r = backtest_signal_ftmo(c, combo.fillna(0), txn_cost_bps=2.14, wf_rolling=True)
+            r = backtest_signal_risk(c, combo.fillna(0), txn_cost_bps=2.14, wf_rolling=True)
             m = r.get("oos_monthly_return_pct", 0) or 0
             dd = (r.get("oos_max_drawdown", 0) or 0) * 100
             t = r.get("oos_n_trades", 0)

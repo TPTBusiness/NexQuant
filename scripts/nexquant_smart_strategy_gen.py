@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """
-Smart Strategy Generation with Feedback Loop, Parameter Optimization & FTMO Risk Management.
+Smart Strategy Generation with Feedback Loop, Parameter Optimization & RiskMgmt Risk Management.
 
 Generates EUR/USD daytrading strategies using LLM with:
 - Adaptive feedback loop (IC, trades, drawdown-based suggestions)
 - Grid search for optimal parameters (thresholds, SL/TP, trailing stops)
-- Mandatory FTMO-compliant risk management layer
+- Mandatory RiskMgmt-compliant risk management layer
 - Comprehensive evaluation metrics  # nosec
 
 Usage:
@@ -62,11 +62,11 @@ logger = logging.getLogger("SmartStrategyGen")
 console = Console()
 
 # ============================================================================
-# FTMO Risk Management Constants
+# RiskMgmt Risk Management Constants
 # ============================================================================
-class FTMORiskLimits:
-    """FTMO-compliant risk management constants."""
-    MAX_DAILY_LOSS_PCT = 0.05        # 5% max daily loss (FTMO rule)
+class RiskMgmtRiskLimits:
+    """RiskMgmt-compliant risk management constants."""
+    MAX_DAILY_LOSS_PCT = 0.05        # 5% max daily loss (RiskMgmt rule)
     MAX_PER_TRADE_LOSS_PCT = 0.02    # 2% max per trade
     MAX_TOTAL_DRAWDOWN = 0.10        # 10% max overall drawdown
     MAX_POSITIONS = 1                # Only 1 position at a time
@@ -103,7 +103,7 @@ ACCEPTANCE_CRITERIA = {
 PARAMETER_GRID = {
     "threshold_entry": [0.2, 0.3, 0.4, 0.5],
     "rolling_window": [10, 20, 30, 60],
-    "stop_loss": [0.01, 0.015, 0.02],        # 1%, 1.5%, 2% (HARD MAX: 2% for FTMO)
+    "stop_loss": [0.01, 0.015, 0.02],        # 1%, 1.5%, 2% (HARD MAX: 2% for RiskMgmt)
     "take_profit": [0.02, 0.03, 0.04, 0.06], # 2x-3x SL
     "trailing_stop": [0.01, 0.015],           # 1%, 1.5% after profit threshold
     "trailing_activation": [0.015, 0.02],     # Activate trail after 1.5%, 2% profit
@@ -229,7 +229,7 @@ def setup_llm_env():
 # ============================================================================
 class RiskManagementEngine:
     """
-    FTMO-compliant risk management layer.
+    RiskMgmt-compliant risk management layer.
 
     Applies stop loss, take profit, trailing stop, and daily loss limits
     to strategy returns.
@@ -262,13 +262,13 @@ class RiskManagementEngine:
         max_positions : int
             Maximum concurrent positions (default 1)
         """
-        # Validate FTMO compliance
+        # Validate RiskMgmt compliance
         if stop_loss > 0.02:
-            raise ValueError(f"Stop loss {stop_loss:.2%} exceeds FTMO max of 2%")
+            raise ValueError(f"Stop loss {stop_loss:.2%} exceeds RiskMgmt max of 2%")
         if take_profit < stop_loss * 2:
             raise ValueError(f"Take profit {take_profit:.2%} must be at least 2x SL ({stop_loss*2:.2%})")
         if max_daily_loss > 0.05:
-            raise ValueError(f"Daily loss {max_daily_loss:.2%} exceeds FTMO max of 5%")
+            raise ValueError(f"Daily loss {max_daily_loss:.2%} exceeds RiskMgmt max of 5%")
 
         self.stop_loss = stop_loss
         self.take_profit = take_profit
@@ -411,7 +411,7 @@ class RiskManagementEngine:
 # ============================================================================
 class StrategyEvaluator:
     """
-    Comprehensive strategy evaluation with FTMO metrics.  # nosec
+    Comprehensive strategy evaluation with RiskMgmt metrics.  # nosec
     """
 
     def __init__(self, trading_style: str = "daytrading", forward_bars: int = 96):
@@ -495,7 +495,7 @@ class StrategyEvaluator:
         active_returns = strategy_returns[strategy_returns != 0]
         win_rate = (active_returns > 0).sum() / len(active_returns) if len(active_returns) > 0 else 0.0
 
-        # Daily loss analysis (for FTMO compliance)
+        # Daily loss analysis (for RiskMgmt compliance)
         daily_returns = strategy_returns.groupby(
             strategy_returns.index.date if hasattr(strategy_returns.index[0], "date") else strategy_returns.index,
         ).sum()
@@ -533,9 +533,9 @@ class StrategyEvaluator:
             "n_bars": total_bars,
             "n_months": float(n_months),
 
-            # FTMO compliance
+            # RiskMgmt compliance
             "max_daily_loss": float(max_daily_loss),
-            "ftmo_compliant": max_daily_loss <= 0.05,
+            "riskmgmt_compliant": max_daily_loss <= 0.05,
 
             # Signal distribution
             "signal_long_pct": n_long / total_bars if total_bars > 0 else 0,
@@ -1117,7 +1117,7 @@ result = {{
     "n_short": int((signal_aligned == -1).sum()),
     "n_neutral": int((signal_aligned == 0).sum()),
     "max_daily_loss": float(max_daily_loss),
-    "ftmo_compliant": max_daily_loss <= 0.05,
+    "riskmgmt_compliant": max_daily_loss <= 0.05,
 }}
 
 def sanitize_val(v):
@@ -1595,7 +1595,7 @@ class SmartStrategyGenerator:
             table.add_column("Trades", justify="right")
             table.add_column("Max DD", justify="right")
             table.add_column("Monthly %", justify="right")
-            table.add_column("FTMO", justify="center")
+            table.add_column("RiskMgmt", justify="center")
 
             for i, s in enumerate(accepted, 1):
                 m = s["metrics"]
@@ -1607,7 +1607,7 @@ class SmartStrategyGenerator:
                     str(m.get("n_trades", 0)),
                     f"{m.get('max_drawdown', 0):.1%}",
                     f"{m.get('monthly_return_pct', 0):.2f}%",
-                    "✅" if m.get("ftmo_compliant", False) else "❌",
+                    "✅" if m.get("riskmgmt_compliant", False) else "❌",
                 )
 
             console.print(table)

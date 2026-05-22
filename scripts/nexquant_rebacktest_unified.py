@@ -36,7 +36,7 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo  # noqa: E402
+from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk  # noqa: E402
 
 OHLCV_PATH = Path("/home/nico/NexQuant/git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
 FACTORS_VALUES_DIR = Path("/home/nico/NexQuant/results/factors/values")
@@ -184,7 +184,7 @@ def rebacktest_one(
     # Signal can arrive on either the factor index or the close index.
     signal = signal.reindex(close_a.index).ffill().fillna(0)
 
-    result = backtest_signal_ftmo(
+    result = backtest_signal_risk(
         close=close_a,
         signal=signal,
         txn_cost_bps=txn_cost_bps,
@@ -252,10 +252,10 @@ def main() -> None:
                     "real_n_trades": bt.get("n_trades"),
                     "total_return": bt.get("total_return"),
                     "annualized_return": bt.get("annualized_return"),
-                    "ftmo_daily_loss_hit": bt.get("ftmo_daily_loss_hit"),
-                    "ftmo_total_loss_hit": bt.get("ftmo_total_loss_hit"),
+                    "riskmgmt_daily_loss_hit": bt.get("riskmgmt_daily_loss_hit"),
+                    "riskmgmt_total_loss_hit": bt.get("riskmgmt_total_loss_hit"),
                     "trading_style": data.get("summary", {}).get("trading_style"),
-                    "engine": "ftmo_v2",
+                    "engine": "riskmgmt_v2",
                     "txn_cost_bps": args.txn_cost_bps,
                     # Walk-forward OOS
                     "is_sharpe": bt.get("is_sharpe"),
@@ -280,7 +280,7 @@ def main() -> None:
                 data["max_drawdown"] = bt.get("max_drawdown")
                 data["win_rate"] = bt.get("win_rate")
                 data["total_return"] = bt.get("total_return")
-                data["reevaluation_status"] = "ftmo_v2"
+                data["reevaluation_status"] = "riskmgmt_v2"
                 try:
                     import json as _json
                     f.write_text(_json.dumps(data, indent=2, ensure_ascii=False))

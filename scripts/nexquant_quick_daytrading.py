@@ -24,7 +24,7 @@ FACTOR_FILES = Path('results/factors')
 VALUE_FILES = FACTOR_FILES / 'values'
 OHLCV_PATH = Path('git_ignore_folder/factor_implementation_source_data/intraday_pv.h5')
 
-# Best daytrading strategies (12-min horizon, optimized for FTMO)
+# Best daytrading strategies (12-min horizon, optimized for RiskMgmt)
 DAYTRADING_COMBOS = [
     {
         'name': 'MomentumDivergence12min',
@@ -236,7 +236,7 @@ def load_factor_series(name):
 def main(n_strategies=5):
     console.print("[bold cyan]🎯 Daytrading Strategy Generator (Quick Mode)[/bold cyan]\n")
     console.print("   Style: 12-minute forward returns")
-    console.print("   Target: FTMO compliant (IC>0.02, Sharpe>0.5, Trades>20, DD>-10%)\n")
+    console.print("   Target: RiskMgmt compliant (IC>0.02, Sharpe>0.5, Trades>20, DD>-10%)\n")
     
     # Load OHLCV data
     if not OHLCV_PATH.exists():
@@ -422,7 +422,7 @@ print(json.dumps(result))
         trades = result.get('n_trades', 0)
         dd = result.get('max_drawdown', 0)
         
-        # FTMO criteria
+        # RiskMgmt criteria
         if abs(ic) > 0.02 and sharpe > 0.5 and trades > 20 and dd > -0.10:
             strategy = {
                 'strategy_name': combo['name'],
