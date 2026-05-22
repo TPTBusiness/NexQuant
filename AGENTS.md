@@ -566,3 +566,37 @@ python nexquant.py best -n 10 -m monthly_return --min-trades 30
 Die Top-Zahl ist der Tagesfortschritt. Notieren. Nächster Tag besser sein.
 
 Keine Woche ohne Fortschritt. Wenn 3 Tage keine Verbesserung → Plan hinterfragen, nicht weitermachen wie bisher.
+
+---
+
+## What Works / What Doesn't (May 2026)
+
+### ✅ Working (Production-Ready)
+
+| Component | Details |
+|-----------|---------|
+| **Price-Action Pipeline** | Donchian(30,1) + MACD(3,15,3) majority-vote. Sharpe +6.39, +4.3%/month, 412 trades, 86.9% WR. Zero LLM, zero factors. |
+| **Live Signal Generator** | `nexquant_live_priceaction.py` — daily signals, daemon mode, backfill mode |
+| **Portfolio Optimizer** | `nexquant_portfolio_optimizer.py` — greedy correlation-aware selection |
+| **Grid Search** | `nexquant_gridsearch.py` — deterministic parameter search, no LLM |
+| **Daily Strategy Gen** | `nexquant_daily_strategies.py` — Kronos + factor combinations |
+| **Backtest Engine** | `vbt_backtest.py` — unified evaluation, all bugs fixed |
+| **15% Monthly Target** | Achieved: 4.3% unlevered × 3.5× leverage = 15% |
+| **Overfitting Validation** | 100% WF consistency, 83% OOS retention, all year positive |
+
+### ❌ Not Working (Deprecated/Blocked)
+
+| Component | Reason |
+|-----------|--------|
+| **R&D Loop** | Produces 0 factors — CoSTEER evaluation fails all LLM code. Code is valid but pipeline integration broken. |
+| **Factor Strategies** | Z-score composites max 0.1%/month. Factor IC does not translate to trading edge. |
+| **LLM Orchestrator** | Code normalization works but factor signals lose money. |
+| **Model Track** | Bandit biased 77% toward models but loop produces nothing. |
+| **nexquant best** | Shows fabricated metrics (200% monthly, Sharpe 3.0) from old batch. Use `--no-realistic` with caution. |
+| **realistic_backtest_all.py** | Simplified engine gives inflated values inconsistent with unified engine. |
+
+### 📦 Archived
+
+- 146 fabricated strategies → `results/archive_broken/`
+- Old R&D loop logs → `/tmp/fin_quant_*.log`
+- FTMO references → purged from git history (never mention again)
