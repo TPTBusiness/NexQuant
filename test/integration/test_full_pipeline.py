@@ -6,7 +6,7 @@ Tests the complete end-to-end pipeline including:
 - Portfolio Optimization (P7)
 - Full Pipeline End-to-End
 - Parallelization
-- FTMO Compliance
+- RiskMgmt Compliance
 
 At least 20 integration tests covering all new features.
 
@@ -526,15 +526,15 @@ class TestParallelization:
 
 
 # ---------------------------------------------------------------------------
-# Tests: FTMO Compliance
+# Tests: RiskMgmt Compliance
 # ---------------------------------------------------------------------------
 
 
-class TestFTMOCompliance:
-    """Test FTMO compliance checks for accepted strategies."""
+class TestRiskMgmtCompliance:
+    """Test RiskMgmt compliance checks for accepted strategies."""
 
     def test_stop_loss_compliance(self, mock_strategies, mock_project_structure):
-        """Test that all strategies have max drawdown within FTMO limits."""
+        """Test that all strategies have max drawdown within RiskMgmt limits."""
         strategies_dir = mock_project_structure / "results" / "strategies_new"
 
         for json_file in strategies_dir.glob("*.json"):
@@ -542,7 +542,7 @@ class TestFTMOCompliance:
                 data = json.load(f)
 
             max_dd = abs(data.get("max_drawdown", 0))
-            # FTMO max drawdown limit: 10%
+            # RiskMgmt max drawdown limit: 10%
             assert max_dd <= 0.25 or data.get("max_drawdown", 0) < 0
 
     def test_daily_loss_compliance(self, mock_strategies, mock_project_structure):
@@ -554,25 +554,25 @@ class TestFTMOCompliance:
                 data = json.load(f)
 
             daily_loss = abs(data.get("daily_loss_max", 0))
-            # FTMO daily loss limit: 5%
+            # RiskMgmt daily loss limit: 5%
             assert daily_loss <= 0.05 or data.get("daily_loss_max", 0) == 0
 
     def test_portfolio_max_drawdown(self, mock_strategies, portfolio_optimizer):
-        """Test that optimized portfolio respects FTMO drawdown limits."""
+        """Test that optimized portfolio respects RiskMgmt drawdown limits."""
         opt_result = portfolio_optimizer.optimize_portfolio(method="mean_variance")
 
         if opt_result and "weights" in opt_result:
             bt_result = portfolio_optimizer.backtest_portfolio(opt_result["weights"])
 
             if bt_result:
-                # FTMO max drawdown: 10%
+                # RiskMgmt max drawdown: 10%
                 # Portfolio should stay within limits
                 max_dd = abs(bt_result.get("max_drawdown", 0))
                 # Note: This is a soft check as mock data may vary
                 assert max_dd < 0.50  # Generous threshold for mock data
 
-    def test_ftmo_compliance_report(self, mock_strategies, portfolio_optimizer):
-        """Test generation of FTMO compliance report."""
+    def test_riskmgmt_compliance_report(self, mock_strategies, portfolio_optimizer):
+        """Test generation of RiskMgmt compliance report."""
         strategies = portfolio_optimizer._load_strategy_data()
 
         if not strategies:
@@ -922,12 +922,12 @@ class TestSharpeRatioProperties:
 
 
 # ---------------------------------------------------------------------------
-# Property 5: FTMO Drawdown Limits
+# Property 5: RiskMgmt Drawdown Limits
 # ---------------------------------------------------------------------------
 
 
-class TestFTMODrawdownLimits:
-    """Property: FTMO drawdown invariants."""
+class TestRiskMgmtDrawdownLimits:
+    """Property: RiskMgmt drawdown invariants."""
 
     @given(
         equity_gain=st.floats(min_value=-0.15, max_value=0.50),
@@ -948,17 +948,17 @@ class TestFTMODrawdownLimits:
     @settings(max_examples=50, deadline=10000)
     def test_daily_loss_at_5_percent(self, daily_returns):
         """Property: daily P&L breach triggers at −5%."""
-        ftmo_daily_max = 0.05
+        riskmgmt_daily_max = 0.05
         daily_pnl = np.prod(1 + np.array(daily_returns)) - 1
-        breached = daily_pnl < -ftmo_daily_max
+        breached = daily_pnl < -riskmgmt_daily_max
         assert isinstance(breached, (bool, np.bool_))
 
     @given(
         total_return=st.floats(min_value=-0.15, max_value=0.50),
     )
     @settings(max_examples=50, deadline=10000)
-    def test_ftmo_end_equity_formula(self, total_return):
-        """Property: ftmo_end_equity = initial_capital * (1 + total_return)."""
+    def test_riskmgmt_end_equity_formula(self, total_return):
+        """Property: riskmgmt_end_equity = initial_capital * (1 + total_return)."""
         initial = 100_000.0
         end_equity = initial * (1 + total_return)
         assert end_equity > 0  # Can't go below zero

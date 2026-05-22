@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
+from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk
 
 DATA_PATH = Path("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5")
 FACTORS_DIR = Path("results/factors")
@@ -63,7 +63,7 @@ def backtest(signal) -> float:
     common = close.index.intersection(signal.dropna().index)
     if len(common) < 100:
         return -999
-    r = backtest_signal_ftmo(close.loc[common], signal.reindex(common).fillna(0),
+    r = backtest_signal_risk(close.loc[common], signal.reindex(common).fillna(0),
                              txn_cost_bps=TXN_COST_BPS, wf_rolling=False)
     return r.get("oos_sharpe", -999)
 

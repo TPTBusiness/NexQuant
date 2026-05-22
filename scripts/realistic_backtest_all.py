@@ -4,11 +4,11 @@ Realistic backtest of all strategies in results/strategies_new/.
 Costs modeled per trade:
   1.5 pip spread + 0.5 pip slippage + 0.35 pip commission = 2.35 pip total
 
-FTMO 100k rules enforced:
+RiskMgmt 100k rules enforced:
   - Max daily loss:   5%  of initial balance ($5,000)  → no trading rest of day if hit
   - Max total loss:  10%  of initial balance ($10,000)  → account blown, simulation ends
   - Position sizing: 1% equity risk per trade, 10-pip stop (no artificial lot cap)
-  - Max leverage:    1:30 (EU regulation standard, FTMO default)
+  - Max leverage:    1:30 (EU regulation standard, RiskMgmt default)
   - Compounding:     position size grows with equity each trade
 
 Out-of-sample window: 2024-01-01 onwards (never seen during factor research).
@@ -43,9 +43,9 @@ COST_ENTRY        = 2.0 * PIP    # spread + slippage
 COST_EXIT         = 0.35 * PIP   # commission
 RISK_PCT          = 0.015         # 1.5% equity risk per trade
 STOP              = 10 * PIP      # 10-pip hard stop
-MAX_LEVERAGE      = 30            # 1:30 max leverage (FTMO / EU standard)
-FTMO_MAX_DAILY    = 0.05          # 5% max daily loss of initial balance
-FTMO_MAX_TOTAL    = 0.10          # 10% max total loss of initial balance
+MAX_LEVERAGE      = 30            # 1:30 max leverage (RiskMgmt / EU standard)
+RiskMgmt_MAX_DAILY    = 0.05          # 5% max daily loss of initial balance
+RiskMgmt_MAX_TOTAL    = 0.10          # 10% max total loss of initial balance
 OOS_START         = "2024-01-01"
 
 
@@ -111,7 +111,7 @@ def _build_signal(factor_names: list[str], full_idx: pd.Index,
 def _run_engine(sig_arr: np.ndarray, px_arr: np.ndarray,
                 ts_arr: np.ndarray) -> dict:
     """
-    FTMO-compliant backtest engine.
+    RiskMgmt-compliant backtest engine.
 
     Rules enforced:
       - Daily loss limit: if daily PnL < -5% of initial ($5k), no new trades that day
@@ -165,11 +165,11 @@ def _run_engine(sig_arr: np.ndarray, px_arr: np.ndarray,
             pos = 0
 
             # Check daily loss limit
-            if (equity - day_start_eq) / INITIAL < -FTMO_MAX_DAILY:
+            if (equity - day_start_eq) / INITIAL < -RiskMgmt_MAX_DAILY:
                 day_blocked = True
 
             # Check total loss limit → account blown
-            if equity < INITIAL * (1 - FTMO_MAX_TOTAL):
+            if equity < INITIAL * (1 - RiskMgmt_MAX_TOTAL):
                 blown = True
                 break
 
@@ -361,22 +361,22 @@ def main() -> None:
         hits.to_csv(out_hits, index=False)
         print(f"\nFiltered results saved → {out_hits}")
 
-    # ── FTMO projection for #1 ────────────────────────────────────────────────
+    # ── RiskMgmt projection for #1 ────────────────────────────────────────────────
     best_row = (hits if not hits.empty else df.sort_values("oos_monthly_pct", ascending=False)).iloc[0]
     mon = best_row["oos_monthly_pct"]
     dd  = abs(best_row["oos_dd_pct"])
     gross = 100_000 * mon / 100
     challenge_m = 10 / max(mon, 0.01)
     print(f"\n{'='*70}")
-    print(f"  FTMO 100k projection — #{1}: {best_row['name']}")
+    print(f"  RiskMgmt 100k projection — #{1}: {best_row['name']}")
     print(f"{'='*70}")
     print(f"  OOS monthly return:    {mon:+.2f}%")
     print(f"  Monthly gross profit:  ${gross:,.0f}")
     print(f"  Trader share (80%):    ${gross*0.8:,.0f} / month")
     print(f"  Trader annual (80%):   ${gross*0.8*12:,.0f} / year")
-    print(f"  OOS Max Drawdown:      {-dd:.2f}%  (FTMO limit: 10%)")
+    print(f"  OOS Max Drawdown:      {-dd:.2f}%  (RiskMgmt limit: 10%)")
     print(f"  Challenge duration:    ~{challenge_m:.1f} months to hit +10%")
-    print(f"  FTMO safe?             {'YES ✓' if dd < 8 else 'BORDERLINE ⚠' if dd < 10 else 'NO ✗'}")
+    print(f"  RiskMgmt safe?             {'YES ✓' if dd < 8 else 'BORDERLINE ⚠' if dd < 10 else 'NO ✗'}")
 
 
 def _print_table(df: pd.DataFrame) -> None:

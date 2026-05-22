@@ -1,6 +1,6 @@
 import json, numpy as np, pandas as pd
 from pathlib import Path
-from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
+from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk
 
 close = pd.read_hdf("git_ignore_folder/factor_implementation_source_data/intraday_pv.h5", key="data")["$close"]
 close = close.droplevel(-1).sort_index().dropna().resample("1h").last().dropna()
@@ -34,7 +34,7 @@ for i, f in enumerate(factors[:100]):
         sig = pd.Series(dr * np.sign(fac).fillna(0), index=close.index)
         sig[~is_session] = 0
         if sig.abs().sum() < 20: continue
-        r = backtest_signal_ftmo(close, sig.fillna(0), txn_cost_bps=2.14)
+        r = backtest_signal_risk(close, sig.fillna(0), txn_cost_bps=2.14)
         oos = r.get("wf_oos_sharpe_mean") or r.get("oos_sharpe", -999)
         oos_m = r.get("oos_monthly_return_pct", 0) or 0
         results.append((f"{f['name']}_{label}", oos, oos_m, r.get("oos_n_trades",0)))
@@ -67,7 +67,7 @@ if top:
     df = pd.DataFrame(all_sig, index=close.index).fillna(0)
     for n in [3, 5, 8]:
         combo = df[list(df.columns)[:n]].mean(axis=1)
-        r = backtest_signal_ftmo(close, combo.fillna(0), txn_cost_bps=2.14, wf_rolling=True)
+        r = backtest_signal_risk(close, combo.fillna(0), txn_cost_bps=2.14, wf_rolling=True)
         oos_m = r.get("oos_monthly_return_pct",0) or 0
         dd = (r.get("oos_max_drawdown",0) or 0)*100
         ann = ((1+oos_m/100)**12-1)*100

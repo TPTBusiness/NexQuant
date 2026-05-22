@@ -3,7 +3,7 @@
 
 Given N strategies with daily returns, find the optimal combination that:
 - Maximizes monthly return
-- Keeps max drawdown within FTMO limits (10% total, 5% daily)
+- Keeps max drawdown within RiskMgmt limits (10% total, 5% daily)
 - Diversifies across uncorrelated strategies
 """
 
@@ -23,8 +23,8 @@ OHLCV_PATH = Path(os.getenv("PREDIX_OHLCV_PATH",
     str(PROJECT / "git_ignore_folder" / "intraday_pv_all.h5")))
 
 TARGET_MONTHLY = 15.0
-MAX_DD = 0.10       # FTMO: 10% max total drawdown
-MAX_DAILY_DD = 0.05  # FTMO: 5% max daily drawdown
+MAX_DD = 0.10       # RiskMgmt: 10% max total drawdown
+MAX_DAILY_DD = 0.05  # RiskMgmt: 5% max daily drawdown
 MIN_TRADES = 30
 MIN_SHARPE = 0.5
 

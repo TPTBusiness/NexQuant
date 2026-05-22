@@ -1,11 +1,11 @@
 """
-Tests for backtest_signal_ftmo and walk-forward OOS validation.
+Tests for backtest_signal_risk and walk-forward OOS validation.
 
 Covers:
-- FTMO daily/total loss limits
+- RiskMgmt daily/total loss limits
 - Risk-based leverage calculation
 - OOS split returns independent IS and OOS metrics
-- OOS uses fresh FTMO simulation (not contaminated by IS losses)
+- OOS uses fresh RiskMgmt simulation (not contaminated by IS losses)
 - Monte Carlo permutation test helper
 """
 from __future__ import annotations
@@ -16,11 +16,11 @@ import pytest
 
 from rdagent.components.backtesting.vbt_backtest import (
     OOS_START_DEFAULT,
-    _apply_ftmo_mask,
-    backtest_signal_ftmo,
-    FTMO_INITIAL_CAPITAL,
-    FTMO_MAX_DAILY_LOSS,
-    FTMO_MAX_TOTAL_LOSS,
+    _apply_risk_mask,
+    backtest_signal_risk,
+    INITIAL_CAPITAL,
+    MAX_DAILY_LOSS,
+    MAX_TOTAL_LOSS,
     monte_carlo_trade_pvalue,
     walk_forward_rolling,
 )
@@ -31,7 +31,7 @@ from rdagent.components.backtesting.vbt_backtest import (
 # ---------------------------------------------------------------------------
 @pytest.fixture
 def close_2yr() -> pd.Series:
-    """~3 months of synthetic 1-min EUR/USD (enough bars for all leverage/FTMO tests)."""
+    """~3 months of synthetic 1-min EUR/USD (enough bars for all leverage/RiskMgmt tests)."""
     np.random.seed(42)
     n = 90 * 1440  # 90 days × 1440 min
     idx = pd.date_range("2022-01-01", periods=n, freq="1min")
@@ -59,27 +59,27 @@ def _random_signal(index: pd.Index, seed: int = 0) -> pd.Series:
 
 
 # ---------------------------------------------------------------------------
-# FTMO leverage tests
+# RiskMgmt leverage tests
 # ---------------------------------------------------------------------------
-def test_ftmo_result_contains_leverage_fields(close_2yr):
+def test_riskmgmt_result_contains_leverage_fields(close_2yr):
     signal = _random_signal(close_2yr.index)
-    r = backtest_signal_ftmo(close_2yr, signal, oos_start=None)
-    assert "ftmo_leverage" in r
-    assert "ftmo_risk_pct" in r
-    assert "ftmo_stop_pips" in r
-    assert r["ftmo_leverage"] > 0
+    r = backtest_signal_risk(close_2yr, signal, oos_start=None)
+    assert "riskmgmt_leverage" in r
+    assert "riskmgmt_risk_pct" in r
+    assert "riskmgmt_stop_pips" in r
+    assert r["riskmgmt_leverage"] > 0
 
 
-def test_ftmo_leverage_capped_at_max(close_2yr):
+def test_riskmgmt_leverage_capped_at_max(close_2yr):
     signal = _random_signal(close_2yr.index)
     # With very tight stop (1 pip) risk_pct=0.5% → leverage would be 55x → capped at 30
-    r = backtest_signal_ftmo(close_2yr, signal, stop_pips=1, max_leverage=30, oos_start=None)
-    assert r["ftmo_leverage"] <= 30.0
+    r = backtest_signal_risk(close_2yr, signal, stop_pips=1, max_leverage=30, oos_start=None)
+    assert r["riskmgmt_leverage"] <= 30.0
 
 
-def test_ftmo_zero_signal_produces_no_trades(close_2yr):
+def test_riskmgmt_zero_signal_produces_no_trades(close_2yr):
     signal = pd.Series(0.0, index=close_2yr.index)
-    r = backtest_signal_ftmo(close_2yr, signal, oos_start=None)
+    r = backtest_signal_risk(close_2yr, signal, oos_start=None)
     assert r["n_trades"] == 0
     assert r["total_return"] == 0.0
 
@@ -89,7 +89,7 @@ def test_ftmo_zero_signal_produces_no_trades(close_2yr):
 # ---------------------------------------------------------------------------
 def test_oos_split_produces_is_and_oos_keys(close_6yr):
     signal = _random_signal(close_6yr.index)
-    r = backtest_signal_ftmo(close_6yr, signal, oos_start="2024-01-01")
+    r = backtest_signal_risk(close_6yr, signal, oos_start="2024-01-01")
 
     assert "is_sharpe" in r
     assert "oos_sharpe" in r
@@ -102,19 +102,19 @@ def test_oos_split_produces_is_and_oos_keys(close_6yr):
 
 def test_oos_split_bars_sum_to_total(close_6yr):
     signal = _random_signal(close_6yr.index)
-    r = backtest_signal_ftmo(close_6yr, signal, oos_start="2024-01-01")
+    r = backtest_signal_risk(close_6yr, signal, oos_start="2024-01-01")
     assert r["is_n_bars"] + r["oos_n_bars"] == len(close_6yr)
 
 
 def test_oos_none_disables_split(close_6yr):
     signal = _random_signal(close_6yr.index)
-    r = backtest_signal_ftmo(close_6yr, signal, oos_start=None)
+    r = backtest_signal_risk(close_6yr, signal, oos_start=None)
     assert "is_sharpe" not in r
     assert "oos_sharpe" not in r
 
 
 def test_oos_is_independent_of_is_losses(close_6yr):
-    """OOS must use a fresh FTMO simulation — IS blowup must not zero OOS trades."""
+    """OOS must use a fresh RiskMgmt simulation — IS blowup must not zero OOS trades."""
     # Force the IS period to blow up immediately with max short on rising market
     rising = pd.Series(
         np.linspace(1.0, 2.0, len(close_6yr)),
@@ -122,7 +122,7 @@ def test_oos_is_independent_of_is_losses(close_6yr):
     )
     always_short = pd.Series(-1.0, index=close_6yr.index)
 
-    r = backtest_signal_ftmo(rising, always_short, oos_start="2024-01-01")
+    r = backtest_signal_risk(rising, always_short, oos_start="2024-01-01")
 
     # IS should be wiped out (total loss limit hit), but OOS must still trade
     assert r.get("oos_n_trades", 0) is not None
@@ -131,7 +131,7 @@ def test_oos_is_independent_of_is_losses(close_6yr):
 
 def test_oos_default_start_matches_constant(close_6yr):
     signal = _random_signal(close_6yr.index)
-    r = backtest_signal_ftmo(close_6yr, signal)
+    r = backtest_signal_risk(close_6yr, signal)
     assert r.get("oos_start") == OOS_START_DEFAULT
 
 
@@ -143,7 +143,7 @@ def _monte_carlo_pvalue(close: pd.Series, signal: pd.Series, n_permutations: int
     Estimate p-value: fraction of random permutations that beat the real Sharpe.
     p < 0.05 → strategy has statistically significant edge.
     """
-    real_r = backtest_signal_ftmo(close, signal, oos_start=None)
+    real_r = backtest_signal_risk(close, signal, oos_start=None)
     real_sharpe = real_r.get("sharpe", 0.0) or 0.0
 
     rng = np.random.default_rng(seed)
@@ -152,7 +152,7 @@ def _monte_carlo_pvalue(close: pd.Series, signal: pd.Series, n_permutations: int
     for _ in range(n_permutations):
         perm = rng.permutation(signal_vals)
         perm_signal = pd.Series(perm, index=signal.index)
-        perm_r = backtest_signal_ftmo(close, perm_signal, oos_start=None)
+        perm_r = backtest_signal_risk(close, perm_signal, oos_start=None)
         if (perm_r.get("sharpe") or 0.0) >= real_sharpe:
             beat += 1
     return beat / n_permutations
@@ -171,7 +171,7 @@ def test_random_signal_has_no_edge(close_2yr):
 def test_perfect_signal_is_significant(close_2yr):
     """An oracle signal on hourly bars should beat random permutations significantly.
 
-    Per-minute oracle trading is unprofitable due to FTMO transaction costs, so we
+    Per-minute oracle trading is unprofitable due to RiskMgmt transaction costs, so we
     use 60-bar held positions (≈1h) where each directional move is large enough to
     cover the spread.
     """
@@ -184,14 +184,14 @@ def test_perfect_signal_is_significant(close_2yr):
 
 
 # ---------------------------------------------------------------------------
-# FTMO metrics in result dict
+# RiskMgmt metrics in result dict
 # ---------------------------------------------------------------------------
-def test_ftmo_result_has_equity_and_profit(close_2yr):
+def test_riskmgmt_result_has_equity_and_profit(close_2yr):
     signal = _random_signal(close_2yr.index)
-    r = backtest_signal_ftmo(close_2yr, signal, oos_start=None)
-    assert "ftmo_end_equity" in r
-    assert "ftmo_monthly_profit" in r
-    assert r["ftmo_end_equity"] > 0
+    r = backtest_signal_risk(close_2yr, signal, oos_start=None)
+    assert "riskmgmt_end_equity" in r
+    assert "riskmgmt_monthly_profit" in r
+    assert r["riskmgmt_end_equity"] > 0
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ def test_ftmo_result_has_equity_and_profit(close_2yr):
 # ---------------------------------------------------------------------------
 def test_mc_pvalue_in_result(close_2yr):
     signal = _random_signal(close_2yr.index)
-    r = backtest_signal_ftmo(close_2yr, signal, oos_start=None, mc_n_permutations=50)
+    r = backtest_signal_risk(close_2yr, signal, oos_start=None, mc_n_permutations=50)
     assert "mc_pvalue" in r
     assert 0.0 <= r["mc_pvalue"] <= 1.0
     assert r["mc_n_permutations"] == 50
@@ -207,7 +207,7 @@ def test_mc_pvalue_in_result(close_2yr):
 
 def test_mc_pvalue_disabled_by_default(close_2yr):
     signal = _random_signal(close_2yr.index)
-    r = backtest_signal_ftmo(close_2yr, signal, oos_start=None)
+    r = backtest_signal_risk(close_2yr, signal, oos_start=None)
     assert "mc_pvalue" not in r
 
 
@@ -222,32 +222,32 @@ def test_mc_zero_trades_returns_one(close_2yr):
 # ---------------------------------------------------------------------------
 def test_wf_rolling_keys_in_result(close_6yr):
     signal = _random_signal(close_6yr.index)
-    r = backtest_signal_ftmo(close_6yr, signal, oos_start="2024-01-01", wf_rolling=True)
+    r = backtest_signal_risk(close_6yr, signal, oos_start="2024-01-01", wf_rolling=True)
     # With only ~150 days of data, windows may be 0 — just check key presence
     assert "wf_n_windows" in r
 
 
 def test_wf_rolling_enabled_by_default(close_6yr):
     signal = _random_signal(close_6yr.index)
-    r = backtest_signal_ftmo(close_6yr, signal, oos_start="2024-01-01")
+    r = backtest_signal_risk(close_6yr, signal, oos_start="2024-01-01")
     assert "wf_n_windows" in r
 
 
 def test_wf_consistency_range(close_6yr):
     """wf_oos_consistency must be in [0, 1] when windows exist."""
     signal = _random_signal(close_6yr.index)
-    r = backtest_signal_ftmo(close_6yr, signal, oos_start="2024-01-01", wf_rolling=True)
+    r = backtest_signal_risk(close_6yr, signal, oos_start="2024-01-01", wf_rolling=True)
     c = r.get("wf_oos_consistency")
     if c is not None:
         assert 0.0 <= c <= 1.0
 
 
 # ---------------------------------------------------------------------------
-# Direct _apply_ftmo_mask unit tests
+# Direct _apply_risk_mask unit tests
 # ---------------------------------------------------------------------------
 
 class TestApplyFtmoMask:
-    """Direct unit tests for _apply_ftmo_mask — the core FTMO daily/total loss engine."""
+    """Direct unit tests for _apply_risk_mask — the core RiskMgmt daily/total loss engine."""
 
     @pytest.fixture
     def flat_close(self) -> pd.Series:
@@ -257,19 +257,19 @@ class TestApplyFtmoMask:
 
     def test_returns_compliance_dict(self, flat_close):
         signal = _random_signal(flat_close.index)
-        masked, info = _apply_ftmo_mask(signal, flat_close, leverage=1.0, txn_cost_bps=2.14)
-        assert "ftmo_daily_breaches" in info
-        assert "ftmo_total_breached" in info
-        assert "ftmo_total_breach_ts" in info
-        assert "ftmo_compliant" in info
+        masked, info = _apply_risk_mask(signal, flat_close, leverage=1.0, txn_cost_bps=2.14)
+        assert "riskmgmt_daily_breaches" in info
+        assert "riskmgmt_total_breached" in info
+        assert "riskmgmt_total_breach_ts" in info
+        assert "riskmgmt_compliant" in info
 
     def test_flat_market_zero_signal_fully_compliant(self, flat_close):
         """No trades → always compliant."""
         signal = pd.Series(0.0, index=flat_close.index)
-        masked, info = _apply_ftmo_mask(signal, flat_close, leverage=1.0, txn_cost_bps=2.14)
-        assert info["ftmo_daily_breaches"] == 0
-        assert info["ftmo_total_breached"] is False
-        assert info["ftmo_compliant"] is True
+        masked, info = _apply_risk_mask(signal, flat_close, leverage=1.0, txn_cost_bps=2.14)
+        assert info["riskmgmt_daily_breaches"] == 0
+        assert info["riskmgmt_total_breached"] is False
+        assert info["riskmgmt_compliant"] is True
         # All signals should remain zero
         assert (masked == 0).all()
 
@@ -282,8 +282,8 @@ class TestApplyFtmoMask:
         price.iloc[3:20] = 0.00  # crash from 1.10 to 0.00 → massive loss
         signal = pd.Series(1.0, index=idx)  # always long at 30x leverage
 
-        masked, info = _apply_ftmo_mask(signal, price, leverage=30.0, txn_cost_bps=0)
-        assert info["ftmo_daily_breaches"] > 0
+        masked, info = _apply_risk_mask(signal, price, leverage=30.0, txn_cost_bps=0)
+        assert info["riskmgmt_daily_breaches"] > 0
         # After breach, signals on same day must be zeroed
         breach_day = idx[0].date()
         same_day_late = (idx[-1] if idx[-1].date() == breach_day else idx[20])
@@ -299,9 +299,9 @@ class TestApplyFtmoMask:
         price.iloc[5:50] = 0.50  # >10% drop with 30x leverage
         signal = pd.Series(1.0, index=idx)
 
-        masked, info = _apply_ftmo_mask(signal, price, leverage=30.0, txn_cost_bps=0)
-        assert info["ftmo_total_breached"] is True
-        assert info["ftmo_total_breach_ts"] is not None
+        masked, info = _apply_risk_mask(signal, price, leverage=30.0, txn_cost_bps=0)
+        assert info["riskmgmt_total_breached"] is True
+        assert info["riskmgmt_total_breach_ts"] is not None
         # After breach, ALL later signals must be zero
         assert (masked.iloc[100:] == 0).all()
 
@@ -313,9 +313,9 @@ class TestApplyFtmoMask:
         price.iloc[5:50] = 0.50
         signal = pd.Series(1.0, index=idx)
 
-        masked, info = _apply_ftmo_mask(signal, price, leverage=30.0, txn_cost_bps=0)
+        masked, info = _apply_risk_mask(signal, price, leverage=30.0, txn_cost_bps=0)
         # All signals after breach index must be zero
-        breach_ts = pd.Timestamp(info["ftmo_total_breach_ts"])
+        breach_ts = pd.Timestamp(info["riskmgmt_total_breach_ts"])
         assert (masked.loc[masked.index > breach_ts] == 0).all()
 
     def test_daily_loss_resets_on_new_day(self):
@@ -327,35 +327,35 @@ class TestApplyFtmoMask:
         price.iloc[5:20] = 1.09  # ~1% drop with 30x → ~30% loss
         signal = pd.Series(1.0, index=idx)
 
-        masked, info = _apply_ftmo_mask(signal, price, leverage=30.0, txn_cost_bps=0)
-        assert info["ftmo_daily_breaches"] >= 1
+        masked, info = _apply_risk_mask(signal, price, leverage=30.0, txn_cost_bps=0)
+        assert info["riskmgmt_daily_breaches"] >= 1
         # Day 2 signals should be active again if not total-breached
         day2_mask = idx.date > idx[0].date()
-        if day2_mask.any() and not info["ftmo_total_breached"]:
+        if day2_mask.any() and not info["riskmgmt_total_breached"]:
             day2 = idx[day2_mask][0]
             assert masked.loc[day2] != 0
 
     def test_compliant_flag_false_after_daily_breach(self):
-        """Even one daily breach makes ftmo_compliant=False."""
+        """Even one daily breach makes riskmgmt_compliant=False."""
         n = 3000
         idx = pd.date_range("2024-01-01", periods=n, freq="1min")
         price = pd.Series(1.10, index=idx, dtype=float)
         price.iloc[3:20] = 0.00
         signal = pd.Series(1.0, index=idx)
 
-        masked, info = _apply_ftmo_mask(signal, price, leverage=30.0, txn_cost_bps=0)
-        assert info["ftmo_compliant"] is False
+        masked, info = _apply_risk_mask(signal, price, leverage=30.0, txn_cost_bps=0)
+        assert info["riskmgmt_compliant"] is False
 
     def test_compliant_flag_false_after_total_breach(self):
-        """Total breach makes ftmo_compliant=False."""
+        """Total breach makes riskmgmt_compliant=False."""
         n = 5000
         idx = pd.date_range("2024-01-01", periods=n, freq="1min")
         price = pd.Series(1.10, index=idx, dtype=float)
         price.iloc[5:50] = 0.50
         signal = pd.Series(1.0, index=idx)
 
-        masked, info = _apply_ftmo_mask(signal, price, leverage=30.0, txn_cost_bps=0)
-        assert info["ftmo_compliant"] is False
+        masked, info = _apply_risk_mask(signal, price, leverage=30.0, txn_cost_bps=0)
+        assert info["riskmgmt_compliant"] is False
 
     def test_transaction_costs_reduce_equity(self):
         """Transaction costs should reduce equity — compliant scenario with fees."""
@@ -365,9 +365,9 @@ class TestApplyFtmoMask:
         # Alternating signal → lots of position changes → high costs
         signal = pd.Series([1.0 if i % 2 == 0 else -1.0 for i in range(n)], index=idx)
 
-        masked, info = _apply_ftmo_mask(signal, price, leverage=1.0, txn_cost_bps=10.0)
+        masked, info = _apply_risk_mask(signal, price, leverage=1.0, txn_cost_bps=10.0)
         # With high costs and flat market, equity should drop
-        assert "ftmo_daily_breaches" in info
+        assert "riskmgmt_daily_breaches" in info
 
     def test_output_mask_has_same_index(self):
         n = 2000
@@ -375,13 +375,13 @@ class TestApplyFtmoMask:
         price = pd.Series(1.10, index=idx)
         signal = _random_signal(idx, seed=1)
 
-        masked, info = _apply_ftmo_mask(signal, price, leverage=1.0, txn_cost_bps=2.14)
+        masked, info = _apply_risk_mask(signal, price, leverage=1.0, txn_cost_bps=2.14)
         assert len(masked) == len(signal)
         assert masked.index.equals(signal.index)
 
 
 # ==============================================================================
-# HYPOTHESIS-BASED PROPERTY TESTS — FTMO OOS Metrics, Drawdown Bounds,
+# HYPOTHESIS-BASED PROPERTY TESTS — RiskMgmt OOS Metrics, Drawdown Bounds,
 # Risk Limit Invariants
 # ==============================================================================
 from hypothesis import given, settings, strategies as st
@@ -390,13 +390,13 @@ import pandas as pd
 import math
 
 from rdagent.components.backtesting.vbt_backtest import (
-    _apply_ftmo_mask,
+    _apply_risk_mask,
     _compute_trade_pnl,
-    backtest_signal_ftmo,
-    FTMO_INITIAL_CAPITAL,
-    FTMO_MAX_DAILY_LOSS,
-    FTMO_MAX_TOTAL_LOSS,
-    FTMO_MAX_LEVERAGE,
+    backtest_signal_risk,
+    INITIAL_CAPITAL,
+    MAX_DAILY_LOSS,
+    MAX_TOTAL_LOSS,
+    MAX_LEVERAGE,
     DEFAULT_TXN_COST_BPS,
     monte_carlo_trade_pvalue,
     walk_forward_rolling,
@@ -443,7 +443,7 @@ def _make_signal_series(
 
 
 class TestLeverageBounds:
-    """Property: leverage stays within [0.05, FTMO_MAX_LEVERAGE] for all valid inputs."""
+    """Property: leverage stays within [0.05, MAX_LEVERAGE] for all valid inputs."""
 
     @given(
         risk_pct=st.floats(min_value=0.0001, max_value=0.10),
@@ -475,19 +475,19 @@ class TestLeverageBounds:
 
 
 # ---------------------------------------------------------------------------
-# Property 2: FTMO Result Dict Shape
+# Property 2: RiskMgmt Result Dict Shape
 # ---------------------------------------------------------------------------
 
 
 class TestFtmoResultDictShape:
-    """Property: backtest_signal_ftmo returns a consistent dict shape."""
+    """Property: backtest_signal_risk returns a consistent dict shape."""
 
     REQUIRED_KEYS = {
         "status", "sharpe", "max_drawdown", "total_return", "win_rate",
         "n_trades", "n_bars", "txn_cost_bps", "bars_per_year",
-        "ftmo_leverage", "ftmo_risk_pct", "ftmo_stop_pips",
-        "ftmo_daily_breaches", "ftmo_total_breached", "ftmo_compliant",
-        "ftmo_end_equity", "ftmo_monthly_profit",
+        "riskmgmt_leverage", "riskmgmt_risk_pct", "riskmgmt_stop_pips",
+        "riskmgmt_daily_breaches", "riskmgmt_total_breached", "riskmgmt_compliant",
+        "riskmgmt_end_equity", "riskmgmt_monthly_profit",
     }
 
     @given(
@@ -502,7 +502,7 @@ class TestFtmoResultDictShape:
         """Property: result dict contains all required top-level keys regardless of inputs."""
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, txn_cost_bps=cost_bps, oos_start=None)
+        r = backtest_signal_risk(close, signal, txn_cost_bps=cost_bps, oos_start=None)
         missing = self.REQUIRED_KEYS - set(r.keys())
         assert not missing, f"Missing keys: {missing}"
 
@@ -516,7 +516,7 @@ class TestFtmoResultDictShape:
         """Property: status is 'success' for any valid input."""
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["status"] == "success"
 
 
@@ -541,10 +541,10 @@ class TestSignalSymmetry:
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
 
-        r1 = backtest_signal_ftmo(close, signal, oos_start=None)
-        r2 = backtest_signal_ftmo(close, -signal, oos_start=None)
+        r1 = backtest_signal_risk(close, signal, oos_start=None)
+        r2 = backtest_signal_risk(close, -signal, oos_start=None)
 
-        # Negated signal → total_return should differ (FTMO masking may make both negative)
+        # Negated signal → total_return should differ (RiskMgmt masking may make both negative)
         if r1["n_trades"] > 0 and r2["n_trades"] > 0:
             assert np.isfinite(r1["total_return"])
             assert np.isfinite(r2["total_return"])
@@ -562,18 +562,18 @@ class TestSignalSymmetry:
         close = _make_price_series(n_bars, drift, vol)
         signal = pd.Series(0.0, index=close.index)
 
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["n_trades"] == 0
         assert r["total_return"] == 0.0
 
 
 # ---------------------------------------------------------------------------
-# Property 4: FTMO Compliance Invariants
+# Property 4: RiskMgmt Compliance Invariants
 # ---------------------------------------------------------------------------
 
 
 class TestFtmoComplianceInvariants:
-    """Property: compliance invariants of _apply_ftmo_mask."""
+    """Property: compliance invariants of _apply_risk_mask."""
 
     @given(
         n_bars=st.integers(min_value=100, max_value=3000),
@@ -583,14 +583,14 @@ class TestFtmoComplianceInvariants:
     )
     @settings(max_examples=50, deadline=10000)
     def test_zero_signal_always_compliant(self, n_bars, leverage, cost_bps, seed):
-        """Property: zero signal → ftmo_compliant=True, daily_breaches=0, total_breached=False."""
+        """Property: zero signal → riskmgmt_compliant=True, daily_breaches=0, total_breached=False."""
         np.random.seed(seed)
         price = _make_price_series(n_bars, 0, 0.0001)
         signal = pd.Series(0.0, index=price.index)
-        masked, info = _apply_ftmo_mask(signal, price, leverage, cost_bps)
-        assert info["ftmo_compliant"] is True
-        assert info["ftmo_daily_breaches"] == 0
-        assert info["ftmo_total_breached"] is False
+        masked, info = _apply_risk_mask(signal, price, leverage, cost_bps)
+        assert info["riskmgmt_compliant"] is True
+        assert info["riskmgmt_daily_breaches"] == 0
+        assert info["riskmgmt_total_breached"] is False
 
     @given(
         n_bars=st.integers(min_value=100, max_value=3000),
@@ -604,7 +604,7 @@ class TestFtmoComplianceInvariants:
         np.random.seed(seed)
         price = _make_price_series(n_bars, 0, 0.0001)
         signal = _make_signal_series(price.index, "ternary")
-        masked, info = _apply_ftmo_mask(signal, price, leverage, cost_bps)
+        masked, info = _apply_risk_mask(signal, price, leverage, cost_bps)
         assert len(masked) == len(signal)
         assert masked.index.equals(signal.index)
         # Every element of masked is either 0 or the original signal value
@@ -622,7 +622,7 @@ class TestFtmoComplianceInvariants:
         np.random.seed(seed)
         price = _make_price_series(n_bars, 0, 0.0001)
         signal = _make_signal_series(price.index, "continuous")
-        masked, info = _apply_ftmo_mask(signal, price, leverage, cost_bps)
+        masked, info = _apply_risk_mask(signal, price, leverage, cost_bps)
         assert (masked.abs() <= signal.abs()).all()
 
     @given(
@@ -636,8 +636,8 @@ class TestFtmoComplianceInvariants:
         idx = pd.date_range("2024-01-01", periods=n_bars, freq="1min")
         price = pd.Series(1.10, index=idx)
         signal = _make_signal_series(price.index, "ternary")
-        _masked, info = _apply_ftmo_mask(signal, price, leverage, 0.0)
-        assert info["ftmo_total_breached"] is False
+        _masked, info = _apply_risk_mask(signal, price, leverage, 0.0)
+        assert info["riskmgmt_total_breached"] is False
 
     @given(
         n_bars=st.integers(min_value=100, max_value=2000),
@@ -645,14 +645,14 @@ class TestFtmoComplianceInvariants:
     )
     @settings(max_examples=50, deadline=10000)
     def test_total_breach_implies_noncompliant(self, n_bars, leverage):
-        """Property: total_breached=True => ftmo_compliant=False."""
+        """Property: total_breached=True => riskmgmt_compliant=False."""
         idx = pd.date_range("2024-01-01", periods=n_bars, freq="1min")
         price = pd.Series(1.10, index=idx)
         price.iloc[3:50] = 0.50  # Crash to trigger total breach
         signal = pd.Series(1.0, index=price.index)
-        masked, info = _apply_ftmo_mask(signal, price, leverage, 0.0)
-        if info["ftmo_total_breached"]:
-            assert info["ftmo_compliant"] is False
+        masked, info = _apply_risk_mask(signal, price, leverage, 0.0)
+        if info["riskmgmt_total_breached"]:
+            assert info["riskmgmt_compliant"] is False
 
     @given(
         n_bars=st.integers(min_value=500, max_value=3000),
@@ -660,14 +660,14 @@ class TestFtmoComplianceInvariants:
     )
     @settings(max_examples=50, deadline=10000)
     def test_daily_breach_implies_noncompliant(self, n_bars, leverage):
-        """Property: daily_breaches > 0 => ftmo_compliant=False."""
+        """Property: daily_breaches > 0 => riskmgmt_compliant=False."""
         idx = pd.date_range("2024-01-01", periods=n_bars, freq="1min")
         price = pd.Series(1.10, index=idx)
         price.iloc[3:20] = 0.00
         signal = pd.Series(1.0, index=price.index)
-        masked, info = _apply_ftmo_mask(signal, price, leverage, 0.0)
-        if info["ftmo_daily_breaches"] > 0:
-            assert info["ftmo_compliant"] is False
+        masked, info = _apply_risk_mask(signal, price, leverage, 0.0)
+        if info["riskmgmt_daily_breaches"] > 0:
+            assert info["riskmgmt_compliant"] is False
 
     @given(
         n_bars=st.integers(min_value=100, max_value=3000),
@@ -677,13 +677,13 @@ class TestFtmoComplianceInvariants:
     )
     @settings(max_examples=50, deadline=10000)
     def test_compliant_scenario_has_no_mask_changes(self, n_bars, leverage, cost_bps, seed):
-        """Property: if ftmo_compliant=True, masked signals equal original signals."""
+        """Property: if riskmgmt_compliant=True, masked signals equal original signals."""
         np.random.seed(seed)
         idx = pd.date_range("2024-01-01", periods=n_bars, freq="1min")
         price = _make_price_series(n_bars, 0.0, 0.00001)
         signal = _make_signal_series(price.index, "ternary")
-        masked, info = _apply_ftmo_mask(signal, price, leverage, cost_bps)
-        if info["ftmo_compliant"]:
+        masked, info = _apply_risk_mask(signal, price, leverage, cost_bps)
+        if info["riskmgmt_compliant"]:
             # In compliant scenarios with very low vol, masked should equal signal
             pass  # This is trivially true since compliance means no breaches
 
@@ -709,10 +709,10 @@ class TestCostMonotonicity:
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
 
-        r_lo = backtest_signal_ftmo(close, signal, txn_cost_bps=1.0, oos_start=None)
-        r_hi = backtest_signal_ftmo(close, signal, txn_cost_bps=10.0, oos_start=None)
+        r_lo = backtest_signal_risk(close, signal, txn_cost_bps=1.0, oos_start=None)
+        r_hi = backtest_signal_risk(close, signal, txn_cost_bps=10.0, oos_start=None)
 
-        # Higher costs should not improve total return (allowing for FTMO mask differences)
+        # Higher costs should not improve total return (allowing for RiskMgmt mask differences)
         assert np.isfinite(r_hi["total_return"])
         assert np.isfinite(r_lo["total_return"])
 
@@ -729,8 +729,8 @@ class TestCostMonotonicity:
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
 
-        r_lo = backtest_signal_ftmo(close, signal, txn_cost_bps=1.0, oos_start=None)
-        r_hi = backtest_signal_ftmo(close, signal, txn_cost_bps=10.0, oos_start=None)
+        r_lo = backtest_signal_risk(close, signal, txn_cost_bps=1.0, oos_start=None)
+        r_hi = backtest_signal_risk(close, signal, txn_cost_bps=10.0, oos_start=None)
 
         # Higher costs should not improve annualized return
         assert np.isfinite(r_hi["annualized_return"])
@@ -757,7 +757,7 @@ class TestDrawdownBounds:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         dd = r["max_drawdown"]
         assert -1.0 <= dd <= 0.0
 
@@ -773,7 +773,7 @@ class TestDrawdownBounds:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         # total_return >= -1 (can't lose more than everything)
         assert r["total_return"] >= -1.0
 
@@ -798,7 +798,7 @@ class TestPositionBounds:
         np.random.seed(seed)
         price = _make_price_series(n_bars, 0.0, 0.0001)
         signal = _make_signal_series(price.index, "continuous")
-        masked, info = _apply_ftmo_mask(signal, price, leverage, cost_bps)
+        masked, info = _apply_risk_mask(signal, price, leverage, cost_bps)
         # Position = masked * leverage, should be in [-leverage, leverage]
         positions = masked * leverage
         assert (positions >= -leverage).all()
@@ -825,7 +825,7 @@ class TestTradeCounting:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["n_trades"] <= r["n_position_changes"]
 
     @given(
@@ -840,7 +840,7 @@ class TestTradeCounting:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["signal_long"] + r["signal_short"] + r["signal_neutral"] == r["n_bars"]
 
     @given(
@@ -855,19 +855,19 @@ class TestTradeCounting:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = pd.Series(0.0, index=close.index)
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["n_trades"] == 0
         assert r["win_rate"] == 0.0
         assert r["profit_factor"] == 0.0
 
 
 # ---------------------------------------------------------------------------
-# Property 9: FTMO Equity Invariants
+# Property 9: RiskMgmt Equity Invariants
 # ---------------------------------------------------------------------------
 
 
 class TestFtmoEquityInvariants:
-    """Property: ftmo_end_equity and ftmo_monthly_profit invariants."""
+    """Property: riskmgmt_end_equity and riskmgmt_monthly_profit invariants."""
 
     @given(
         n_bars=st.integers(min_value=200, max_value=1500),
@@ -877,13 +877,13 @@ class TestFtmoEquityInvariants:
     )
     @settings(max_examples=50, deadline=10000)
     def test_end_equity_formula(self, n_bars, drift, vol, seed):
-        """Property: ftmo_end_equity = FTMO_INITIAL_CAPITAL * (1 + total_return)."""
+        """Property: riskmgmt_end_equity = INITIAL_CAPITAL * (1 + total_return)."""
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
-        expected_equity = FTMO_INITIAL_CAPITAL * (1 + r["total_return"])
-        assert abs(r["ftmo_end_equity"] - expected_equity) < 1.0
+        r = backtest_signal_risk(close, signal, oos_start=None)
+        expected_equity = INITIAL_CAPITAL * (1 + r["total_return"])
+        assert abs(r["riskmgmt_end_equity"] - expected_equity) < 1.0
 
     @given(
         n_bars=st.integers(min_value=200, max_value=1500),
@@ -893,12 +893,12 @@ class TestFtmoEquityInvariants:
     )
     @settings(max_examples=50, deadline=10000)
     def test_end_equity_positive(self, n_bars, drift, vol, seed):
-        """Property: ftmo_end_equity > 0 always (can't lose more than initial)."""
+        """Property: riskmgmt_end_equity > 0 always (can't lose more than initial)."""
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
-        assert r["ftmo_end_equity"] > 0
+        r = backtest_signal_risk(close, signal, oos_start=None)
+        assert r["riskmgmt_end_equity"] > 0
 
     @given(
         n_bars=st.integers(min_value=200, max_value=1500),
@@ -908,13 +908,13 @@ class TestFtmoEquityInvariants:
     )
     @settings(max_examples=50, deadline=10000)
     def test_monthly_profit_sign_matches_monthly_return(self, n_bars, drift, vol, seed):
-        """Property: sign(ftmo_monthly_profit) = sign(monthly_return)."""
+        """Property: sign(riskmgmt_monthly_profit) = sign(monthly_return)."""
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         if r["monthly_return"] != 0:
-            assert np.sign(r["ftmo_monthly_profit"]) == np.sign(r["monthly_return"])
+            assert np.sign(r["riskmgmt_monthly_profit"]) == np.sign(r["monthly_return"])
 
 
 # ---------------------------------------------------------------------------
@@ -989,48 +989,48 @@ class TestMonteCarloPValue:
 
 
 # ---------------------------------------------------------------------------
-# Property 11: FTMO Loss Limit Invariants
+# Property 11: RiskMgmt Loss Limit Invariants
 # ---------------------------------------------------------------------------
 
 
 class TestFtmoLossLimitInvariants:
-    """Property: FTMO constants satisfy fundamental ordering."""
+    """Property: RiskMgmt constants satisfy fundamental ordering."""
 
     def test_daily_loss_less_than_total_loss(self):
-        """Property: FTMO_MAX_DAILY_LOSS < FTMO_MAX_TOTAL_LOSS."""
-        assert FTMO_MAX_DAILY_LOSS < FTMO_MAX_TOTAL_LOSS
+        """Property: MAX_DAILY_LOSS < MAX_TOTAL_LOSS."""
+        assert MAX_DAILY_LOSS < MAX_TOTAL_LOSS
 
     def test_initial_capital_is_100k(self):
-        """Property: FTMO_INITIAL_CAPITAL = 100_000."""
-        assert FTMO_INITIAL_CAPITAL == 100_000.0
+        """Property: INITIAL_CAPITAL = 100_000."""
+        assert INITIAL_CAPITAL == 100_000.0
 
     def test_max_daily_loss_is_5_percent(self):
-        """Property: FTMO_MAX_DAILY_LOSS = 0.05 (5%)."""
-        assert FTMO_MAX_DAILY_LOSS == 0.05
+        """Property: MAX_DAILY_LOSS = 0.05 (5%)."""
+        assert MAX_DAILY_LOSS == 0.05
 
     def test_max_total_loss_is_10_percent(self):
-        """Property: FTMO_MAX_TOTAL_LOSS = 0.10 (10%)."""
-        assert FTMO_MAX_TOTAL_LOSS == 0.10
+        """Property: MAX_TOTAL_LOSS = 0.10 (10%)."""
+        assert MAX_TOTAL_LOSS == 0.10
 
     def test_leverage_default_is_30(self):
-        """Property: FTMO_MAX_LEVERAGE = 30."""
-        assert FTMO_MAX_LEVERAGE == 30
+        """Property: MAX_LEVERAGE = 30."""
+        assert MAX_LEVERAGE == 30
 
     @given(
         n_bars=st.integers(min_value=100, max_value=2000),
-        leverage=st.floats(min_value=0.1, max_value=FTMO_MAX_LEVERAGE),
+        leverage=st.floats(min_value=0.1, max_value=MAX_LEVERAGE),
         seed=st.integers(min_value=0, max_value=100),
     )
     @settings(max_examples=50, deadline=10000)
-    def test_total_loss_never_exceeds_ftmo_limit(self, n_bars, leverage, seed):
-        """Property: _apply_ftmo_mask detects total breach at exactly the FTMO threshold."""
+    def test_total_loss_never_exceeds_riskmgmt_limit(self, n_bars, leverage, seed):
+        """Property: _apply_risk_mask detects total breach at exactly the RiskMgmt threshold."""
         np.random.seed(seed)
         idx = pd.date_range("2024-01-01", periods=n_bars, freq="1min")
         price = _make_price_series(n_bars, 0.0, 0.00001)
         signal = _make_signal_series(price.index, "ternary")
-        _masked, info = _apply_ftmo_mask(signal, price, leverage, 0.0)
-        assert isinstance(info["ftmo_total_breached"], bool)
-        assert isinstance(info["ftmo_compliant"], bool)
+        _masked, info = _apply_risk_mask(signal, price, leverage, 0.0)
+        assert isinstance(info["riskmgmt_total_breached"], bool)
+        assert isinstance(info["riskmgmt_compliant"], bool)
 
 
 # ---------------------------------------------------------------------------
@@ -1039,7 +1039,7 @@ class TestFtmoLossLimitInvariants:
 
 
 class TestOosIndependence:
-    """Property: OOS metrics are computed from fresh FTMO simulation."""
+    """Property: OOS metrics are computed from fresh RiskMgmt simulation."""
 
     @given(
         n_bars=st.integers(min_value=300, max_value=2000),
@@ -1053,7 +1053,7 @@ class TestOosIndependence:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         # Without OOS, all bars are in the main result
         assert "is_n_bars" not in r or r.get("is_n_bars", 0) == 0
         assert "oos_n_bars" not in r or r.get("oos_n_bars", 0) == 0
@@ -1073,7 +1073,7 @@ class TestOosIndependence:
         # Use a date in the middle of the range
         mid = close.index[len(close) // 2]
         oos_start_str = mid.strftime("%Y-%m-%d")
-        r = backtest_signal_ftmo(close, signal, oos_start=oos_start_str)
+        r = backtest_signal_risk(close, signal, oos_start=oos_start_str)
         assert r.get("oos_start") == oos_start_str
 
     @given(
@@ -1090,7 +1090,7 @@ class TestOosIndependence:
         signal = _make_signal_series(close.index, "ternary")
         mid = close.index[len(close) // 2]
         oos_start_str = mid.strftime("%Y-%m-%d")
-        r = backtest_signal_ftmo(close, signal, oos_start=oos_start_str, wf_rolling=True)
+        r = backtest_signal_risk(close, signal, oos_start=oos_start_str, wf_rolling=True)
         c = r.get("wf_oos_consistency")
         if c is not None:
             assert 0.0 <= c <= 1.0
@@ -1116,7 +1116,7 @@ class TestSharpeSortinoConsistency:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         if r["total_return"] > 0:
             # Sortino is typically >= Sharpe for profitable strategies
             pass  # Not strictly guaranteed but a good sanity check
@@ -1133,7 +1133,7 @@ class TestSharpeSortinoConsistency:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert np.isfinite(r["sharpe"])
         assert np.isfinite(r["sortino"])
 
@@ -1213,10 +1213,10 @@ class TestLeverageRiskInvariants:
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
 
-        r_lo = backtest_signal_ftmo(close, signal, stop_pips=5, oos_start=None)
-        r_hi = backtest_signal_ftmo(close, signal, stop_pips=20, oos_start=None)
+        r_lo = backtest_signal_risk(close, signal, stop_pips=5, oos_start=None)
+        r_hi = backtest_signal_risk(close, signal, stop_pips=20, oos_start=None)
 
-        assert r_hi["ftmo_leverage"] <= r_lo["ftmo_leverage"]
+        assert r_hi["riskmgmt_leverage"] <= r_lo["riskmgmt_leverage"]
 
 
 # ---------------------------------------------------------------------------
@@ -1239,7 +1239,7 @@ class TestWalkForwardProperties:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, wf_rolling=True, oos_start=None)
+        r = backtest_signal_risk(close, signal, wf_rolling=True, oos_start=None)
         assert isinstance(r.get("wf_n_windows", 0), int)
         assert r.get("wf_n_windows", 0) >= 0
 
@@ -1255,7 +1255,7 @@ class TestWalkForwardProperties:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, wf_rolling=True, oos_start=None)
+        r = backtest_signal_risk(close, signal, wf_rolling=True, oos_start=None)
         assert "wf_n_windows" in r
 
     def test_walk_forward_non_datetime_index(self):
@@ -1272,7 +1272,7 @@ class TestWalkForwardProperties:
 
 
 class TestSignalClipping:
-    """Property: backtest_signal_ftmo clips signals to [-1, 1]."""
+    """Property: backtest_signal_risk clips signals to [-1, 1]."""
 
     @given(
         n_bars=st.integers(min_value=200, max_value=1000),
@@ -1285,7 +1285,7 @@ class TestSignalClipping:
         np.random.seed(seed)
         close = _make_price_series(n_bars, 0, 0.0001)
         signal = _make_signal_series(close.index, "continuous") * signal_scale
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["status"] == "success"
 
     @given(
@@ -1302,7 +1302,7 @@ class TestSignalClipping:
         n_nan = int(n_bars * nan_frac)
         if n_nan > 0:
             signal.iloc[:n_nan] = np.nan
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["status"] == "success"
 
 
@@ -1326,7 +1326,7 @@ class TestMetricRangeInvariants:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert 0.0 <= r["win_rate"] <= 1.0
 
     @given(
@@ -1341,7 +1341,7 @@ class TestMetricRangeInvariants:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["profit_factor"] >= 0.0
 
     @given(
@@ -1356,7 +1356,7 @@ class TestMetricRangeInvariants:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["volatility"] >= 0.0
 
     @given(
@@ -1371,7 +1371,7 @@ class TestMetricRangeInvariants:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["n_trades"] >= 0
 
     @given(
@@ -1386,7 +1386,7 @@ class TestMetricRangeInvariants:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["n_months"] > 0.0
 
 
@@ -1403,14 +1403,14 @@ class TestDeterminism:
         seed=st.integers(min_value=0, max_value=50),
     )
     @settings(max_examples=50, deadline=10000)
-    def test_backtest_signal_ftmo_deterministic(self, n_bars, seed):
-        """Property: calling backtest_signal_ftmo twice with same inputs gives same results."""
+    def test_backtest_signal_risk_deterministic(self, n_bars, seed):
+        """Property: calling backtest_signal_risk twice with same inputs gives same results."""
         np.random.seed(seed)
         close = _make_price_series(n_bars, 0, 0.0001)
         signal = _make_signal_series(close.index, "ternary")
 
-        r1 = backtest_signal_ftmo(close.copy(), signal.copy(), oos_start=None)
-        r2 = backtest_signal_ftmo(close.copy(), signal.copy(), oos_start=None)
+        r1 = backtest_signal_risk(close.copy(), signal.copy(), oos_start=None)
+        r2 = backtest_signal_risk(close.copy(), signal.copy(), oos_start=None)
 
         for key in r1:
             if key in r2:
@@ -1421,14 +1421,14 @@ class TestDeterminism:
         seed=st.integers(min_value=0, max_value=50),
     )
     @settings(max_examples=50, deadline=10000)
-    def test_apply_ftmo_mask_deterministic(self, n_bars, seed):
-        """Property: _apply_ftmo_mask is deterministic."""
+    def test_apply_risk_mask_deterministic(self, n_bars, seed):
+        """Property: _apply_risk_mask is deterministic."""
         np.random.seed(seed)
         price = _make_price_series(n_bars, 0, 0.0001)
         signal = _make_signal_series(price.index, "ternary")
 
-        m1, i1 = _apply_ftmo_mask(signal.copy(), price.copy(), leverage=10.0, txn_cost_bps=2.14)
-        m2, i2 = _apply_ftmo_mask(signal.copy(), price.copy(), leverage=10.0, txn_cost_bps=2.14)
+        m1, i1 = _apply_risk_mask(signal.copy(), price.copy(), leverage=10.0, txn_cost_bps=2.14)
+        m2, i2 = _apply_risk_mask(signal.copy(), price.copy(), leverage=10.0, txn_cost_bps=2.14)
 
         assert m1.equals(m2)
         assert i1 == i2
@@ -1456,14 +1456,14 @@ class TestCostSymmetry:
 
         # All-long signal
         long_signal = pd.Series(1.0, index=close.index)
-        r_long = backtest_signal_ftmo(close, long_signal, txn_cost_bps=2.14, oos_start=None)
+        r_long = backtest_signal_risk(close, long_signal, txn_cost_bps=2.14, oos_start=None)
 
         # All-short signal
         short_signal = pd.Series(-1.0, index=close.index)
-        r_short = backtest_signal_ftmo(close, short_signal, txn_cost_bps=2.14, oos_start=None)
+        r_short = backtest_signal_risk(close, short_signal, txn_cost_bps=2.14, oos_start=None)
 
         # With drift near zero, returns should be roughly opposite
-        # Position change counts may differ due to FTMO masks
+        # Position change counts may differ due to RiskMgmt masks
         assert r_long["n_position_changes"] >= 0
         assert r_short["n_position_changes"] >= 0
 
@@ -1488,7 +1488,7 @@ class TestCalmarRatio:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert np.isfinite(r["calmar"])
 
 
@@ -1510,7 +1510,7 @@ class TestICProperties:
         np.random.seed(seed)
         close = _make_price_series(n_bars, 0, 0.0001)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         assert r["ic"] is None
 
     @given(
@@ -1524,7 +1524,7 @@ class TestICProperties:
         close = _make_price_series(n_bars, 0, 0.0001)
         signal = _make_signal_series(close.index, "ternary")
         fwd = close.pct_change().shift(-1).fillna(0)
-        r = backtest_signal_ftmo(close, signal, forward_returns=fwd, oos_start=None)
+        r = backtest_signal_risk(close, signal, forward_returns=fwd, oos_start=None)
         if r["ic"] is not None:
             assert -1.0 <= r["ic"] <= 1.0
 
@@ -1550,10 +1550,10 @@ class TestExtremeMarketHandling:
         price = pd.Series(1.10, index=idx, dtype=float)
         price.iloc[n_bars // 4 : n_bars // 4 + 5] = 1.10 * (1 - crash_magnitude)
         signal = pd.Series(1.0, index=price.index)
-        r = backtest_signal_ftmo(price, signal, oos_start=None)
+        r = backtest_signal_risk(price, signal, oos_start=None)
         assert r["status"] == "success"
         # After a large crash, total_breached is expected
-        assert isinstance(r.get("ftmo_total_breached", False), bool)
+        assert isinstance(r.get("riskmgmt_total_breached", False), bool)
 
 
 # ---------------------------------------------------------------------------
@@ -1571,7 +1571,7 @@ class TestDailyBreachCounting:
     )
     @settings(max_examples=50, deadline=10000)
     def test_daily_breach_count_never_exceeds_ndays(self, n_days, leverage, seed):
-        """Property: ftmo_daily_breaches never exceeds number of trading days."""
+        """Property: riskmgmt_daily_breaches never exceeds number of trading days."""
         np.random.seed(seed)
         n_bars = n_days * 1440
         idx = pd.date_range("2024-01-01", periods=n_bars, freq="1min")
@@ -1581,8 +1581,8 @@ class TestDailyBreachCounting:
             start = d * 1440 + 3
             price.iloc[start : start + 20] = 0.50
         signal = pd.Series(1.0, index=price.index)
-        _masked, info = _apply_ftmo_mask(signal, price, leverage, 0.0)
-        assert info["ftmo_daily_breaches"] <= n_days
+        _masked, info = _apply_risk_mask(signal, price, leverage, 0.0)
+        assert info["riskmgmt_daily_breaches"] <= n_days
 
 
 # ---------------------------------------------------------------------------
@@ -1613,7 +1613,7 @@ class TestNumericPrecision:
         np.random.seed(seed)
         close = _make_price_series(n_bars, drift, vol)
         signal = _make_signal_series(close.index, "ternary")
-        r = backtest_signal_ftmo(close, signal, oos_start=None)
+        r = backtest_signal_risk(close, signal, oos_start=None)
         for k in self.NUMERIC_KEYS:
             if k in r:
                 val = r[k]

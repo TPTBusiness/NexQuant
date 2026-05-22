@@ -14,7 +14,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
+from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk
 
 DATA = Path("git_ignore_folder/factor_implementation_source_data/multi_asset_daily.h5")
 
@@ -85,7 +85,7 @@ def main():
         sig_func = STRATEGIES.get(name, lambda c: rsi_signal(c, 21, 25, 75))
         sig = sig_func(c).fillna(0)
 
-        r = backtest_signal_ftmo(c, sig, txn_cost_bps=2.14, wf_rolling=True)
+        r = backtest_signal_risk(c, sig, txn_cost_bps=2.14, wf_rolling=True)
         oos = r.get("wf_oos_sharpe_mean") or r.get("oos_sharpe", -999)
         oos_m = r.get("oos_monthly_return_pct", 0) or 0
         status = "✅" if oos > 0 else "  "

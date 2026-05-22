@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Add FTMO-compliant risk management to existing strategies.
+Add RiskMgmt-compliant risk management to existing strategies.
 
 For each accepted strategy, add:
 - Stop Loss: 2%
@@ -27,11 +27,11 @@ console = Console()
 STRATEGIES_DIR = Path('results/strategies_new')
 OHLCV_PATH = Path('git_ignore_folder/factor_implementation_source_data/intraday_pv.h5')
 
-# FTMO Risk Parameters
+# RiskMgmt Risk Parameters
 STOP_LOSS = 0.02      # 2% hard stop
 TAKE_PROFIT = 0.04    # 4% target (2x SL)
 TRAILING_STOP = 0.015 # 1.5% trail after 2% profit
-MAX_DAILY_LOSS = 0.05 # 5% FTMO daily limit
+MAX_DAILY_LOSS = 0.05 # 5% RiskMgmt daily limit
 
 def load_ohlcv():
     """Load OHLCV close prices."""
@@ -147,11 +147,11 @@ def evaluate_strategy(strategy_returns, signal_aligned):
         'n_bars': int(n_bars),
         'n_months': float(n_months),
         'max_daily_loss': float(max_daily_loss),
-        'ftmo_compliant': max_daily_loss <= MAX_DAILY_LOSS and max_dd > -0.10,
+        'riskmgmt_compliant': max_daily_loss <= MAX_DAILY_LOSS and max_dd > -0.10,
     }
 
 def main():
-    console.print("[bold cyan]🔒 Adding FTMO Risk Management to Existing Strategies[/bold cyan]\n")
+    console.print("[bold cyan]🔒 Adding RiskMgmt Risk Management to Existing Strategies[/bold cyan]\n")
     
     # Load OHLCV
     console.print("📊 Loading OHLCV data...")
@@ -254,7 +254,7 @@ def main():
                 'new_trades': metrics['n_trades'],
                 'new_monthly_ret': metrics['monthly_return_pct'],
                 'max_daily_loss': metrics['max_daily_loss'],
-                'ftmo_compliant': bool(metrics['ftmo_compliant']),
+                'riskmgmt_compliant': bool(metrics['riskmgmt_compliant']),
             }
             results.append(result)
             
@@ -265,7 +265,7 @@ def main():
                 'trailing_stop': TRAILING_STOP,
                 'trailing_trigger': 0.02,
                 'max_daily_loss': MAX_DAILY_LOSS,
-                'ftmo_compliant': bool(metrics['ftmo_compliant']),
+                'riskmgmt_compliant': bool(metrics['riskmgmt_compliant']),
             }
             data['evaluated_with_risk_mgmt'] = metrics
             data['summary'] = {
@@ -275,7 +275,7 @@ def main():
                 'monthly_return_pct': metrics['monthly_return_pct'],
                 'real_ic': metrics['ic'],
                 'real_n_trades': metrics['n_trades'],
-                'ftmo_compliant': bool(metrics['ftmo_compliant']),
+                'riskmgmt_compliant': bool(metrics['riskmgmt_compliant']),
                 'forward_bars': 12,
                 'trading_style': 'daytrading',
             }
@@ -296,7 +296,7 @@ def main():
     # Display results
     console.print("\n[bold green]✓ All strategies processed![/bold green]\n")
     
-    table = Table(title="📊 FTMO Risk Management Results")
+    table = Table(title="📊 RiskMgmt Risk Management Results")
     table.add_column("#", justify="right")
     table.add_column("Strategy", style="cyan")
     table.add_column("IC", justify="right")
@@ -304,11 +304,11 @@ def main():
     table.add_column("Trades", justify="right")
     table.add_column("Monthly %", justify="right")
     table.add_column("Max DD", justify="right")
-    table.add_column("FTMO", justify="center")
+    table.add_column("RiskMgmt", justify="center")
     
     results.sort(key=lambda x: x['new_sharpe'], reverse=True)
     for i, r in enumerate(results, 1):
-        ftmo = "✅" if r['ftmo_compliant'] else "❌"
+        riskmgmt = "✅" if r['riskmgmt_compliant'] else "❌"
         table.add_row(
             str(i), r['name'],
             f"{r['new_ic']:.4f}",
@@ -316,14 +316,14 @@ def main():
             str(r['new_trades']),
             f"{r['new_monthly_ret']:.2f}%",
             f"{r['new_max_dd']:.1%}",
-            ftmo
+            riskmgmt
         )
     
     console.print(table)
     
     # Summary
-    ftmo_count = sum(1 for r in results if r['ftmo_compliant'])
-    console.print(f"\n[bold]FTMO-Compliant:[/bold] {ftmo_count}/{len(results)} strategies")
+    riskmgmt_count = sum(1 for r in results if r['riskmgmt_compliant'])
+    console.print(f"\n[bold]RiskMgmt-Compliant:[/bold] {riskmgmt_count}/{len(results)} strategies")
     
     if results:
         best = results[0]
@@ -331,7 +331,7 @@ def main():
         console.print(f"   Sharpe: {best['new_sharpe']:.2f}")
         console.print(f"   Monthly Return: {best['new_monthly_ret']:.2f}%")
         console.print(f"   Max Drawdown: {best['new_max_dd']:.1%}")
-        console.print(f"   FTMO Compliant: {'✅' if best['ftmo_compliant'] else '❌'}")
+        console.print(f"   RiskMgmt Compliant: {'✅' if best['riskmgmt_compliant'] else '❌'}")
 
 if __name__ == '__main__':
     main()

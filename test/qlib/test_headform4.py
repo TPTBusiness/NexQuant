@@ -66,17 +66,17 @@ class TestLiveTraderMock:
     def test_script_imports(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location(
-            "ftmo_live_trader",
-            PROJECT_ROOT / "git_ignore_folder/live_trading/ftmo_live_trader.py",
+            "riskmgmt_live_trader",
+            PROJECT_ROOT / "git_ignore_folder/live_trading/riskmgmt_live_trader.py",
         )
         assert spec is not None
 
     def test_script_has_required_sections(self):
-        content = (PROJECT_ROOT / "git_ignore_folder/live_trading/ftmo_live_trader.py").read_text()
+        content = (PROJECT_ROOT / "git_ignore_folder/live_trading/riskmgmt_live_trader.py").read_text()
         assert "RISK_PCT" in content
         assert "STOP_PIPS" in content
         assert "TP_PIPS" in content
-        assert "FTMO_DAILY_LIMIT" in content
+        assert "RiskMgmt_DAILY_LIMIT" in content
 
 
 class TestFactorValuesIntegration:

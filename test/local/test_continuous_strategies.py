@@ -51,7 +51,7 @@ class TestBuildMLModel:
         result = build_ml_model(factor_data.iloc[:100], close_data.iloc[:100], "swing")
         assert result is None
 
-    @patch("rdagent.components.backtesting.vbt_backtest.backtest_signal_ftmo")
+    @patch("rdagent.components.backtesting.vbt_backtest.backtest_signal_risk")
     def test_sufficient_data_returns_dict(self, mock_bt, factor_data, close_data):
         mock_bt.return_value = {
             "sharpe": 1.5, "max_drawdown": -0.1, "win_rate": 0.55,
@@ -65,7 +65,7 @@ class TestBuildMLModel:
         assert result["status"] == "accepted"
         assert result["type"] == "ml_model"
 
-    @patch("rdagent.components.backtesting.vbt_backtest.backtest_signal_ftmo")
+    @patch("rdagent.components.backtesting.vbt_backtest.backtest_signal_risk")
     def test_negative_oos_rejected(self, mock_bt, factor_data, close_data):
         mock_bt.return_value = {
             "sharpe": 1.5, "max_drawdown": -0.1, "win_rate": 0.55,

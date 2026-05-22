@@ -68,8 +68,8 @@ def build_ml_model(factor_values: pd.DataFrame, close: pd.Series, style: str) ->
     signal = pd.Series(np.sign(preds), index=common[split:])
 
     # Backtest
-    from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
-    bt = backtest_signal_ftmo(
+    from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk
+    bt = backtest_signal_risk(
         close=close_aligned.loc[common[split:]],
         signal=signal,
         txn_cost_bps=2.14,

@@ -7,7 +7,7 @@ Tests cover:
 - Parameter space definition and validation
 - Parameter suggestion mechanisms
 - Objective function calculation
-- FTMO penalty logic
+- RiskMgmt penalty logic
 - Optuna study creation and configuration
 - Parameter injection into strategy code
 - Optimization run (mocked, small trial count)
@@ -37,11 +37,11 @@ except ImportError:
 from rdagent.scenarios.qlib.local.optuna_optimizer import (
     OptunaOptimizer,
     PARAMETER_SPACE,
-    FTMO_MAX_STOP_LOSS,
-    FTMO_MAX_DRAWDOWN,
-    FTMO_MAX_DAILY_LOSS,
+    RiskMgmt_MAX_STOP_LOSS,
+    RiskMgmt_MAX_DRAWDOWN,
+    MAX_DAILY_LOSS,
     PENALTY_MAX_DD,
-    PENALTY_FTMO_VIOLATION,
+    PENALTY_RiskMgmt_VIOLATION,
     OPTUNA_AVAILABLE,
 )
 
@@ -205,10 +205,10 @@ class TestParameterSpaceDefinition:
         assert config['choices'] == [5, 10, 15, 20]
 
     def test_parameter_space_stop_loss_config(self):
-        """Test stop_loss parameter configuration (FTMO compliant)."""
+        """Test stop_loss parameter configuration (RiskMgmt compliant)."""
         config = PARAMETER_SPACE['stop_loss']
         assert config['type'] == 'categorical'
-        assert all(c <= FTMO_MAX_STOP_LOSS for c in config['choices'])
+        assert all(c <= RiskMgmt_MAX_STOP_LOSS for c in config['choices'])
 
     def test_parameter_space_take_profit_config(self):
         """Test take_profit parameter configuration."""
@@ -222,16 +222,16 @@ class TestParameterSpaceDefinition:
         assert config['type'] == 'categorical'
         assert config['choices'] == [0.01, 0.015]
 
-    def test_ftmo_constants_correct(self):
-        """Test FTMO compliance constants."""
-        assert FTMO_MAX_STOP_LOSS == 0.02
-        assert FTMO_MAX_DRAWDOWN == -0.10
-        assert FTMO_MAX_DAILY_LOSS == 0.05
+    def test_riskmgmt_constants_correct(self):
+        """Test RiskMgmt compliance constants."""
+        assert RiskMgmt_MAX_STOP_LOSS == 0.02
+        assert RiskMgmt_MAX_DRAWDOWN == -0.10
+        assert MAX_DAILY_LOSS == 0.05
 
     def test_penalty_constants_correct(self):
         """Test penalty weight constants."""
         assert PENALTY_MAX_DD == -10.0
-        assert PENALTY_FTMO_VIOLATION == -50.0
+        assert PENALTY_RiskMgmt_VIOLATION == -50.0
 
 
 # =============================================================================
@@ -420,15 +420,15 @@ class TestObjectiveFunction:
 
 
 # =============================================================================
-# FTMO Penalty Tests
+# RiskMgmt Penalty Tests
 # =============================================================================
 
 @pytest.mark.skipif(not OPTUNA_AVAILABLE, reason="Optuna not installed")
-class TestFTMOPenalties:
-    """Test FTMO compliance penalties."""
+class TestRiskMgmtPenalties:
+    """Test RiskMgmt compliance penalties."""
 
     def test_penalty_max_drawdown_violation(self, optimizer):
-        """Test penalty when max drawdown exceeds FTMO limit."""
+        """Test penalty when max drawdown exceeds RiskMgmt limit."""
         study = optuna.create_study(sampler=optuna.samplers.TPESampler(seed=42))
 
         with patch.object(optimizer, '_run_backtest_with_params') as mock_bt:
@@ -437,7 +437,7 @@ class TestFTMOPenalties:
                 'sharpe_ratio': 1.5,
                 'ic': 0.08,
                 'total_trades': 25,
-                'max_drawdown': -0.12,  # Below FTMO_MAX_DRAWDOWN (-0.10)
+                'max_drawdown': -0.12,  # Below RiskMgmt_MAX_DRAWDOWN (-0.10)
             }
 
             trial = study.ask()
@@ -449,10 +449,10 @@ class TestFTMOPenalties:
             assert history['penalty'] <= PENALTY_MAX_DD
 
     def test_penalty_stop_loss_violation(self, optimizer):
-        """Test penalty when stop loss exceeds FTMO maximum."""
+        """Test penalty when stop loss exceeds RiskMgmt maximum."""
         study = optuna.create_study(sampler=optuna.samplers.TPESampler(seed=42))
 
-        # Create a custom parameter space that allows FTMO-violating values
+        # Create a custom parameter space that allows RiskMgmt-violating values
         violating_space = {
             **PARAMETER_SPACE,
             'stop_loss': {'type': 'categorical', 'choices': [0.01, 0.025, 0.03]},
@@ -475,13 +475,13 @@ class TestFTMOPenalties:
                 value = optimizer.objective(trial)
 
             history = optimizer._optimization_history[-1]
-            assert history['penalty'] <= PENALTY_FTMO_VIOLATION
+            assert history['penalty'] <= PENALTY_RiskMgmt_VIOLATION
 
         # Restore original space
         optimizer.parameter_space = optimizer.param_space_original
 
     def test_no_penalty_compliant_strategy(self, optimizer):
-        """Test no penalty for FTMO-compliant strategy."""
+        """Test no penalty for RiskMgmt-compliant strategy."""
         study = optuna.create_study(sampler=optuna.samplers.TPESampler(seed=42))
 
         with patch.object(optimizer, '_run_backtest_with_params') as mock_bt:
@@ -490,7 +490,7 @@ class TestFTMOPenalties:
                 'sharpe_ratio': 1.5,
                 'ic': 0.08,
                 'total_trades': 25,
-                'max_drawdown': -0.05,  # Within FTMO limit
+                'max_drawdown': -0.05,  # Within RiskMgmt limit
             }
 
             trial = study.ask()
@@ -517,7 +517,7 @@ class TestFTMOPenalties:
                 'sharpe_ratio': 1.5,
                 'ic': 0.08,
                 'total_trades': 25,
-                'max_drawdown': -0.12,  # FTMO violation
+                'max_drawdown': -0.12,  # RiskMgmt violation
             }
 
             trial = study.ask()
@@ -526,7 +526,7 @@ class TestFTMOPenalties:
 
             history = optimizer._optimization_history[-1]
             # Both penalties should apply
-            expected_penalty = PENALTY_MAX_DD + PENALTY_FTMO_VIOLATION
+            expected_penalty = PENALTY_MAX_DD + PENALTY_RiskMgmt_VIOLATION
             assert history['penalty'] == expected_penalty
 
 

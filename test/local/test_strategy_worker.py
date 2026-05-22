@@ -452,9 +452,9 @@ class TestAcceptanceGate:
         assert gate.min_sharpe == 0.5
         assert gate.min_trades == 10
         assert gate.max_drawdown == -0.15
-        assert gate.ftmo_max_sl == 0.02
-        assert gate.ftmo_max_daily_loss == 0.05
-        assert gate.ftmo_max_dd == 0.10
+        assert gate.riskmgmt_max_sl == 0.02
+        assert gate.riskmgmt_max_daily_loss == 0.05
+        assert gate.riskmgmt_max_dd == 0.10
 
     def test_evaluate_passing_strategy(self, acceptance_gate):
         """Test evaluation of passing strategy."""
@@ -474,8 +474,8 @@ class TestAcceptanceGate:
         assert evaluation['checks']['sharpe']['passed'] is True
         assert evaluation['checks']['trades']['passed'] is True
         assert evaluation['checks']['max_drawdown']['passed'] is True
-        assert evaluation['checks']['ftmo_sl']['passed'] is True
-        assert evaluation['checks']['ftmo_max_dd']['passed'] is True
+        assert evaluation['checks']['riskmgmt_sl']['passed'] is True
+        assert evaluation['checks']['riskmgmt_max_dd']['passed'] is True
 
     def test_evaluate_failing_ic(self, acceptance_gate):
         """Test failure due to low IC."""
@@ -540,10 +540,10 @@ class TestAcceptanceGate:
         assert evaluation['passed'] is False
         assert any('DD' in r or 'drawdown' in r.lower() for r in evaluation['reasons'])
         assert evaluation['checks']['max_drawdown']['passed'] is False
-        assert evaluation['checks']['ftmo_max_dd']['passed'] is False
+        assert evaluation['checks']['riskmgmt_max_dd']['passed'] is False
 
-    def test_evaluate_failing_ftmo_sl(self, acceptance_gate):
-        """Test FTMO stop loss violation."""
+    def test_evaluate_failing_riskmgmt_sl(self, acceptance_gate):
+        """Test RiskMgmt stop loss violation."""
         result = {
             'ic': 0.05,
             'sharpe_ratio': 1.2,
@@ -555,7 +555,7 @@ class TestAcceptanceGate:
         evaluation = acceptance_gate.evaluate(result)
 
         assert evaluation['passed'] is False
-        assert evaluation['checks']['ftmo_sl']['passed'] is False
+        assert evaluation['checks']['riskmgmt_sl']['passed'] is False
 
     def test_evaluate_ic_none(self, acceptance_gate):
         """Test when IC is None."""

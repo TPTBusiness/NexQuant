@@ -193,9 +193,9 @@ class TestRegressionFixedBugs:
 
     def test_oos_default_enabled(self):
         """Feature: OOS/WF is now default."""
-        from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
+        from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk
         import inspect
-        source = inspect.signature(backtest_signal_ftmo)
+        source = inspect.signature(backtest_signal_risk)
         assert source.parameters["wf_rolling"].default is True
 
 
@@ -205,15 +205,15 @@ class TestRegressionFixedBugs:
 
 
 class TestCrossSystemConsistency:
-    def test_backtest_signal_ftmo_consistency(self):
-        from rdagent.components.backtesting.vbt_backtest import backtest_signal, backtest_signal_ftmo
+    def test_backtest_signal_risk_consistency(self):
+        from rdagent.components.backtesting.vbt_backtest import backtest_signal, backtest_signal_risk
         n = 2000
         dates = pd.date_range("2024-01-01", periods=n, freq="1min")
         rng = np.random.default_rng(42)
         close = pd.Series(1.10 * np.exp(np.cumsum(rng.normal(0, 0.0002, n))), index=dates)
         signal = pd.Series(np.where(rng.normal(0, 1, n) > 0, 1.0, -1.0), index=dates)
         r1 = backtest_signal(close, signal, txn_cost_bps=2.14)
-        r2 = backtest_signal_ftmo(close, signal, txn_cost_bps=2.14, wf_rolling=False)
+        r2 = backtest_signal_risk(close, signal, txn_cost_bps=2.14, wf_rolling=False)
         if r1["status"] == "success" and r2.get("status") == "success":
             assert "sharpe" in r1 and "sharpe" in r2
             assert -1.0 <= r1["max_drawdown"] <= 0.0

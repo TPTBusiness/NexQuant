@@ -77,7 +77,7 @@ def main():
     print("  Quick Daily Strategy Test on Multi-Asset")
     print(f"{'='*60}")
 
-    from rdagent.components.backtesting.vbt_backtest import backtest_signal_ftmo
+    from rdagent.components.backtesting.vbt_backtest import backtest_signal_risk
 
     for asset in df.columns:
         c = df[asset].dropna()
@@ -91,7 +91,7 @@ def main():
         sig[f > s] = 1
         sig[f < s] = -1
 
-        r = backtest_signal_ftmo(c, sig.fillna(0), txn_cost_bps=2.14, wf_rolling=True)
+        r = backtest_signal_risk(c, sig.fillna(0), txn_cost_bps=2.14, wf_rolling=True)
         oos = r.get("wf_oos_sharpe_mean") or r.get("oos_sharpe", -999)
         oos_m = r.get("oos_monthly_return_pct", 0) or 0
         status = "✅" if oos > 0 else "  "
@@ -106,7 +106,7 @@ def main():
     sig = pd.Series(0.0, index=c.index)
     sig[f > s] = 1
     sig[f < s] = -1
-    r = backtest_signal_ftmo(c, sig.fillna(0), txn_cost_bps=2.14, wf_rolling=True)
+    r = backtest_signal_risk(c, sig.fillna(0), txn_cost_bps=2.14, wf_rolling=True)
     oos = r.get("wf_oos_sharpe_mean") or r.get("oos_sharpe", -999)
     print(f"  SMA10/30 extended: OOS={oos:+8.2f} Mon={r.get('oos_monthly_return_pct',0):+.2f}%")
 
