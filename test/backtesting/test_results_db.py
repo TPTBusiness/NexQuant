@@ -1065,7 +1065,7 @@ class TestSchemaMigrationFuzzing:
                 c = db.conn.cursor()
                 c.execute("PRAGMA table_info(backtest_runs)")
                 cols = [row[1] for row in c.fetchall()]
-                assert cols.count(col_name) == 1
+                assert sum(1 for c in cols if c.lower() == col_name.lower()) == 1
             finally:
                 db.close()
 
