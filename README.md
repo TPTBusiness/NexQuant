@@ -15,7 +15,7 @@
 </p>
 
 <h4 align="center">
-  <strong>AI-powered Quantitative Trading Agent for EUR/USD Forex</strong>
+  <strong>AI-powered Quantitative Research Framework</strong>
 </h4>
 
 <p align="center">
@@ -75,17 +75,19 @@ rdagent nexquant
 
 ## Overview
 
-**NexQuant** is an autonomous AI agent for quantitative trading strategies in the EUR/USD forex market. Built on a multi-agent framework, NexQuant automates the full research and development cycle:
+**NexQuant** is an autonomous AI agent for quantitative strategy research. Built on a multi-agent framework, it automates the full R&D cycle:
 
-- 📊 **Factor Generation** — LLM proposes novel alpha factors; Kronos foundation model generates OHLCV-based predictions
-- 💡 **Strategy Discovery** — Autopilot generates + backtests trading strategies 24/7
-- 🧠 **Model Evolution** — CoSTEER iteratively improves predictive models through code evolution
-- 📈 **Backtesting** — Unified engine with 10 runtime invariants on 1-min EUR/USD data (2020–2026)
-- 🔄 **Auto-Restart** — All services run as daemons with automatic crash recovery
+- 📊 **Factor Generation** — LLM proposes novel alpha factors; CoSTEER evolves code through iterative improvement
+- 🔍 **Strategy Discovery** — R&D loop generates and evaluates hundreds of strategies across multiple timeframes
+- 🧠 **Model Evolution** — Thompson-sampling bandit balances factor vs. model generation for optimal discovery
+- 📈 **Price-Action R&D Loop** — Deterministic technical indicator optimization (no LLM required)
+- ⚡ **Backtesting Engine** — Unified engine with runtime invariants, walk-forward validation
 
-NexQuant is optimized for **1-minute EUR/USD FX data** (2020–2026) and supports both local LLMs (llama.cpp) and cloud backends (OpenRouter).
+> **This repository contains the research framework.** Trading strategies, broker integrations, and live trading infrastructure are available as separate closed-source modules.
 
-> **Backtest Verification**: Every backtest result is automatically verified at runtime against mathematical invariants (MaxDD ∈ [-1,0], WinRate ∈ [0,1], Sharpe finite, sign consistency, etc.). 1125 collected tests with deep property-based, fuzzing, and hypothesis tests ensure metric correctness. See [Backtest Integrity](#backtest-integrity).
+NexQuant works with any OHLCV data in HDF5 MultiIndex format. It supports local LLMs (llama.cpp) and cloud backends (OpenRouter).
+
+> **Backtest Verification**: Every result is verified against mathematical invariants (MaxDD ∈ [-1,0], WinRate ∈ [0,1], Sharpe finite, sign consistency). 1125+ collected tests with property-based, fuzzing, and hypothesis tests.
 
 ## Acknowledgments
 
@@ -99,7 +101,7 @@ Special thanks to:
 
 - **[ai-hedge-fund](https://github.com/virattt/ai-hedge-fund)** - Inspiration for macro analysis (Stanley Druckenmiller agent), risk management concepts, and market regime detection.
 
-All code in NexQuant is originally written and implemented independently. NexQuant extends these frameworks with EUR/USD forex-specific features, 1-minute backtesting capabilities, comprehensive risk management, and trading dashboards.
+All code in NexQuant is originally written and implemented independently.
 
 ---
 
@@ -150,18 +152,18 @@ docker run --rm hello-world
 
 ## Data Setup
 
-NexQuant requires **1-minute EUR/USD OHLCV data** in HDF5 format. This is a hard prerequisite — the system cannot run without it.
+NexQuant requires **OHLCV data** in HDF5 MultiIndex format. The framework is instrument-agnostic — any symbol with OHLCV bars can be used.
 
 ### Step 1: Get the data
 
-Download 1-minute EUR/USD data (2020–present) from any of these free sources:
+Download OHLCV data from any of these free sources:
 
 | Source | Cost | Notes |
 |--------|------|-------|
-| **[Dukascopy](https://www.dukascopy.com/swiss/english/marketfeed/historical/)** | Free | Best quality free EUR/USD tick data |
+| **[Dukascopy](https://www.dukascopy.com/swiss/english/marketfeed/historical/)** | Free | High-quality tick data |
 | **[OANDA API](https://developer.oanda.com/)** | Free (demo) | Requires API key, programmatic access |
 | **[TrueFX](https://truefx.com/)** | Free | Institutional-quality tick data |
-| **[Kaggle](https://www.kaggle.com/datasets?search=EURUSD+1min)** | Free | Search "EURUSD 1 minute" |
+| **[Kaggle](https://www.kaggle.com/datasets?search=EURUSD+1min)** | Free | Search "OHLCV 1 minute" |
 | **MetaTrader 5** | Free | Export via `copy_rates_range()` |
 
 ### Step 2: Convert to HDF5
@@ -169,10 +171,10 @@ Download 1-minute EUR/USD data (2020–present) from any of these free sources:
 ```python
 import pandas as pd
 
-df = pd.read_csv('eurusd_1min.csv', parse_dates=['datetime'])
+df = pd.read_csv('ohlcv_data.csv', parse_dates=['datetime'])
 df = df.rename(columns={'open': '$open', 'close': '$close',
                         'high': '$high', 'low': '$low', 'volume': '$volume'})
-df['instrument'] = 'EURUSD'
+df['instrument'] = 'SYMBOL'
 df = df.set_index(['datetime', 'instrument'])
 for col in ['$open', '$close', '$high', '$low', '$volume']:
     df[col] = df[col].astype('float32')
@@ -215,7 +217,7 @@ LITELLM_PROXY_API_BASE=http://localhost:11434/v1
 EMBEDDING_MODEL=nomic-embed-text
 
 # Paths
-QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
+QLIB_DATA_DIR=~/.qlib/qlib_data/market_data
 ```
 
 ### LLM Server (llama.cpp)
@@ -245,9 +247,9 @@ QLIB_DATA_DIR=~/.qlib/qlib_data/eurusd_1min_data
 Edit [`data_config.yaml`](data_config.yaml) to customize walk-forward splits:
 
 ```yaml
-instrument: EURUSD
+instrument: SYMBOL
 frequency: 1min
-data_path: ~/.qlib/qlib_data/eurusd_1min_data
+data_path: ~/.qlib/qlib_data/market_data
 
 train_start: "2022-03-14"
 train_end:   "2024-06-30"
@@ -462,7 +464,7 @@ NexQuant integrates Kronos — an OHLCV foundation model from the NeoQuasar team
 
 | Model | Params | p24 IC | Best For |
 |-------|--------|--------|----------|
-| **Kronos-small** (default) | 25M | \|IC\| ≈ 0.09 | 1-min EUR/USD |
+| **Kronos-small** (default) | 25M | \|IC\| ≈ 0.09 | OHLCV data |
 | Kronos-mini | 4.1M | \|IC\| ≈ 0.07 | Low-resource |
 | Kronos-base | 102M | \|IC\| ≈ 0.002 | Daily/weekly data only |
 
@@ -502,7 +504,7 @@ nexquant/
 │   │   └── qlib_rd_loop/    # Quant R&D loop (factor + model generation)
 │   ├── components/          # Reusable agent components
 │   │   ├── backtesting/     # Backtest engine & protections
-│   │   │   ├── vbt_backtest.py  # Unified backtest engine (1-min bars)
+│   │   │   ├── vbt_backtest.py  # Unified backtest engine (OHLCV bars)
 │   │   │   ├── verify.py        # Runtime backtest invariant checker
 │   │   │   ├── results_db.py
 │   │   │   └── protections/     # Trading protection system
