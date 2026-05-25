@@ -88,6 +88,80 @@ def _ma_env_signal(c, period, pct):
     return s.replace(0, np.nan).ffill(limit=3).fillna(0).astype(int).clip(-1, 1)
 
 
+def _stoch_signal(c, period, smooth):
+    """Stochastic Oscillator — oversold/overbought crossover."""
+    lo = c.rolling(period).min()
+    hi = c.rolling(period).max()
+    k = 100 * (c - lo) / (hi - lo + 1e-8)
+    d = k.rolling(smooth).mean()
+    s = pd.Series(0, index=c.index)
+    s[(k > d) & (k < 30)] = 1
+    s[(k < d) & (k > 70)] = -1
+    return s.fillna(0).astype(int).clip(-1, 1)
+
+def _cci_signal(c, h, l, period):
+    """Commodity Channel Index."""
+    tp = (h + l + c) / 3
+    ma = tp.rolling(period).mean()
+    md = (tp - ma).abs().rolling(period).mean()
+    cci = (tp - ma) / (0.015 * md + 1e-8)
+    s = pd.Series(0, index=c.index)
+    s[cci < -100] = 1
+    s[cci > 100] = -1
+    return s.fillna(0).astype(int).clip(-1, 1)
+
+def _williams_r(c, h, l, period):
+    """Williams %R — overbought/oversold."""
+    hi = h.rolling(period).max()
+    lo = l.rolling(period).min()
+    wr = -100 * (hi - c) / (hi - lo + 1e-8)
+    s = pd.Series(0, index=c.index)
+    s[wr < -80] = 1
+    s[wr > -20] = -1
+    return s.fillna(0).astype(int).clip(-1, 1)
+
+def _roc_signal(c, period, threshold):
+    """Rate of Change — momentum threshold."""
+    roc = c.pct_change(period) * 100
+    s = pd.Series(0, index=c.index)
+    s[roc > threshold] = 1
+    s[roc < -threshold] = -1
+    return s.fillna(0).astype(int).clip(-1, 1)
+
+def _ema_cross(c, fast, slow):
+    """EMA Crossover (separate from SMA)."""
+    ef = c.ewm(span=fast, adjust=False).mean()
+    es = c.ewm(span=slow, adjust=False).mean()
+    s = pd.Series(0, index=c.index)
+    s[ef > es] = 1
+    s[ef < es] = -1
+    return s.fillna(0).astype(int).clip(-1, 1)
+
+def _keltner(c, h, l, period, mult):
+    """Keltner Channel breakout."""
+    ma = c.rolling(period).mean()
+    atr = ((h - l).abs()).rolling(period).mean()
+    s = pd.Series(0, index=c.index)
+    s[c > ma + mult * atr] = 1
+    s[c < ma - mult * atr] = -1
+    return s.replace(0, np.nan).ffill(limit=2).fillna(0).astype(int).clip(-1, 1)
+
+def _adx_filter(c, h, l, period, threshold):
+    """ADX trend-strength filter — only trade when ADX > threshold."""
+    tr = pd.concat([h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1).max(axis=1)
+    atr = tr.rolling(period).mean()
+    up = h - h.shift()
+    dn = l.shift() - l
+    pdi = 100 * (up.clip(lower=0).rolling(period).mean() / (atr + 1e-8))
+    ndi = 100 * (dn.clip(lower=0).rolling(period).mean() / (atr + 1e-8))
+    dx = 100 * (pdi - ndi).abs() / (pdi + ndi + 1e-8)
+    adx = dx.rolling(period).mean()
+    s = pd.Series(0, index=c.index)
+    s[(pdi > ndi) & (adx > threshold)] = 1
+    s[(ndi > pdi) & (adx > threshold)] = -1
+    return s.fillna(0).astype(int).clip(-1, 1)
+
+
 INDICATORS = {
     "MACD":       {"params": {"fast": [3,5,8,12], "slow": [10,15,20,26,35], "sig": [3,5,9]},
                    "build": _macd_signal, "desc": "MACD({fast},{slow},{sig})"},
@@ -97,12 +171,26 @@ INDICATORS = {
                    "build": _rsi_signal, "desc": "RSI({period})[{oversold}/{overbought}]"},
     "SMA_Cross":  {"params": {"fast": [5,10,20,50], "slow": [20,50,100,200]},
                    "build": _sma_signal, "desc": "SMA({fast},{slow})"},
+    "EMA_Cross":  {"params": {"fast": [3,5,8,12], "slow": [15,26,50,100]},
+                   "build": _ema_cross, "desc": "EMA({fast},{slow})"},
     "Bollinger":  {"params": {"period": [10,20,40], "std": [1.5,2.0,2.5]},
                    "build": _bb_signal, "desc": "BB({period},{std}s)"},
+    "Keltner":    {"params": {"period": [10,20,40], "mult": [1.0,1.5,2.0,2.5]},
+                   "build": lambda c, period, mult: _keltner(c, c, c, period, mult), "desc": "Keltner({period},{mult})"},
     "ATR_Channel":{"params": {"period": [10,20,40], "mult": [1.0,1.5,2.0,2.5]},
                    "build": _atr_signal, "desc": "ATR({period},{mult})"},
     "MA_Envelope":{"params": {"period": [20,50,100], "pct": [0.01,0.02,0.03,0.05]},
                    "build": _ma_env_signal, "desc": "MA_Env({period},{pct})"},
+    "Stochastic": {"params": {"period": [5,9,14], "smooth": [3,5]},
+                   "build": lambda c, period, smooth: _stoch_signal(c, period, smooth), "desc": "Stoch({period},{smooth})"},
+    "CCI":        {"params": {"period": [14,20,50]},
+                   "build": lambda c, period: _cci_signal(c, c, c, period), "desc": "CCI({period})"},
+    "WilliamsR":  {"params": {"period": [7,14,21]},
+                   "build": lambda c, period: _williams_r(c, c, c, period), "desc": "WR({period})"},
+    "ROC_Momentum":{"params": {"period": [5,10,20], "threshold": [0.1,0.2,0.5,1.0]},
+                   "build": _roc_signal, "desc": "ROC({period},{threshold}%)"},
+    "ADX":        {"params": {"period": [7,14,21], "threshold": [15,20,25]},
+                   "build": lambda c, period, threshold: _adx_filter(c, c, c, period, threshold), "desc": "ADX({period}>{threshold})"},
 }
 
 TIMEFRAMES = ["15min", "30min", "1h", "4h", "1d"]
