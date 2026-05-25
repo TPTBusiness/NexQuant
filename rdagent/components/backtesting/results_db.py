@@ -97,7 +97,7 @@ class ResultsDatabase:
         c = self.conn.cursor()
         c.execute("SELECT name FROM pragma_table_info(?)", (table,))
         existing = {row[0] for row in c.fetchall()}
-        if column not in existing:
+        if column.lower() not in {name.lower() for name in existing}:
             c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
     
     def add_factor(self, name: str, type: str = "unknown") -> int:
