@@ -68,6 +68,7 @@ class FactorAutoFixer:
             self._fix_inf_nan_handling,             # Tenth: add inf/nan handling
             self._fix_data_range_processing,        # Eleventh: ensure full data range
             self._fix_multiindex_groupby,           # Twelfth: ensure groupby on MultiIndex
+            self._fix_composite_normalization,      # Thirteenth: normalize thresholds + composite variance
         ]
 
         for fix_method in fix_methods:
@@ -84,6 +85,24 @@ class FactorAutoFixer:
             )
 
         return fixed_code
+
+    def _fix_composite_normalization(self, code: str) -> str:
+        """Normalize strategy code: cap thresholds, limit windows, normalize composite."""
+        code = re.sub(r'\bentry_thresh\s*=\s*([0-9.]+)',
+                      lambda m: f'entry_thresh = {min(float(m.group(1)), 0.7):.1f}', code)
+        code = re.sub(r'\bexit_thresh\s*=\s*([0-9.]+)',
+                      lambda m: f'exit_thresh = {min(float(m.group(1)), 0.3):.1f}', code)
+        code = re.sub(r'\bwindow\s*=\s*(\d+)',
+                      lambda m: f'window = {min(int(m.group(1)), 20)}', code)
+        code = re.sub(r'(signal\s*=\s*signal\s*\.\s*rolling\s*\()(\d+)',
+                      lambda m: f'{m.group(1)}{min(int(m.group(2)), 2)}', code)
+        if 'composite' in code and 'composite = (composite' not in code:
+            code = re.sub(
+                r'\n(signal\s*=\s*pd\.Series)',
+                r'\ncomposite = (composite - composite.rolling(20).mean()) / (composite.rolling(20).std() + 1e-8)\n\n\1',
+                code, count=1,
+            )
+        return code
 
     def _fix_instrument_column_access(self, code: str) -> str:
         """
