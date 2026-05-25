@@ -345,11 +345,8 @@ python nexquant.py best
 # fin_quant — factor R&D loop
 nohup bash -c 'while true; do rdagent fin_quant --loop-n 10 --model local >> /tmp/fin_quant_daemon.log 2>&1; sleep 10; done' &
 
-# Autopilot — 24/7 strategy generator (Kronos factors auto-selected)
+# Autopilot — 24/7 strategy generator
 nohup python scripts/nexquant_autopilot.py >> /tmp/autopilot_daemon.log 2>&1 &
-
-# Live Trader — FTMO FIX API (requires credentials)
-nohup python git_ignore_folder/live_trading/ftmo_live_trader.py >> ftmo_live_trader.log 2>&1 &
 ```
 
 ---
