@@ -333,10 +333,10 @@ def _apply_risk_mask(
             masked.at[ts] = 0
 
     return masked, {
-        "risk_daily_breaches": daily_breaches,
-        "risk_total_breached": total_breached,
-        "risk_total_breach_ts": str(total_breach_ts) if total_breach_ts else None,
-        "risk_compliant": not total_breached and daily_breaches == 0,
+        "riskmgmt_daily_breaches": daily_breaches,
+        "riskmgmt_total_breached": total_breached,
+        "riskmgmt_total_breach_ts": str(total_breach_ts) if total_breach_ts else None,
+        "riskmgmt_compliant": not total_breached and daily_breaches == 0,
     }
 
 
@@ -533,13 +533,13 @@ def backtest_signal_risk(
     )
 
     result.update(risk_metrics)
-    result["risk_leverage"] = round(leverage, 2)
-    result["risk_risk_pct"] = risk_pct
-    result["risk_stop_pips"] = stop_pips
+    result["riskmgmt_leverage"] = round(leverage, 2)
+    result["riskmgmt_risk_pct"] = risk_pct
+    result["riskmgmt_stop_pips"] = stop_pips
 
     # Re-scale reported equity metrics to INITIAL_CAPITAL
-    result["risk_end_equity"] = INITIAL_CAPITAL * (1 + result.get("total_return", 0))
-    result["risk_monthly_profit"] = INITIAL_CAPITAL * result.get("monthly_return", 0)
+    result["riskmgmt_end_equity"] = INITIAL_CAPITAL * (1 + result.get("total_return", 0))
+    result["riskmgmt_monthly_profit"] = INITIAL_CAPITAL * result.get("monthly_return", 0)
 
     # Walk-forward OOS split
     if oos_start is not None:
