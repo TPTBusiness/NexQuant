@@ -1,0 +1,343 @@
+#!/usr/bin/env python3
+"""R&D Loop for Technical Indicators — Replaces factor pipeline with indicator discovery.
+
+Architecture (mirrors the original R&D loop):
+    1. Hypothesize: LLM proposes indicator combinations with parameters
+    2. Evaluate: Direct backtest_signal (no Docker, no Qlib)
+    3. Feedback: Compare against SOTA, bias next hypotheses
+    4. Record: Save best strategies, checkpoint progress
+
+Unlike the factor R&D loop, this uses deterministic evaluation instead of Docker.
+"""
+
+import json, os, random, sys, time
+from datetime import datetime
+from pathlib import Path
+import numpy as np, pandas as pd
+
+PROJECT = Path(__file__).resolve().parent.parent
+OHLCV_PATH = Path(os.getenv("PREDIX_OHLCV_PATH",
+    str(PROJECT / "git_ignore_folder" / "intraday_pv_all.h5")))
+RESULTS_DIR = PROJECT / "results" / "rd_loop"
+STATE_DIR = PROJECT / "git_ignore_folder" / "rd_loop_state"
+
+TIMEFRAMES = ["15min", "30min", "1h", "4h"]
+INDICATORS_POOL = ["MACD", "RSI", "BBands", "Donchian", "Stoch", "CCI", "WillR", "ADX", "SAR", "ROC", "MOM", "AROON", "MFI", "SMA", "EMA"]
+STRATEGY_TYPES = ["single", "multi_tf", "portfolio"]
+MIN_SHARPE, MIN_TRADES = 0.5, 20
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Evaluation
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def evaluate_strategy(close, hypothesis):
+    """Run backtest and return metrics."""
+    import talib
+    signal = None
+
+    if hypothesis['type'] == 'single':
+        ind = hypothesis['indicator']
+        tf = hypothesis['timeframe']
+        bars = close.resample(tf).last().dropna()
+        sig = _build_indicator_signal(ind, bars, hypothesis['params'])
+        signal = sig.reindex(close.index).ffill().fillna(0).astype(int).clip(-1, 1)
+
+    elif hypothesis['type'] == 'multi_tf':
+        ind = hypothesis['indicator']
+        sigs = {}
+        for tf in hypothesis['timeframes']:
+            bars = close.resample(tf).last().dropna()
+            sig = _build_indicator_signal(ind, bars, hypothesis['params'])
+            sigs[tf] = sig.reindex(close.index).ffill().fillna(0).astype(int).clip(-1, 1)
+        port = pd.DataFrame(sigs).dropna()
+        vote = port.mean(axis=1)
+        signal = pd.Series(0, index=vote.index)
+        signal[vote > 0.25] = 1; signal[vote < -0.25] = -1
+
+    elif hypothesis['type'] == 'portfolio':
+        sigs = []
+        for cfg in hypothesis['indicators']:
+            bars = close.resample('1d').last().dropna()
+            sig = _build_indicator_signal(cfg['name'], bars, cfg['params'])
+            sigs.append(sig.reindex(close.index).ffill().fillna(0).astype(int).clip(-1, 1))
+        port = pd.DataFrame({f"s{i}": s for i, s in enumerate(sigs)}).dropna()
+        vote = port.mean(axis=1)
+        signal = pd.Series(0, index=vote.index)
+        signal[vote > 0.25] = 1; signal[vote < -0.25] = -1
+
+    if signal is None or signal.nunique() <= 1:
+        return {"sharpe": 0, "monthly_pct": 0, "max_dd": 0, "n_trades": 0, "win_rate": 0}
+
+    from rdagent.components.backtesting.vbt_backtest import backtest_signal
+    bt = backtest_signal(close=close, signal=signal)
+    return {"sharpe": bt.get("sharpe", 0) or 0, "monthly_pct": bt.get("monthly_return_pct", 0) or 0,
+            "max_dd": bt.get("max_drawdown", 0) or 0, "n_trades": bt.get("n_trades", 0) or 0,
+            "win_rate": bt.get("win_rate", 0) or 0}
+
+
+def _build_indicator_signal(name, bars, params):
+    """Build indicator signal using talib + hand-rolled."""
+    import talib
+    c = bars.values.astype(np.float64)
+    if name == 'MACD':
+        mc, sc, _ = talib.MACD(c, fastperiod=params.get('fast', 3),
+                               slowperiod=params.get('slow', 15),
+                               signalperiod=params.get('sig', 3))
+        s = pd.Series(0, index=bars.index); s[mc > sc] = 1; s[mc < sc] = -1
+    elif name == 'RSI':
+        v = talib.RSI(c, timeperiod=params.get('period', 14))
+        s = pd.Series(0, index=bars.index); s[v < params.get('oversold', 30)] = 1; s[v > params.get('overbought', 70)] = -1
+    elif name == 'BBands':
+        up, mi, lo = talib.BBANDS(c, timeperiod=params.get('period', 20),
+                                  nbdevup=params.get('std', 2), nbdevdn=params.get('std', 2))
+        s = pd.Series(0, index=bars.index); s[c < lo] = 1; s[c > up] = -1
+    elif name == 'Donchian':
+        hi = bars.rolling(params.get('period', 20)).max()
+        lo = bars.rolling(params.get('period', 20)).min()
+        s = pd.Series(0, index=bars.index); s[bars > hi.shift(1)] = 1; s[bars < lo.shift(1)] = -1
+        s = s.replace(0, np.nan).ffill(limit=params.get('hold', 1)).fillna(0).astype(int)
+    elif name == 'Stoch':
+        k, d = talib.STOCH(c, c, c, fastk_period=params.get('fastk', 9),
+                           slowk_period=params.get('slowk', 3), slowd_period=params.get('slowd', 3))
+        s = pd.Series(0, index=bars.index); s[(k > d) & (k < 30)] = 1; s[(k < d) & (k > 70)] = -1
+    elif name == 'CCI':
+        v = talib.CCI(c, c, c, timeperiod=params.get('period', 14))
+        s = pd.Series(0, index=bars.index); s[v < -100] = 1; s[v > 100] = -1
+    elif name == 'WillR':
+        v = talib.WILLR(c, c, c, timeperiod=params.get('period', 14))
+        s = pd.Series(0, index=bars.index); s[v < -80] = 1; s[v > -20] = -1
+    elif name == 'ADX':
+        pdi = talib.PLUS_DI(c, c, c, timeperiod=params.get('period', 14))
+        ndi = talib.MINUS_DI(c, c, c, timeperiod=params.get('period', 14))
+        adx = talib.ADX(c, c, c, timeperiod=params.get('period', 14))
+        s = pd.Series(0, index=bars.index)
+        s[(pdi > ndi) & (adx > params.get('threshold', 20))] = 1
+        s[(ndi > pdi) & (adx > params.get('threshold', 20))] = -1
+    elif name == 'SAR':
+        v = talib.SAR(c, c, acceleration=params.get('accel', 0.02), maximum=params.get('max_accel', 0.2))
+        s = pd.Series(0, index=bars.index); s[c > v] = 1; s[c < v] = -1
+    elif name == 'ROC':
+        v = talib.ROC(c, timeperiod=params.get('period', 10))
+        s = pd.Series(0, index=bars.index); s[v > params.get('threshold', 0.2)] = 1; s[v < -params.get('threshold', 0.2)] = -1
+    elif name == 'MOM':
+        v = talib.MOM(c, timeperiod=params.get('period', 10))
+        s = pd.Series(0, index=bars.index); s[v > 0] = 1; s[v < 0] = -1
+    elif name == 'AROON':
+        up, dn = talib.AROON(c, c, timeperiod=params.get('period', 14))
+        s = pd.Series(0, index=bars.index); s[up > dn] = 1; s[up < dn] = -1
+    elif name == 'MFI':
+        v = talib.MFI(c, c, c, c, timeperiod=params.get('period', 14))
+        s = pd.Series(0, index=bars.index); s[v < 20] = 1; s[v > 80] = -1
+    elif name == 'SMA':
+        s = pd.Series(0, index=bars.index)
+        s[bars.rolling(params.get('fast', 10)).mean() > bars.rolling(params.get('slow', 50)).mean()] = 1
+        s[bars.rolling(params.get('fast', 10)).mean() < bars.rolling(params.get('slow', 50)).mean()] = -1
+    elif name == 'EMA':
+        ef = bars.ewm(span=params.get('fast', 5), adjust=False).mean()
+        es = bars.ewm(span=params.get('slow', 26), adjust=False).mean()
+        s = pd.Series(0, index=bars.index); s[ef > es] = 1; s[ef < es] = -1
+    else:
+        s = pd.Series(0, index=bars.index)
+    return s.fillna(0).astype(int).clip(-1, 1)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Hypothesis Generation (simulated R&D loop — no LLM needed for indicators)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ResearchLoop:
+    """Mimics the R&D loop: hypothesize → evaluate → feedback → record."""
+
+    def __init__(self, close):
+        self.close = close
+        self.sota = []  # State-of-the-art strategies
+        self.history = []  # All evaluated hypotheses
+        self.iteration = 0
+        self.best_sharpe = 0
+        self.exploration_rate = 0.3  # % of time we explore randomly vs exploit SOTA
+
+    def hypothesize(self):
+        """Generate a new strategy hypothesis.
+        
+        Uses a bandit-inspired approach:
+        - 70%: Exploit — mutate the best-known strategy
+        - 30%: Explore — random new strategy
+        """
+        self.iteration += 1
+        
+        if random.random() < self.exploration_rate or not self.sota:
+            # EXPLORE: random new strategy
+            return self._random_hypothesis()
+        else:
+            # EXPLOIT: mutate the best strategy
+            base = random.choice(self.sota[:5])
+            return self._mutate_hypothesis(base['hypothesis'])
+
+    def _random_hypothesis(self):
+        stype = random.choice(STRATEGY_TYPES)
+        if stype == 'single':
+            ind = random.choice(INDICATORS_POOL)
+            tf = random.choice(TIMEFRAMES)
+            params = self._random_params(ind)
+            return {'type': 'single', 'indicator': ind, 'timeframe': tf, 'params': params,
+                    'description': f"{ind} on {tf}", 'generation': 'explore'}
+        elif stype == 'multi_tf':
+            ind = random.choice(INDICATORS_POOL)
+            tfs = random.sample(TIMEFRAMES, k=random.randint(2, 4))
+            params = self._random_params(ind)
+            return {'type': 'multi_tf', 'indicator': ind, 'timeframes': tfs, 'params': params,
+                    'description': f"{ind} on {','.join(tfs)}", 'generation': 'explore'}
+        else:
+            i1, i2 = random.sample(INDICATORS_POOL, 2)
+            p1 = self._random_params(i1); p2 = self._random_params(i2)
+            return {'type': 'portfolio', 'indicators': [{'name': i1, 'params': p1}, {'name': i2, 'params': p2}],
+                    'description': f"{i1}+{i2}", 'generation': 'explore'}
+
+    def _mutate_hypothesis(self, base):
+        """Mutate an existing hypothesis — change one aspect."""
+        hp = dict(base)  # shallow copy
+        mutations = ['params', 'indicator', 'timeframe']
+        mutation = random.choice(mutations)
+        hp['generation'] = 'exploit'
+
+        if mutation == 'params' and 'params' in hp:
+            # Tweak one parameter
+            params = dict(hp['params'])
+            key = random.choice(list(params.keys()))
+            if isinstance(params[key], (int, float)):
+                params[key] = params[key] * random.uniform(0.5, 1.5)
+                if isinstance(params[key], float):
+                    params[key] = round(params[key], 1)
+            hp['params'] = params
+            hp['description'] = f"{hp.get('indicator','?')} (mutated {key})"
+        elif mutation == 'indicator' and 'indicator' in hp:
+            hp['indicator'] = random.choice([i for i in INDICATORS_POOL if i != hp.get('indicator')])
+            hp['params'] = self._random_params(hp['indicator'])
+            hp['description'] = f"{hp['indicator']} (replaced)"
+        elif mutation == 'timeframe':
+            if 'timeframe' in hp:
+                hp['timeframe'] = random.choice(TIMEFRAMES)
+            elif 'timeframes' in hp:
+                hp['timeframes'] = random.sample(TIMEFRAMES, k=len(hp['timeframes']))
+            hp['description'] = f"{hp.get('indicator','?')} (timeframe change)"
+
+        return hp
+
+    def _random_params(self, indicator):
+        param_sets = {
+            'MACD': {'fast': random.choice([3,5,8,12]), 'slow': random.choice([10,15,20,26]), 'sig': random.choice([3,5,9])},
+            'RSI': {'period': random.choice([7,14,21]), 'oversold': random.choice([20,25,30]), 'overbought': random.choice([70,75,80])},
+            'BBands': {'period': random.choice([10,20,40]), 'std': random.choice([1.5,2.0,2.5])},
+            'Donchian': {'period': random.choice([5,10,20,30,50]), 'hold': random.choice([1,2,3,5])},
+            'Stoch': {'fastk': random.choice([5,9,14]), 'slowk': 3, 'slowd': random.choice([3,5])},
+            'CCI': {'period': random.choice([14,20,50])},
+            'WillR': {'period': random.choice([7,14,21])},
+            'ADX': {'period': random.choice([7,14,21]), 'threshold': random.choice([15,20,25])},
+            'SAR': {'accel': random.choice([0.02,0.05,0.08]), 'max_accel': random.choice([0.2,0.3,0.5])},
+            'ROC': {'period': random.choice([5,10,20]), 'threshold': random.choice([0.1,0.2,0.5])},
+            'MOM': {'period': random.choice([5,10,20,50])},
+            'AROON': {'period': random.choice([7,14,21])},
+            'MFI': {'period': random.choice([7,14,21])},
+            'SMA': {'fast': random.choice([5,10,20,50]), 'slow': random.choice([20,50,100,200])},
+            'EMA': {'fast': random.choice([3,5,8,12]), 'slow': random.choice([15,26,50,100])},
+        }
+        return param_sets.get(indicator, {'period': 14})
+
+    def feedback(self, result):
+        """Update SOTA and bias future exploration."""
+        if result['sharpe'] >= MIN_SHARPE and result['n_trades'] >= MIN_TRADES:
+            self.sota.append(result)
+            self.sota.sort(key=lambda r: r['sharpe'], reverse=True)
+            self.sota = self.sota[:20]  # Keep top 20
+            if result['sharpe'] > self.best_sharpe:
+                self.best_sharpe = result['sharpe']
+                return True  # NEW BEST
+        return False
+
+    def record(self):
+        """Save checkpoint."""
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        if self.sota:
+            cp = RESULTS_DIR / f"rd_loop_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            cp.write_text(json.dumps(self.sota[:15], indent=2, default=str))
+
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def main():
+    iterations = 200
+    if "--iterations" in sys.argv:
+        iterations = int(sys.argv[sys.argv.index("--iterations") + 1])
+
+    print("=" * 60)
+    print(f"  R&D Loop — Technical Indicators ({len(INDICATORS_POOL)} indicators)")
+    print(f"  Strategy: hypothezise → evaluate → feedback → record")
+    print(f"  Iterations: {iterations}")
+    print("=" * 60)
+
+    df = pd.read_hdf(OHLCV_PATH, key="data")
+    close = df.xs("EURUSD", level="instrument")["$close"].sort_index()
+
+    loop = ResearchLoop(close)
+    t0 = time.time()
+
+    for i in range(iterations):
+        # 1. HYPOTHESIZE
+        hp = loop.hypothesize()
+
+        # 2. EVALUATE
+        result = evaluate_strategy(close, hp)
+        result['hypothesis'] = hp
+        result['iteration'] = i + 1
+        result['timestamp'] = datetime.now().isoformat()
+        loop.history.append(result)
+
+        # 3. FEEDBACK
+        is_new_best = loop.feedback(result)
+
+        # Log
+        gen = hp.get('generation', '?')
+        if is_new_best:
+            print(f"\n  ★ NEW BEST (#{i+1}, {gen}): {hp['description']}")
+            print(f"    Sharpe={result['sharpe']:.2f} Mon={result['monthly_pct']:.1f}% "
+                  f"DD={result['max_dd']:.4f} Tr={result['n_trades']}")
+        elif (i + 1) % 50 == 0:
+            print(f"  [{i+1}/{iterations}] {gen:>7s} | SOTA: {len(loop.sota)} | "
+                  f"Best Sh={loop.best_sharpe:.2f} | "
+                  f"Explore: {loop.exploration_rate:.0%}")
+
+        # 4. RECORD checkpoint
+        if (i + 1) % 100 == 0:
+            loop.record()
+
+        # Adaptive exploration: reduce over time as SOTA grows
+        if len(loop.sota) > 10:
+            loop.exploration_rate = max(0.1, 0.3 - len(loop.sota) * 0.01)
+
+    # Final
+    elapsed = time.time() - t0
+    print(f"\n{'=' * 60}")
+    print(f"  R&D Loop Complete: {iterations} iterations in {elapsed:.0f}s")
+    print(f"  SOTA Strategies: {len(loop.sota)}")
+    print(f"{'=' * 60}")
+
+    if loop.sota:
+        print(f"\n  TOP DISCOVERIES:")
+        for i, r in enumerate(loop.sota[:15], 1):
+            hp = r['hypothesis']
+            print(f"  {i:>2d}. {hp['description'][:50]:50s} Sh={r['sharpe']:+.2f} Mon={r['monthly_pct']:+.1f}% "
+                  f"Tr={r['n_trades']} ({hp.get('generation','?')})")
+
+        final = RESULTS_DIR / f"rd_loop_final_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        final.write_text(json.dumps(loop.sota, indent=2, default=str))
+        print(f"\n  Saved: {final}")
+
+        # Learnings summary
+        exploit_best = [r for r in loop.sota if r['hypothesis'].get('generation') == 'exploit']
+        explore_best = [r for r in loop.sota if r['hypothesis'].get('generation') == 'explore']
+        print(f"\n  Exploit wins: {len(exploit_best)} (avg Sh={np.mean([r['sharpe'] for r in exploit_best]):.1f})" if exploit_best else "")
+        print(f"  Explore wins: {len(explore_best)} (avg Sh={np.mean([r['sharpe'] for r in explore_best]):.1f})" if explore_best else "")
+
+
+if __name__ == "__main__":
+    main()
