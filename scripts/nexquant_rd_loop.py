@@ -242,16 +242,14 @@ class ResearchLoop:
     def hypothesize(self):
         self.iteration += 1
         
+        # Every 2000 iterations: train ML model (check before Optuna, higher priority)
+        if self.iteration % 2000 == 0 and len(self.sota) >= 5:
+            return {'type': 'ml', 'generation': 'ml',
+                    'description': f"ML: LightGBM on {len(self.sota)} strategies",
+                    'sota': self.sota[:5]}
+        
         # Every 500 iterations: Optuna-optimize best strategy
         if self.iteration % 500 == 0 and self.sota:
-            best = self.sota[0]
-            hp = dict(best['hypothesis'])
-            hp['generation'] = 'optuna'
-            hp['description'] = f"Optuna: {hp.get('description','?')}"
-            return hp
-        
-        # Every 2000 iterations: train ML model
-        if self.iteration % 2000 == 0 and len(self.sota) >= 5:
             return {'type': 'ml', 'generation': 'ml',
                     'description': f"ML: LightGBM on {len(self.sota)} strategies",
                     'sota': self.sota[:5]}
