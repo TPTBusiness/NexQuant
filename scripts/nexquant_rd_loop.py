@@ -76,6 +76,7 @@ TIMEFRAMES = ["15min", "30min", "1h", "4h"]
 INDICATORS_POOL = ["MACD", "RSI", "BBands", "Donchian", "Stoch", "CCI", "WillR", "ADX", "SAR", "ROC", "MOM", "AROON", "MFI", "SMA", "EMA"]
 STRATEGY_TYPES = ["single", "multi_tf", "portfolio"]
 MIN_SHARPE, MIN_TRADES = 0.5, 20
+EXPLORATION_RATE = 0.30  # 30% explore, 70% exploit
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Evaluation
@@ -505,9 +506,9 @@ def main():
         if (i + 1) % 100 == 0:
             loop.record()
 
-        # Adaptive exploration: reduce over time as SOTA grows
+        # Adaptive exploration: higher rate needed for indicator discovery
         if len(loop.sota) > 10:
-            loop.exploration_rate = max(0.1, 0.3 - len(loop.sota) * 0.01)
+            loop.exploration_rate = max(0.15, EXPLORATION_RATE - len(loop.sota) * 0.005)
 
     # Final
     elapsed = time.time() - t0
