@@ -72,9 +72,11 @@ def _backtest_numba(prices, signals, cost=0.000264):
     
     return equity, max_dd, trade_count, wins, total_ret, sharpe, trades[:trade_count]
 
-TIMEFRAMES = ["15min", "30min", "1h", "4h"]
+TIMEFRAMES = ["5min", "15min", "30min", "1h", "4h"]
 INDICATORS_POOL = ["MACD", "RSI", "BBands", "Donchian", "Stoch", "CCI", "WillR", "ADX", "SAR", "ROC", "MOM", "AROON", "MFI", "SMA", "EMA"]
-STRATEGY_TYPES = ["single", "multi_tf", "portfolio"]
+STRATEGY_TYPES = ["single", "multi_tf", "portfolio", "multi_role"]
+TREND_TFS = ["30min", "1h", "4h"]    # higher TFs for trend filter
+ENTRY_TFS = ["5min", "15min", "30min"]  # lower TFs for entry
 MIN_SHARPE, MIN_TRADES = 0.5, 20
 EXPLORATION_RATE = 0.30  # 30% explore, 70% exploit
 
@@ -124,6 +126,25 @@ def evaluate_strategy(close, hypothesis):
         vote = port.mean(axis=1)
         signal = pd.Series(0, index=vote.index)
         signal[vote > 0.25] = 1; signal[vote < -0.25] = -1
+
+    elif hypothesis['type'] == 'multi_role':
+        # Trend filter (higher TF) + Entry signal (lower TF) with directional gating
+        trend_ind = hypothesis['trend_ind']
+        entry_ind = hypothesis['entry_ind']
+        trend_tf = hypothesis['trend_tf']
+        entry_tf = hypothesis['entry_tf']
+        # Build trend signal on higher TF, forward-fill to lower TF
+        trend_bars = close.resample(trend_tf).last().dropna()
+        trend_sig = _build_indicator_signal(trend_ind, trend_bars, hypothesis['trend_params'])
+        trend_sig = trend_sig.reindex(close.index).ffill().fillna(0).astype(int).clip(-1, 1)
+        # Build entry signal on lower TF
+        entry_bars = close.resample(entry_tf).last().dropna()
+        entry_sig = _build_indicator_signal(entry_ind, entry_bars, hypothesis['entry_params'])
+        entry_sig = entry_sig.reindex(close.index).ffill().fillna(0).astype(int).clip(-1, 1)
+        # GATE: entry only fires when trend confirms direction
+        signal = pd.Series(0, index=close.index)
+        signal[(trend_sig == 1) & (entry_sig == 1)] = 1    # long trend + long entry
+        signal[(trend_sig == -1) & (entry_sig == -1)] = -1  # short trend + short entry
 
     if signal is None or signal.nunique() <= 1:
         return {"sharpe": 0, "monthly_pct": 0, "max_dd": 0, "n_trades": 0, "win_rate": 0}
@@ -255,6 +276,18 @@ class ResearchLoop:
             params = self._random_params(ind)
             return {'type': 'multi_tf', 'indicator': ind, 'timeframes': tfs, 'params': params,
                     'description': f"{ind} on {','.join(tfs)}", 'generation': 'explore'}
+        elif stype == 'multi_role':
+            trend_ind = random.choice(INDICATORS_POOL)
+            entry_ind = random.choice(INDICATORS_POOL)
+            trend_tf = random.choice(TREND_TFS)
+            entry_tf = random.choice([t for t in ENTRY_TFS if t < trend_tf])
+            trend_p = self._random_params(trend_ind)
+            entry_p = self._random_params(entry_ind)
+            return {'type': 'multi_role',
+                    'trend_ind': trend_ind, 'trend_params': trend_p, 'trend_tf': trend_tf,
+                    'entry_ind': entry_ind, 'entry_params': entry_p, 'entry_tf': entry_tf,
+                    'description': f"{trend_ind}({trend_tf})→{entry_ind}({entry_tf})",
+                    'generation': 'explore'}
         else:
             i1, i2 = random.sample(INDICATORS_POOL, 2)
             p1 = self._random_params(i1); p2 = self._random_params(i2)
@@ -264,9 +297,42 @@ class ResearchLoop:
     def _mutate_hypothesis(self, base):
         """Mutate an existing hypothesis — change one aspect."""
         hp = dict(base)  # shallow copy
+        hp['generation'] = 'exploit'
+
+        # multi_role has its own mutation logic
+        if hp.get('type') == 'multi_role':
+            mut = random.choice(['trend_ind', 'entry_ind', 'trend_tf', 'entry_tf',
+                                 'trend_params', 'entry_params'])
+            if mut == 'trend_ind':
+                hp['trend_ind'] = random.choice([i for i in INDICATORS_POOL if i != hp['trend_ind']])
+                hp['trend_params'] = self._random_params(hp['trend_ind'])
+                hp['description'] = f"{hp['trend_ind']}({hp['trend_tf']})→{hp['entry_ind']}({hp['entry_tf']})"
+            elif mut == 'entry_ind':
+                hp['entry_ind'] = random.choice([i for i in INDICATORS_POOL if i != hp['entry_ind']])
+                hp['entry_params'] = self._random_params(hp['entry_ind'])
+                hp['description'] = f"{hp['trend_ind']}({hp['trend_tf']})→{hp['entry_ind']}({hp['entry_tf']})"
+            elif mut == 'trend_tf':
+                hp['trend_tf'] = random.choice(TREND_TFS)
+                if hp['trend_tf'] <= hp['entry_tf']:
+                    hp['entry_tf'] = random.choice([t for t in ENTRY_TFS if t < hp['trend_tf']])
+                hp['description'] = f"{hp['trend_ind']}({hp['trend_tf']})→{hp['entry_ind']}({hp['entry_tf']})"
+            elif mut == 'entry_tf':
+                hp['entry_tf'] = random.choice([t for t in ENTRY_TFS if t < hp['trend_tf']])
+                hp['description'] = f"{hp['trend_ind']}({hp['trend_tf']})→{hp['entry_ind']}({hp['entry_tf']})"
+            elif mut == 'trend_params':
+                p = dict(hp['trend_params']); k = random.choice(list(p.keys()))
+                if isinstance(p[k], (int, float)): p[k] = p[k] * random.uniform(0.5, 1.5)
+                hp['trend_params'] = p
+                hp['description'] = f"{hp['trend_ind']}({hp['trend_tf']})→{hp['entry_ind']}({hp['entry_tf']}) (tuned)"
+            elif mut == 'entry_params':
+                p = dict(hp['entry_params']); k = random.choice(list(p.keys()))
+                if isinstance(p[k], (int, float)): p[k] = p[k] * random.uniform(0.5, 1.5)
+                hp['entry_params'] = p
+                hp['description'] = f"{hp['trend_ind']}({hp['trend_tf']})→{hp['entry_ind']}({hp['entry_tf']}) (tuned)"
+            return hp
+
         mutations = ['params', 'indicator', 'timeframe']
         mutation = random.choice(mutations)
-        hp['generation'] = 'exploit'
 
         if mutation == 'params' and 'params' in hp:
             # Tweak one parameter
