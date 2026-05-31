@@ -78,7 +78,7 @@ STRATEGY_TYPES = ["single", "multi_tf", "portfolio", "multi_role"]
 TREND_TFS = ["30min", "1h", "4h"]    # higher TFs for trend filter
 ENTRY_TFS = ["5min", "15min", "30min"]  # lower TFs for entry
 MIN_SHARPE, MIN_TRADES = 0.5, 20
-EXPLORATION_RATE = 0.30  # 30% explore, 70% exploit
+EXPLORATION_RATE = 0.40  # 40% explore, 60% exploit
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Evaluation
@@ -256,7 +256,39 @@ class ResearchLoop:
                     'description': f"ML: LightGBM on {len(self.sota)} strategies",
                     'sota': self.sota[:5]}
         
-        if random.random() < self.exploration_rate or not self.sota:
+        # Every 100 iterations: force non-dominant indicator exploration
+        if self.iteration % 100 == 0 and len(self.sota) >= 5:
+            top_ind = self.sota[0]['hypothesis'].get('trend_ind', self.sota[0]['hypothesis'].get('indicator'))
+            hp = self._random_hypothesis()
+            # Ensure at least one role uses a different indicator
+            if hp.get('type') == 'multi_role' and hp['trend_ind'] == top_ind and hp['entry_ind'] == top_ind:
+                if random.random() < 0.5:
+                    hp['trend_ind'] = random.choice([i for i in INDICATORS_POOL if i != top_ind])
+                    hp['trend_params'] = self._random_params(hp['trend_ind'])
+                else:
+                    hp['entry_ind'] = random.choice([i for i in INDICATORS_POOL if i != top_ind])
+                    hp['entry_params'] = self._random_params(hp['entry_ind'])
+                hp['description'] = f"{hp['trend_ind']}({hp['trend_tf']})→{hp['entry_ind']}({hp['entry_tf']})"
+            elif hp.get('type') == 'single' and hp.get('indicator') == top_ind:
+                hp['indicator'] = random.choice([i for i in INDICATORS_POOL if i != top_ind])
+                hp['params'] = self._random_params(hp['indicator'])
+                hp['description'] = f"{hp['indicator']} on {hp['timeframe']}"
+            elif hp.get('type') == 'multi_tf' and hp.get('indicator') == top_ind:
+                hp['indicator'] = random.choice([i for i in INDICATORS_POOL if i != top_ind])
+                hp['params'] = self._random_params(hp['indicator'])
+                hp['description'] = f"{hp['indicator']} on {','.join(hp['timeframes'][:2])}"
+            hp['generation'] = 'explore'
+            return hp
+
+        # Boost exploration when SOTA is dominated by one indicator
+        effective_rate = self.exploration_rate
+        if len(self.sota) >= 10:
+            top_ind = self.sota[0]['hypothesis'].get('trend_ind', self.sota[0]['hypothesis'].get('indicator'))
+            dominated = sum(1 for r in self.sota if r['hypothesis'].get('trend_ind', r['hypothesis'].get('indicator')) == top_ind)
+            if dominated > len(self.sota) * 0.8:  # >80% same indicator
+                effective_rate += 0.25  # +25% explore boost
+        
+        if random.random() < effective_rate or not self.sota:
             return self._random_hypothesis()
         else:
             base = random.choice(self.sota[:5])
