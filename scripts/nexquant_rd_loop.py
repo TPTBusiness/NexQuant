@@ -22,7 +22,8 @@ RESULTS_DIR = PROJECT / "results" / "rd_loop"
 STATE_DIR = PROJECT / "git_ignore_folder" / "rd_loop_state"
 
 INSTRUMENTS = ["EURUSD", "GBPUSD", "BTCUSD"]
-INSTRUMENT_ALIASES = {"GBPUSDT": "GBPUSD"}  # Merge aliases under canonical name
+INSTRUMENT_ALIASES = {"GBPUSDT": "GBPUSD"}
+LEADER_MAP = {"GBPUSD": "EURUSD"}  # Cross-pair: GBP confirms with EUR
 TIMEFRAMES = ["5min", "15min", "30min", "1h", "4h"]
 INDICATORS_POOL = ["MACD", "RSI", "BBands", "Donchian", "Stoch", "CCI", "WillR", "ADX", "SAR", "ROC", "MOM", "AROON", "MFI", "SMA", "EMA"]
 STRATEGY_TYPES = ["single", "multi_tf", "multi_role"]
@@ -157,6 +158,65 @@ def _apply_vola_filter(signal, close, atr_period=14, min_atr_pct=0.0003):
     return (signal * (~too_quiet).astype(int)).fillna(0).astype(int).clip(-1, 1)
 
 
+_NEWS_CACHE = None
+def _load_news_events():
+    """Load high-impact news events from YAML, return dict of currency → DatetimeIndex mask."""
+    global _NEWS_CACHE
+    if _NEWS_CACHE is not None:
+        return _NEWS_CACHE
+    import yaml
+    news_file = PROJECT / "git_ignore_folder" / "economic_events_full.yaml"
+    if not news_file.exists():
+        _NEWS_CACHE = {}
+        return _NEWS_CACHE
+    with open(news_file) as f:
+        data = yaml.safe_load(f)
+    events = {}
+    for evt in data.get('events', []):
+        if evt.get('impact') != 'high':
+            continue
+        dt = pd.Timestamp(evt['datetime'])
+        currency = evt.get('currency', 'USD')
+        if currency not in events:
+            events[currency] = []
+        events[currency].append(dt)
+    _NEWS_CACHE = events
+    return _NEWS_CACHE
+
+
+def _apply_news_filter(signal, index, currency, window_min=5):
+    """Block trades during high-impact news events (+/- window_min)."""
+    events = _load_news_events()
+    if currency not in events and currency[:3] not in events:
+        return signal
+    key = currency if currency in events else currency[:3]
+    timestamps = events.get(key, [])
+    if not timestamps:
+        return signal
+
+    blocked = np.zeros(len(index), dtype=bool)
+    for ts in timestamps:
+        start = ts - pd.Timedelta(minutes=window_min)
+        end = ts + pd.Timedelta(minutes=window_min)
+        mask = (index >= start) & (index <= end)
+        blocked |= mask
+
+    return (signal * (~blocked).astype(int)).astype(int).clip(-1, 1)
+
+
+def _apply_cross_confirm(signal, close_follower, close_leader, lookback=5, min_pct=0.0003):
+    """Cancel follower signals when leader momentum strongly opposes (>0.03% move)."""
+    leader_mom = close_leader.pct_change(lookback)
+    leader_mom = leader_mom.reindex(signal.index, method='ffill')
+
+    # Only BLOCK when leader moves strongly opposite to signal
+    # Don't require confirmation — just cancel clear contrarian moves
+    cancel_long = (signal == 1) & (leader_mom < -min_pct)
+    cancel_short = (signal == -1) & (leader_mom > min_pct)
+    cancel = cancel_long | cancel_short
+    return (signal * (~cancel).astype(int)).fillna(0).astype(int).clip(-1, 1)
+
+
 def _build_indicator_signal(name, bars, params):
     """Build indicator signal using talib + hand-rolled."""
     import talib
@@ -242,6 +302,14 @@ def evaluate_multi(closes, hypothesis, use_session=True, use_vola=True):
             signal = _apply_session_filter(signal, close.index)
         if use_vola:
             signal = _apply_vola_filter(signal, close)
+
+        # News filter: block trades during high-impact events for this currency
+        signal = _apply_news_filter(signal, close.index, inst.replace("USD", "").replace("BTC", "BTC"))
+
+        # Cross-pair confirmation: validate follower with leader momentum
+        leader_inst = LEADER_MAP.get(inst)
+        if leader_inst and leader_inst in closes:
+            signal = _apply_cross_confirm(signal, close, closes[leader_inst])
 
         if signal.nunique() <= 1:
             results[inst] = {"sharpe": 0, "monthly_pct": 0, "n_trades": 0}
