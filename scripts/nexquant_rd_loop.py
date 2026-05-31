@@ -86,6 +86,14 @@ def evaluate_strategy(close, hypothesis):
     import talib
     signal = None
 
+    # Optuna optimization branch
+    if hypothesis.get('generation') == 'optuna':
+        return _run_optuna(close, hypothesis)
+    
+    # ML training branch
+    if hypothesis.get('type') == 'ml':
+        return _train_ml(close, hypothesis)
+
     if hypothesis['type'] == 'single':
         ind = hypothesis['indicator']
         tf = hypothesis['timeframe']
@@ -210,19 +218,25 @@ class ResearchLoop:
         self.exploration_rate = 0.3  # % of time we explore randomly vs exploit SOTA
 
     def hypothesize(self):
-        """Generate a new strategy hypothesis.
-        
-        Uses a bandit-inspired approach:
-        - 70%: Exploit — mutate the best-known strategy
-        - 30%: Explore — random new strategy
-        """
         self.iteration += 1
         
+        # Every 500 iterations: Optuna-optimize best strategy
+        if self.iteration % 500 == 0 and self.sota:
+            best = self.sota[0]
+            hp = dict(best['hypothesis'])
+            hp['generation'] = 'optuna'
+            hp['description'] = f"Optuna: {hp.get('description','?')}"
+            return hp
+        
+        # Every 2000 iterations: train ML model
+        if self.iteration % 2000 == 0 and len(self.sota) >= 5:
+            return {'type': 'ml', 'generation': 'ml',
+                    'description': f"ML: LightGBM on {len(self.sota)} strategies",
+                    'sota': self.sota[:5]}
+        
         if random.random() < self.exploration_rate or not self.sota:
-            # EXPLORE: random new strategy
             return self._random_hypothesis()
         else:
-            # EXPLOIT: mutate the best strategy
             base = random.choice(self.sota[:5])
             return self._mutate_hypothesis(base['hypothesis'])
 
@@ -317,6 +331,131 @@ class ResearchLoop:
 
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Optuna Optimization
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _run_optuna(close, hypothesis):
+    """Run Optuna hyperparameter optimization on a strategy."""
+    import optuna
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    
+    hp = hypothesis
+    ind = hp.get('indicator', 'MACD')
+    tfs = hp.get('timeframes', ['15min','30min','1h','4h'])
+    base_params = hp.get('params', {})
+    
+    param_ranges = {
+        'MACD': {'fast': (2,15), 'slow': (5,40), 'sig': (2,15)},
+        'RSI': {'period': (5,30), 'oversold': (10,40), 'overbought': (60,90)},
+        'Donchian': {'period': (3,100), 'hold': (1,10)},
+        'SAR': {'accel': (0.01, 0.2), 'max_accel': (0.1, 1.0)},
+        'ADX': {'period': (5,30), 'threshold': (10,40)},
+    }
+    ranges = param_ranges.get(ind, {})
+    
+    def objective(trial):
+        params = {}
+        for k, (lo, hi) in ranges.items():
+            if isinstance(base_params.get(k, 1), int):
+                params[k] = trial.suggest_int(k, int(lo), int(hi))
+            else:
+                params[k] = trial.suggest_float(k, lo, hi)
+        params['fast'] = min(params.get('fast',99), params.get('slow',99)-2)
+        
+        sigs = {}
+        for tf in tfs:
+            bars = close.resample(tf).last().dropna()
+            sig = _build_indicator_signal(ind, bars, params)
+            sigs[tf] = sig.reindex(close.index).ffill().fillna(0).astype(int).clip(-1,1)
+        port = pd.DataFrame(sigs).dropna(); vote = port.mean(axis=1)
+        signal = pd.Series(0, index=vote.index)
+        signal[vote > 0.25] = 1; signal[vote < -0.25] = -1
+        
+        prices = close.values.astype(np.float64); sigs_arr = signal.values.astype(np.int32)
+        _, dd, tr, wins, total_ret, sharpe, _ = _backtest_numba(prices, sigs_arr)
+        return float(sharpe) if sharpe > 0 else -999.0
+    
+    try:
+        study = optuna.create_study(direction='maximize')
+        study.optimize(objective, n_trials=20, show_progress_bar=False)
+        best = study.best_params
+        hp['params'] = {k: int(v) if v == int(v) else v for k, v in best.items()}
+        hp['description'] = f"Optuna: {ind} on {','.join(tfs[:2])}"
+        hp['generation'] = 'optuna'
+        # Re-evaluate with best params
+        sigs = {}
+        for tf in tfs:
+            bars = close.resample(tf).last().dropna()
+            sig = _build_indicator_signal(ind, bars, hp['params'])
+            sigs[tf] = sig.reindex(close.index).ffill().fillna(0).astype(int).clip(-1,1)
+        port = pd.DataFrame(sigs).dropna(); vote = port.mean(axis=1)
+        signal = pd.Series(0, index=vote.index)
+        signal[vote > 0.25] = 1; signal[vote < -0.25] = -1
+        prices = close.values.astype(np.float64); sigs_arr = signal.values.astype(np.int32)
+        eq, dd, tr, wins, ret, sh, _ = _backtest_numba(prices, sigs_arr)
+        n_days = (close.index[-1] - close.index[0]).days
+        mon = ((1+ret)**(1/(n_days/30.44))-1)*100 if ret > -1 else 0
+        print(f"    Optuna best: {best} → Sh={sh:.1f} Mon={mon:.1f}% ({study.best_value:.1f})")
+        return {"sharpe": float(sh), "monthly_pct": float(mon), "max_dd": float(-dd),
+                "n_trades": int(tr), "win_rate": float(wins/tr) if tr>0 else 0,
+                "optuna_best": best, "optuna_value": float(study.best_value)}
+    except Exception as e:
+        return {"sharpe": 0, "monthly_pct": 0, "max_dd": 0, "n_trades": 0, "win_rate": 0}
+
+
+def _train_ml(close, hypothesis):
+    """Train LightGBM classifier on indicator signals to predict direction."""
+    try:
+        from lightgbm import LGBMClassifier
+    except ImportError:
+        return {"sharpe": 0, "monthly_pct": 0, "max_dd": 0, "n_trades": 0, "win_rate": 0}
+    
+    sota = hypothesis.get('sota', [])
+    if not sota: return {"sharpe": 0, "monthly_pct": 0, "max_dd": 0, "n_trades": 0, "win_rate": 0}
+    
+    # Generate features from all SOTA strategies
+    daily = close.resample('1h').last().dropna()
+    features = pd.DataFrame(index=daily.index)
+    
+    for s in sota[:5]:
+        hp_s = s['hypothesis']
+        ind = hp_s.get('indicator', 'MACD')
+        sig = _build_indicator_signal(ind, daily, hp_s.get('params', {}))
+        features[f"{ind}_{hp_s.get('generation','?')}"] = sig
+    
+    features = features.fillna(0)
+    # Target: next bar direction (1=up, 0=down)
+    target = (daily.pct_change().shift(-1) > 0).astype(int)
+    target = target.reindex(features.index).fillna(0)
+    
+    # Train/test split (80/20)
+    split = int(len(features) * 0.8)
+    X_train, X_test = features.iloc[:split], features.iloc[split:]
+    y_train, y_test = target.iloc[:split], target.iloc[split:]
+    
+    if len(X_train) < 100: return {"sharpe": 0, "monthly_pct": 0, "max_dd": 0, "n_trades": 0, "win_rate": 0}
+    
+    model = LGBMClassifier(n_estimators=100, max_depth=5, verbosity=-1)
+    model.fit(X_train, y_train)
+    preds = model.predict(X_test)
+    
+    # Convert predictions to trading signal
+    ml_signal = pd.Series(0, index=X_test.index)
+    ml_signal[preds == 1] = 1; ml_signal[preds == 0] = -1
+    ml_signal = ml_signal.reindex(close.index).ffill().fillna(0).astype(int).clip(-1,1)
+    
+    prices = close.values.astype(np.float64); sigs = ml_signal.values.astype(np.int32)
+    eq, dd, tr, wins, ret, sh, _ = _backtest_numba(prices, sigs)
+    n_days = (close.index[-1] - close.index[0]).days
+    mon = ((1+ret)**(1/(n_days/30.44))-1)*100 if ret > -1 else 0
+    acc = (preds == y_test).mean()
+    print(f"    ML LightGBM: Test acc={acc:.1%} → Sh={sh:.1f} Mon={mon:.1f}% Tr={tr}")
+    return {"sharpe": float(sh), "monthly_pct": float(mon), "max_dd": float(-dd),
+            "n_trades": int(tr), "win_rate": float(wins/tr) if tr>0 else 0,
+            "ml_accuracy": float(acc), "ml_model": "LightGBM"}
+
+
 def main():
     iterations = 200
     if "--iterations" in sys.argv:
@@ -339,7 +478,10 @@ def main():
         hp = loop.hypothesize()
 
         # 2. EVALUATE
-        result = evaluate_strategy(close, hp)
+        try:
+            result = evaluate_strategy(close, hp)
+        except Exception:
+            continue  # skip bad parameters
         result['hypothesis'] = hp
         result['iteration'] = i + 1
         result['timestamp'] = datetime.now().isoformat()
