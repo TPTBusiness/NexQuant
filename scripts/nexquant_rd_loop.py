@@ -286,7 +286,7 @@ def _build_indicator_signal(name, bars, params):
 # Multi-Instrument Evaluation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def evaluate_multi(closes, hypothesis, use_session=True, use_vola=True):
+def evaluate_multi(closes, hypothesis, use_session=True, use_vola=False):
     """Evaluate strategy on all instruments, return combined metrics + per-instrument."""
     results = {}
     equity_curves = {}
