@@ -22,9 +22,12 @@ RESULTS_DIR = PROJECT / "results" / "rd_loop"
 STATE_DIR = PROJECT / "git_ignore_folder" / "rd_loop_state"
 
 INSTRUMENTS = ["EURUSD", "GBPUSD", "BTCUSD", "XAUUSD"]
-INSTRUMENT_ALIASES = {"GBPUSDT": "GBPUSD"}
-LEADER_MAP = {"GBPUSD": "EURUSD"}  # Cross-pair: GBP confirms with EUR
-TIMEFRAMES = ["5min", "15min", "30min", "1h", "4h"]
+LEADER_MAP = {"GBPUSD": "EURUSD"}
+INSTRUMENT_TIMEFRAMES = {
+    "XAUUSD": ["1d", "1w"],           # Daily data → daily/weekly TFs
+    "default": ["5min", "15min", "30min", "1h", "4h"],
+}
+TIMEFRAMES = ["5min", "15min", "30min", "1h", "4h", "1d", "1w"]
 INDICATORS_POOL = ["MACD", "RSI", "BBands", "Donchian", "Stoch", "CCI", "WillR", "ADX", "SAR", "ROC", "MOM", "AROON", "MFI", "SMA", "EMA"]
 STRATEGY_TYPES = ["single", "multi_tf", "multi_role"]
 TREND_TFS = ["30min", "1h", "4h"]
@@ -101,6 +104,25 @@ def build_signal(close, hypothesis):
     import talib
     signal = None
 
+    # Adapt timeframes to data frequency
+    median_delta = (close.index[1:] - close.index[:-1]).median()
+    if median_delta > pd.Timedelta("1h"):
+        valid_tfs = ["1d", "1w"]
+        tf_map = {"5min": "1d", "15min": "1d", "30min": "1d", "1h": "1d", "4h": "1w"}
+        # Remap hypothesis timeframes
+        hp = dict(hypothesis)
+        if hp.get('type') in ('single', 'multi_tf') and 'timeframe' in hp:
+            hp['timeframe'] = tf_map.get(hp.get('timeframe','1h'), '1d')
+        if hp.get('type') == 'multi_tf' and 'timeframes' in hp:
+            hp['timeframes'] = [tf_map.get(t, '1d') for t in hp['timeframes']]
+            hp['timeframes'] = list(set(hp['timeframes']))  # dedup
+        if hp.get('type') == 'multi_role':
+            hp['trend_tf'] = tf_map.get(hp.get('trend_tf','4h'), '1w')
+            hp['entry_tf'] = tf_map.get(hp.get('entry_tf','15min'), '1d')
+        hypothesis = hp
+    else:
+        valid_tfs = ["5min", "15min", "30min", "1h", "4h"]
+
     if hypothesis['type'] == 'single':
         ind = hypothesis['indicator']; tf = hypothesis['timeframe']
         bars = close.resample(tf).last().dropna()
@@ -136,7 +158,10 @@ def build_signal(close, hypothesis):
 
 
 def _apply_session_filter(signal, index):
-    """Only trade London session (07:00-16:00 UTC Mon-Fri)."""
+    """Only trade London session (07:00-16:00 UTC Mon-Fri). Skip for daily data."""
+    delta = (index[1:] - index[:-1]).median() if len(index) > 1 else pd.Timedelta("1min")
+    if delta > pd.Timedelta("1h"):
+        return signal  # Skip session filter for daily/weekly data
     hours = index.hour
     days = index.dayofweek
     in_session = (days < 5) & (hours >= 7) & (hours < 16)
