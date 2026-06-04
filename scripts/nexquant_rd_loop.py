@@ -21,7 +21,7 @@ OHLCV_PATH = Path(os.getenv("PREDIX_OHLCV_PATH",
 RESULTS_DIR = PROJECT / "results" / "rd_loop"
 STATE_DIR = PROJECT / "git_ignore_folder" / "rd_loop_state"
 
-INSTRUMENTS = ["EURUSD", "GBPUSD", "BTCUSD"]
+INSTRUMENTS = ["EURUSD", "GBPUSD", "BTCUSD", "XAUUSD"]
 INSTRUMENT_ALIASES = {"GBPUSDT": "GBPUSD"}
 LEADER_MAP = {"GBPUSD": "EURUSD"}  # Cross-pair: GBP confirms with EUR
 TIMEFRAMES = ["5min", "15min", "30min", "1h", "4h"]
@@ -768,6 +768,7 @@ def load_data():
         "EURUSD": OHLCV_PATH,
         "GBPUSD": data_dir / "gbpusdt_1min.h5",
         "BTCUSD": data_dir / "btc_1min.h5",
+        "XAUUSD": data_dir / "xauusdt_1min.h5",
     }
     for inst, path in instrument_files.items():
         if inst in closes:
