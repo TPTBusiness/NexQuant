@@ -19,7 +19,7 @@
     "dependencies": {
         "axios": "^1.16.0",
         "crypto-js": "^4.2.0",
-        "echarts": "^5.5.1",
+        "echarts": "^6.1.0",
         "element-plus": "^2.7.8",
         "github-markdown-css": "^5.8.1",
         "highlight.js": "^11.11.1",
@@ -32,12 +32,12 @@
         "postcss": "^8.5.14",
         "prismjs": "^1.30.0",
         "vue": "^3.4.21",
-        "vue-echarts": "^7.0.3",
+        "vue-echarts": "^8.0.1",
         "vue-router": "^4.3.0"
     },
     "devDependencies": {
         "@vitejs/plugin-vue": "^5.2.4",
-        "echarts-gl": "^2.0.9",
+        "echarts-gl": "^2.1.0",
         "fast-glob": "^3.3.2",
         "path": "^0.12.7",
         "sass": "^1.77.4",
