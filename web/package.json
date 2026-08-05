@@ -29,7 +29,7 @@
         "markdown-it": "^14.1.1",
         "markdown-it-texmath": "^1.0.0",
         "marked": "^15.0.4",
-        "postcss": "^8.5.14",
+        "postcss": "^8.5.23",
         "prismjs": "^1.30.0",
         "vue": "^3.4.21",
         "vue-echarts": "^7.0.3",
